@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Music Downloader</string>
+    <string name="url_hint">Pega la URL de YouTube / YouTube Music</string>
+    <string name="download">Descargar</string>
+    <string name="downloading">Descargando...</string>
+    <string name="extracting">Extrayendo información...</string>
+    <string name="fetching_metadata">Buscando metadata...</string>
+    <string name="completed">Completado</string>
+    <string name="error">Error</string>
+    <string name="channel_notification">Descargas activas</string>
+</resources>

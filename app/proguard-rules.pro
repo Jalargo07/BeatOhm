@@ -1,0 +1,4 @@
+-keep class org.schabi.newpipe.** { *; }
+-keep class org.jaudiotagger.** { *; }
+-dontwarn org.jaudiotagger.**
+-dontwarn org.schabi.newpipe.**

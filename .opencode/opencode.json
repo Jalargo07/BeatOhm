@@ -1,0 +1,36 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": "DevTeam",
+  "default_agent": "general",
+
+  "agent": {},
+
+  "command": {
+    "plan": {
+      "description": "Inicia la fase de Planning para un nuevo requerimiento. Preguntá: ¿Qué funcionalidad querés desarrollar?",
+      "agent": "planning",
+      "template": "El usuario quiere: $ARGUMENTS. Actuá como Planning Agent. Hacé todas las preguntas necesarias para clarificar el requerimiento, confirmá tu entendimiento con el usuario, y generá un PLAN.md detallado en la raíz del proyecto."
+    },
+    "code": {
+      "description": "Ejecuta la fase de Coder: toma el PLAN.md y lo implementa",
+      "agent": "coder",
+      "template": "Ejecutá la fase de Coder. Leé PLAN.md, implementá cada tarea siguiendo las reglas de .opencode/agents/coder.md. Verificá que compile correctamente al finalizar."
+    },
+    "review": {
+      "description": "Ejecuta la fase de Reviewer: revisa el código contra el PLAN.md",
+      "agent": "reviewer",
+      "template": "Ejecutá la fase de Reviewer. Leé PLAN.md y el código implementado. Revisá contra los criterios de .opencode/agents/reviewer.md. Generá REVIEW.md con los resultados."
+    },
+    "document": {
+      "description": "Ejecuta la fase de Documenter: genera manuales y README",
+      "agent": "documenter",
+      "template": "Ejecutá la fase de Documenter. Leé PLAN.md, REVIEW.md y el código fuente. Generá MANUAL_USUARIO.md, MANUAL_TECNICO.md y actualizá README.md según .opencode/agents/documenter.md."
+    },
+    "develop": {
+      "description": "Pipeline completo: Planning → Coder → Reviewer → Documenter. Ejecuta el flujo completo para un requerimiento.",
+      "agent": "general",
+      "subtask": true,
+      "template": "Ejecutá el pipeline completo de desarrollo:\n\n1. **Planning**: Actuá como Planning Agent. Entendé el requerimiento: $ARGUMENTS. Hacé preguntas, clarificá, y generá PLAN.md.\n2. **Coder**: Tomá el PLAN.md e implementá el código. Seguí las reglas de .opencode/agents/coder.md.\n3. **Reviewer**: Revisá el código contra el PLAN.md. Generá REVIEW.md.\n4. **Documenter**: Generá MANUAL_USUARIO.md, MANUAL_TECNICO.md y actualizá README.md.\n\nCada fase debe completarse antes de pasar a la siguiente. Si una fase encuentra errores, corregilos antes de avanzar."
+    }
+  }
+}
