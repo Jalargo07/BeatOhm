@@ -124,12 +124,20 @@ class YouTubeExtractor {
             }
 
             val best = formats.maxByOrNull { it.bitrate } ?: formats.first()
-            Log.d(TAG, "Mejor audio: ${best.bitrate}bps - ${best.mimeType}")
+            val ipParam = extractQueryParam(best.url, "ip")
+            Log.e(TAG, "Mejor audio: ${best.bitrate}bps - ${best.mimeType} ip=$ipParam")
+            Log.e(TAG, "URL audio: ${best.url}")
             Result.success(best)
         } catch (e: Exception) {
             Log.e(TAG, "Error obteniendo audio", e)
             Result.failure(e)
         }
+    }
+
+    private fun extractQueryParam(url: String, param: String): String? {
+        val regex = Regex("[?&]$param=([^&]+)")
+        val match = regex.find(url) ?: return null
+        return java.net.URLDecoder.decode(match.groupValues[1], "UTF-8")
     }
 
     private fun callInnerTubePlayer(videoId: String): JsonElement? {

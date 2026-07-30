@@ -1,5 +1,6 @@
 package com.musicdownloader.downloader
 
+import android.content.Context
 import android.util.Log
 import com.musicdownloader.model.Song
 import kotlinx.coroutines.Dispatchers
@@ -13,92 +14,100 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
-class AudioDownloader {
+class AudioDownloader(private val context: Context) {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
         .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     suspend fun downloadAudio(
         audioUrl: String,
+        mimeType: String,
         song: Song,
         outputDir: File,
         onProgress: (Int) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Descargando audio: $audioUrl")
-            Log.d(TAG, "Directorio: ${outputDir.absolutePath}")
-            if (!outputDir.exists()) {
-                outputDir.mkdirs()
-                Log.d(TAG, "Directorio creado: ${outputDir.exists()}")
-            }
+            Log.e(TAG, "INICIO descarga: ${audioUrl.take(80)}...")
 
-            val ext = detectExtension(audioUrl)
+            if (!outputDir.exists()) outputDir.mkdirs()
+
+            val ext = detectExtension(mimeType, audioUrl)
             val tempFile = File(outputDir, "${song.fileName}_temp$ext")
             val finalFile = File(outputDir, "${song.fileName}.mp3")
 
             if (finalFile.exists()) {
-                return@withContext Result.success(finalFile)
+                if (finalFile.length() > 0) {
+                    Log.e(TAG, "Ya existe: ${finalFile.name} (${finalFile.length() / 1024}KB)")
+                    return@withContext Result.success(finalFile)
+                } else {
+                    Log.e(TAG, "Archivo vacio previo, borrando: ${finalFile.name}")
+                    finalFile.delete()
+                }
             }
+            tempFile.delete()
 
             val request = Request.Builder()
                 .url(audioUrl)
-                .header("User-Agent", USER_AGENT)
-                .get()
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build()
 
             val response = client.newCall(request).execute()
-            val body = response.body ?: return@withContext Result.failure(Exception("Empty response body"))
+            val body = response.body
+            val code = response.code
 
-            val totalBytes = body.contentLength()
+            Log.e(TAG, "HTTP $code len=${body?.contentLength()} type=${body?.contentType()}")
+
+            if (code != 200) {
+                val err = try { body?.string()?.take(300) } catch (_: Exception) { null }
+                Log.e(TAG, "HTTP $code body=${err ?: "vacio"}")
+                response.close()
+                return@withContext Result.failure(Exception("HTTP $code"))
+            }
+
+            val totalBytes = body?.contentLength() ?: -1L
             var downloadedBytes = 0L
 
-            val buffer = ByteArray(8192)
-            val fileStream = FileOutputStream(tempFile)
-            val inputStream = body.byteStream()
-
-            inputStream.use { input ->
-                fileStream.use { output ->
+            FileOutputStream(tempFile).use { output ->
+                body!!.byteStream().use { input ->
+                    val buffer = ByteArray(8192)
                     var bytesRead: Int
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
                         downloadedBytes += bytesRead
                         if (totalBytes > 0) {
-                            val progress = ((downloadedBytes * 100) / totalBytes).toInt()
-                            onProgress(progress.coerceIn(0, 100))
+                            onProgress(((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 100))
                         }
                     }
                 }
             }
+            response.close()
 
-            val mp3File = convertToMp3(tempFile, finalFile)
-            if (mp3File.exists()) {
+            if (downloadedBytes == 0L) {
                 tempFile.delete()
+                return@withContext Result.failure(Exception("0 bytes descargados"))
             }
 
+            val mp3File = convertToMp3(tempFile, finalFile)
+            if (mp3File.exists()) tempFile.delete()
             writeMetadata(mp3File, song)
 
+            Log.e(TAG, "OK: ${mp3File.name} (${mp3File.length() / 1024}KB)")
             Result.success(mp3File)
         } catch (e: Exception) {
+            Log.e(TAG, "Error downloadAudio: ${e.message}")
             Result.failure(e)
         }
     }
 
     private fun convertToMp3(input: File, output: File): File {
-        return if (input.extension == "mp3" || input.extension == "m4a") {
-            if (output.exists()) output
-            else {
-                input.copyTo(output, overwrite = true)
-                output
-            }
-        } else {
-            if (output.exists()) output
-            else {
-                input.copyTo(output, overwrite = true)
-                output
-            }
+        return if (output.exists()) output
+        else {
+            input.copyTo(output, overwrite = true)
+            output
         }
     }
 
@@ -106,40 +115,33 @@ class AudioDownloader {
         try {
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tagOrCreateAndSetDefault
-
             tag.setField(FieldKey.TITLE, song.title)
             tag.setField(FieldKey.ARTIST, song.artist)
             tag.setField(FieldKey.ALBUM, song.album)
             tag.setField(FieldKey.GENRE, song.genre)
             tag.setField(FieldKey.YEAR, song.year)
-            if (song.trackNumber > 0) {
-                tag.setField(FieldKey.TRACK, song.trackNumber.toString())
-            }
-
+            if (song.trackNumber > 0) tag.setField(FieldKey.TRACK, song.trackNumber.toString())
+            if (song.lyrics.isNotBlank()) tag.setField(FieldKey.LYRICS, song.lyrics)
             if (song.thumbnailUrl.isNotBlank()) {
-                try {
-                    val artwork = ArtworkFactory.createLinkedArtworkFromURL(song.thumbnailUrl)
-                    tag.setField(artwork)
-                } catch (_: Exception) {}
+                try { tag.setField(ArtworkFactory.createLinkedArtworkFromURL(song.thumbnailUrl)) } catch (_: Exception) {}
             }
-
             AudioFileIO.write(audioFile)
         } catch (_: Exception) {}
     }
 
-    private fun detectExtension(url: String): String {
-        val path = url.substringBefore("?").substringAfterLast("/")
+    private fun detectExtension(mimeType: String, url: String): String {
         return when {
-            path.contains(".mp3") -> ".mp3"
-            path.contains(".m4a") || path.contains(".aac") -> ".m4a"
-            path.contains(".webm") -> ".webm"
-            path.contains(".opus") || path.contains(".ogg") -> ".opus"
+            mimeType.contains("mp3") || mimeType.contains("mpeg") -> ".mp3"
+            mimeType.contains("mp4") || mimeType.contains("aac") -> ".m4a"
+            mimeType.contains("webm") -> ".webm"
+            mimeType.contains("opus") -> ".opus"
+            mimeType.contains("ogg") -> ".ogg"
+            url.contains(".mp3") -> ".mp3"
             else -> ".m4a"
         }
     }
 
     companion object {
         private const val TAG = "MusicDownloader"
-        private const val USER_AGENT = "Mozilla/5.0 (Android 14; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0"
     }
 }

@@ -10,7 +10,8 @@ data class Song(
     val duration: Long = 0,
     val thumbnailUrl: String = "",
     val youtubeUrl: String = "",
-    val youtubeId: String = ""
+    val youtubeId: String = "",
+    val lyrics: String = ""
 ) {
     val fileName: String
         get() = "${artist} - ${title}".replace(Regex("[/\\\\:*?\"<>|]"), "_")

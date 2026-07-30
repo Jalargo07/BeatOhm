@@ -1,18 +1,24 @@
 package com.musicdownloader.ui
 
 import android.app.Application
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.os.Build
+import android.os.Environment
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.musicdownloader.DownloadService
+import com.musicdownloader.downloader.AudioDownloader
+import com.musicdownloader.downloader.ProxyDownloader
+import com.musicdownloader.extractor.YouTubeExtractor
+import com.musicdownloader.metadata.MetadataFetcher
+import com.musicdownloader.metadata.LyricsFetcher
 import com.musicdownloader.model.DownloadState
 import com.musicdownloader.model.DownloadStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -23,76 +29,169 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isDownloading = MutableLiveData(false)
     val isDownloading: LiveData<Boolean> = _isDownloading
 
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == DownloadService.BROADCAST_UPDATE) {
-                val id = intent.getStringExtra(DownloadService.EXTRA_ID) ?: return
-                val status = intent.getStringExtra(DownloadService.EXTRA_STATE)
-                    ?.let { DownloadStatus.valueOf(it) }
-                val progress = intent.getIntExtra(DownloadService.EXTRA_PROGRESS, 0)
-                val message = intent.getStringExtra(DownloadService.EXTRA_MESSAGE) ?: ""
+    private val extractor = YouTubeExtractor()
+    private val metadataFetcher = MetadataFetcher()
+    private val lyricsFetcher = LyricsFetcher()
+    private val audioDownloader = AudioDownloader(application)
+    private val proxyDownloader = ProxyDownloader()
 
-                val currentList = _downloads.value?.toMutableList() ?: mutableListOf()
-                val index = currentList.indexOfFirst { it.id == id }
+    fun startDownload(url: String) {
+        Log.e(TAG, "startDownload: $url")
+        val downloadId = UUID.randomUUID().toString()
 
-                val updatedState = if (index >= 0) {
-                    currentList[index].copy(
-                        status = status ?: currentList[index].status,
-                        progress = progress,
-                        errorMessage = message
-                    )
+        val newDownload = DownloadState(id = downloadId, url = url, status = DownloadStatus.QUEUED)
+        addDownload(newDownload)
+
+        viewModelScope.launch {
+            try {
+                Log.e(TAG, "Iniciando corrutina de descarga")
+                updateState(downloadId, DownloadStatus.EXTRACTING, 0, "Extrayendo información...")
+
+                val isPlaylist = extractor.isPlaylistUrl(url)
+                val songs: List<com.musicdownloader.model.Song>
+
+                if (isPlaylist) {
+                    val result = extractor.extractPlaylist(url)
+                    if (result.isFailure) {
+                        throw result.exceptionOrNull() ?: Exception("Failed to extract playlist")
+                    }
+                    songs = result.getOrThrow()
                 } else {
-                    DownloadState(id = id, status = status ?: DownloadStatus.QUEUED, progress = progress, errorMessage = message)
+                    val result = extractor.extractSong(url)
+                    if (result.isFailure) {
+                        throw result.exceptionOrNull() ?: Exception("Failed to extract song")
+                    }
+                    songs = listOf(result.getOrThrow())
                 }
 
-                if (index >= 0) {
-                    currentList[index] = updatedState
-                } else {
-                    currentList.add(0, updatedState)
+                var successCount = 0
+                for (index in songs.indices) {
+                    val song = songs[index]
+                    Log.e(TAG, "Procesando: ${song.title}")
+                    updateState(downloadId, DownloadStatus.FETCHING_METADATA, 0,
+                        "Metadata: ${song.title}... (${index + 1}/${songs.size})")
+
+                    val metaResult = metadataFetcher.fetchFullMetadata(song)
+                    val enrichedSong = metaResult.getOrNull() ?: song
+                    Log.e(TAG, "Metadata: artist=${enrichedSong.artist} album=${enrichedSong.album}")
+
+                    val lyricsResult = lyricsFetcher.fetchLyrics(enrichedSong.artist, enrichedSong.title)
+                    val finalSong = if (lyricsResult.isSuccess) {
+                        val l = lyricsResult.getOrThrow()
+                        Log.e(TAG, "Letras: ${l.take(50)}...")
+                        enrichedSong.copy(lyrics = l)
+                    } else {
+                        Log.e(TAG, "Sin letras: ${lyricsResult.exceptionOrNull()?.message}")
+                        enrichedSong
+                    }
+
+                    updateState(downloadId, DownloadStatus.DOWNLOADING, 0,
+                        "Descargando ${finalSong.title}... (${index + 1}/${songs.size})")
+                    updateSong(downloadId, finalSong)
+
+                    val audioResult = extractor.getBestAudioStream(finalSong.youtubeUrl)
+                    Log.e(TAG, "Audio stream result: ${audioResult.isSuccess}")
+                    if (audioResult.isFailure) {
+                        updateState(downloadId, DownloadStatus.ERROR, 0,
+                            "No se pudo obtener audio: ${audioResult.exceptionOrNull()?.localizedMessage}")
+                        continue
+                    }
+
+                    val audioStream = audioResult.getOrThrow()
+                    val downloadDir = getDownloadDirectory()
+
+                    // Try proxy download (loader.to) for reliable delivery
+                    Log.e(TAG, "Obteniendo URL de proxy...")
+                    updateState(downloadId, DownloadStatus.DOWNLOADING, 0,
+                        "Obteniendo descarga via proxy...")
+
+                    val proxyResult = proxyDownloader.getDownloadUrl(finalSong.youtubeUrl)
+                    var fileResult: Result<File>
+                    if (proxyResult.isSuccess) {
+                        val proxyUrl = proxyResult.getOrThrow()
+                        Log.e(TAG, "Proxy URL: ${proxyUrl.url.take(80)}...")
+                        fileResult = audioDownloader.downloadAudio(
+                            audioUrl = proxyUrl.url,
+                            mimeType = "audio/mpeg",
+                            song = finalSong,
+                            outputDir = downloadDir,
+                            onProgress = { progress ->
+                                updateState(downloadId, DownloadStatus.DOWNLOADING, progress)
+                            }
+                        )
+                    } else {
+                        Log.e(TAG, "Proxy fallo: ${proxyResult.exceptionOrNull()?.message}, intentando directo...")
+                        fileResult = audioDownloader.downloadAudio(
+                            audioUrl = audioStream.url,
+                            mimeType = audioStream.mimeType,
+                            song = finalSong,
+                            outputDir = downloadDir,
+                            onProgress = { progress ->
+                                updateState(downloadId, DownloadStatus.DOWNLOADING, progress)
+                            }
+                        )
+                    }
+
+                    Log.e(TAG, "Download result isSuccess=${fileResult.isSuccess}")
+                    if (fileResult.isSuccess) {
+                        val file = fileResult.getOrThrow()
+                        Log.e(TAG, "Archivo: ${file.name} (${file.length()} bytes)")
+                        updateState(downloadId, DownloadStatus.TAGGING, 100,
+                            "OK ${file.name} (${file.length() / 1024} KB)")
+                        successCount++
+                    } else {
+                        val err = fileResult.exceptionOrNull()
+                        Log.e(TAG, "Error descarga: ${err?.message}")
+                        updateState(downloadId, DownloadStatus.ERROR, 0,
+                            "Error: ${err?.localizedMessage ?: "desconocido"}")
+                    }
                 }
 
-                _downloads.value = currentList
+                val msg = if (successCount == songs.size) "Completado: $successCount canciones"
+                    else "Descargadas $successCount de ${songs.size}"
+                updateState(downloadId, DownloadStatus.COMPLETED, 100, msg)
 
-                val hasActiveDownloads = currentList.any {
-                    it.status == DownloadStatus.QUEUED ||
-                    it.status == DownloadStatus.EXTRACTING ||
-                    it.status == DownloadStatus.FETCHING_METADATA ||
-                    it.status == DownloadStatus.DOWNLOADING ||
-                    it.status == DownloadStatus.TAGGING
-                }
-                _isDownloading.value = hasActiveDownloads
+            } catch (e: Exception) {
+                updateState(downloadId, DownloadStatus.ERROR, 0,
+                    "Error: ${e.localizedMessage ?: "Desconocido"}")
             }
         }
     }
 
-    init {
-        getApplication<Application>().registerReceiver(
-            receiver,
-            IntentFilter(DownloadService.BROADCAST_UPDATE)
-        )
+    private fun getDownloadDirectory(): File {
+        val ctx = getApplication<Application>()
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        val target = File(dir, "MusicDownloader")
+        if (!target.exists()) target.mkdirs()
+        Log.e(TAG, "Dir: ${target.absolutePath}")
+        return target
     }
 
-    fun startDownload(url: String) {
-        val downloadId = UUID.randomUUID().toString()
-        val intent = Intent(getApplication(), DownloadService::class.java).apply {
-            action = DownloadService.ACTION_DOWNLOAD
-            putExtra(DownloadService.EXTRA_URL, url)
-            putExtra(DownloadService.EXTRA_ID, downloadId)
-        }
-        getApplication<Application>().startService(intent)
-
-        val newDownload = DownloadState(
-            id = downloadId,
-            url = url,
-            status = DownloadStatus.QUEUED
-        )
-        val currentList = _downloads.value?.toMutableList() ?: mutableListOf()
-        currentList.add(0, newDownload)
-        _downloads.value = currentList
+    private fun addDownload(state: DownloadState) {
+        val list = _downloads.value?.toMutableList() ?: mutableListOf()
+        list.add(0, state)
+        _downloads.value = list
+        _isDownloading.value = true
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        getApplication<Application>().unregisterReceiver(receiver)
+    private fun updateState(id: String, status: DownloadStatus, progress: Int = 0, message: String? = null) {
+        val list = _downloads.value?.toMutableList() ?: return
+        val idx = list.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        list[idx] = list[idx].copy(status = status, progress = progress, errorMessage = message ?: list[idx].errorMessage)
+        _downloads.value = list
+        _isDownloading.value = list.any { it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.EXTRACTING || it.status == DownloadStatus.FETCHING_METADATA || it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.TAGGING }
+    }
+
+    private fun updateSong(id: String, song: com.musicdownloader.model.Song) {
+        val list = _downloads.value?.toMutableList() ?: return
+        val idx = list.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        list[idx] = list[idx].copy(song = song)
+        _downloads.value = list
+    }
+
+    companion object {
+        private const val TAG = "MusicDownloader"
     }
 }
