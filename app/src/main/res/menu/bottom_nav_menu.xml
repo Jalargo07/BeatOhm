@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/playerFragment"
+        android:icon="@drawable/ic_player"
+        android:title="Player" />
+    <item
+        android:id="@+id/libraryFragment"
+        android:icon="@drawable/ic_library"
+        android:title="Biblioteca" />
+    <item
+        android:id="@+id/downloadsFragment"
+        android:icon="@drawable/ic_downloads"
+        android:title="Downloads" />
+</menu>

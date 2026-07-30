@@ -67,6 +67,21 @@ dependencies {
     // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
+    // Navigation Component
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
+    implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+
+    // Media3 ExoPlayer
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-session:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+
+    // Media session compat (for MediaSessionCompat)
+    implementation("androidx.media:media:1.7.0")
+
+    // Coil para carátulas
+    implementation("io.coil-kt:coil:2.6.0")
+
     // Java 8+ API desugaring (para URLDecoder en Android < 33)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

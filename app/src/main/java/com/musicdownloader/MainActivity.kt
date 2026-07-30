@@ -1,28 +1,32 @@
 package com.musicdownloader
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.IBinder
 import android.provider.Settings
-import android.view.inputmethod.EditorInfo
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.setupWithNavController
 import com.musicdownloader.databinding.ActivityMainBinding
-import com.musicdownloader.ui.DownloadAdapter
 import com.musicdownloader.ui.MainViewModel
+import com.musicdownloader.ui.PlayerViewModel
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
-    private lateinit var viewModel: MainViewModel
-    private lateinit var adapter: DownloadAdapter
+    lateinit var binding: ActivityMainBinding
+    var playbackService: MusicPlaybackService? = null
+        private set
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -32,63 +36,44 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { _ -> }
 
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            playbackService = (service as MusicPlaybackService.LocalBinder).getService()
+            playbackService?.setViewModel(PlayerViewModel.getInstance(application))
+        }
+        override fun onServiceDisconnected(name: ComponentName?) {
+            playbackService = null
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
-        adapter = DownloadAdapter()
+        ViewModelProvider(this)[MainViewModel::class.java]
 
-        setupUI()
-        setupObservers()
-        checkPermissions()
-    }
-
-    private fun setupUI() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(true)
 
-        binding.rvDownloads.layoutManager = LinearLayoutManager(this)
-        binding.rvDownloads.adapter = adapter
+        val navHost = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        val navController = navHost.navController
+        binding.bottomNav.setupWithNavController(navController)
 
-        binding.etUrl.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                startDownload()
-                true
-            } else false
-        }
-
-        binding.btnDownload.setOnClickListener { startDownload() }
+        checkPermissions()
+        bindPlaybackService()
     }
 
-    private fun setupObservers() {
-        viewModel.downloads.observe(this) { list ->
-            adapter.submitList(list)
-            binding.tvEmpty.visibility = if (list.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
-        }
+    private fun bindPlaybackService() {
+        val intent = Intent(this, MusicPlaybackService::class.java)
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
-    private fun startDownload() {
-        val url = binding.etUrl.text.toString().trim()
-        if (url.isBlank()) {
-            binding.etUrl.error = "Ingresa una URL"
-            return
-        }
-
-        if (!isValidYouTubeUrl(url)) {
-            binding.etUrl.error = "URL de YouTube inválida"
-            return
-        }
-
-        viewModel.startDownload(url)
-        binding.etUrl.text?.clear()
-    }
-
-    private fun isValidYouTubeUrl(url: String): Boolean {
-        return url.matches(Regex(
-            "(https?://)?(www\\.|m\\.)?(youtube\\.com|youtu\\.be|music\\.youtube\\.com)/.*"
-        ))
+    fun getMusicDir(): java.io.File {
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        val target = java.io.File(dir, "MusicDownloader")
+        if (!target.exists()) target.mkdirs()
+        return target
     }
 
     private fun checkPermissions() {
@@ -102,12 +87,14 @@ class MainActivity : AppCompatActivity() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS)
-                )
+                != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             }
         }
+    }
+
+    override fun onDestroy() {
+        try { unbindService(serviceConnection) } catch (_: Exception) {}
+        super.onDestroy()
     }
 }
