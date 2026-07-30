@@ -1,12 +1,13 @@
 package com.musicdownloader.ui
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.toSong
 import com.musicdownloader.model.Song
-import java.io.File
+import kotlinx.coroutines.runBlocking
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -78,18 +79,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun scanMusicFiles(): List<Song> {
-        val dir = File(getApplication<Application>().getExternalFilesDir(null)?.parentFile?.parentFile?.parentFile,
-            "Music/MusicDownloader")
-        val songs = mutableListOf<Song>()
-        if (!dir.exists()) return songs
-        dir.listFiles { f -> f.extension == "mp3" || f.extension == "m4a" || f.extension == "webm" || f.extension == "opus" }
-            ?.sortedBy { it.name }?.forEach { file ->
-                songs.add(Song(
-                    title = file.nameWithoutExtension,
-                    artist = "",
-                    youtubeUrl = file.absolutePath
-                ))
-            }
+        val repo = MusicRepository(getApplication())
+        val localSongs = runBlocking { repo.scanMusicFolder() }
+        val songs = localSongs.map { it.toSong() }
         _playlist.value = songs
         return songs
     }

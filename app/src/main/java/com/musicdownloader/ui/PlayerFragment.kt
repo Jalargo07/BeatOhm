@@ -118,18 +118,19 @@ class PlayerFragment : Fragment() {
     private fun startPositionUpdater() {
         updateRunnable = object : Runnable {
             override fun run() {
-                val activity = requireActivity() as? com.musicdownloader.MainActivity
+                val b = _binding ?: return
+                val activity = b.root.context as? com.musicdownloader.MainActivity
                 val service = activity?.playbackService
                 if (service != null && !isSeeking) {
                     val pos = service.getCurrentPosition()
-                    binding.seekBar.progress = (pos / 1000).toInt()
-                    binding.tvCurrentTime.text = formatTime(pos)
+                    b.seekBar.progress = (pos / 1000).toInt()
+                    b.tvCurrentTime.text = formatTime(pos)
                     viewModel.setPosition(pos)
                 }
-                binding.root.postDelayed(this, 500)
+                b.root.postDelayed(this, 500)
             }
         }
-        binding.root.postDelayed(updateRunnable!!, 500)
+        _binding?.root?.postDelayed(updateRunnable!!, 500)
     }
 
     private fun formatTime(millis: Long): String {

@@ -8,6 +8,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.musicdownloader.data.LocalSong
+import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.downloader.AudioDownloader
 import com.musicdownloader.downloader.ProxyDownloader
 import com.musicdownloader.extractor.YouTubeExtractor
@@ -34,6 +36,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val lyricsFetcher = LyricsFetcher()
     private val audioDownloader = AudioDownloader(application)
     private val proxyDownloader = ProxyDownloader()
+    private val musicRepository = MusicRepository(application)
 
     fun startDownload(url: String) {
         Log.e(TAG, "startDownload: $url")
@@ -136,6 +139,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (fileResult.isSuccess) {
                         val file = fileResult.getOrThrow()
                         Log.e(TAG, "Archivo: ${file.name} (${file.length()} bytes)")
+
+                        musicRepository.insertSong(LocalSong(
+                            id = file.absolutePath,
+                            title = finalSong.title,
+                            artist = finalSong.artist,
+                            album = finalSong.album,
+                            genre = finalSong.genre,
+                            year = finalSong.year,
+                            trackNumber = finalSong.trackNumber,
+                            duration = finalSong.duration,
+                            filePath = file.absolutePath,
+                            lyrics = finalSong.lyrics
+                        ))
+
                         updateState(downloadId, DownloadStatus.TAGGING, 100,
                             "OK ${file.name} (${file.length() / 1024} KB)")
                         successCount++
