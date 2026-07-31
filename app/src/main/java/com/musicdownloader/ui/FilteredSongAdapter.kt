@@ -13,8 +13,10 @@ import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import java.io.File
 
-class FilteredSongAdapter(private val onItemClick: (LocalSong) -> Unit) :
-    ListAdapter<LocalSong, FilteredSongAdapter.ViewHolder>(FilteredSongDiffCallback()) {
+class FilteredSongAdapter(
+    private val onItemClick: (LocalSong) -> Unit,
+    private val onItemLongClick: ((LocalSong) -> Unit)? = null
+) : ListAdapter<LocalSong, FilteredSongAdapter.ViewHolder>(FilteredSongDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -38,6 +40,10 @@ class FilteredSongAdapter(private val onItemClick: (LocalSong) -> Unit) :
         }
 
         holder.itemView.setOnClickListener { onItemClick(song) }
+        holder.itemView.setOnLongClickListener {
+            onItemLongClick?.invoke(song)
+            true
+        }
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {

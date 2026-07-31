@@ -29,12 +29,12 @@ class LibraryFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         playerViewModel = ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
 
-        val tabs = listOf("Canciones", "Albumes", "Artistas", "Generos")
+        val tabs = listOf("Canciones", "Albumes", "Artistas", "Generos", "Favoritos", "Playlists")
         val pager = binding.viewPager
         pager.isUserInputEnabled = true
 
         pager.adapter = object : FragmentStateAdapter(this) {
-            override fun getItemCount() = 4
+            override fun getItemCount() = 6
             override fun createFragment(position: Int): Fragment {
                 return when (position) {
                     0 -> SongListFragment()
@@ -47,6 +47,8 @@ class LibraryFragment : Fragment() {
                     3 -> CategoryListFragment().apply {
                         arguments = Bundle().apply { putString("category", "genre") }
                     }
+                    4 -> FavoritesFragment()
+                    5 -> PlaylistsFragment()
                     else -> SongListFragment()
                 }
             }

@@ -55,7 +55,7 @@ class CategoryListFragment : Fragment() {
         repository = MusicRepository(requireContext())
         playerViewModel = ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
 
-        songsAdapter = FilteredSongAdapter { song ->
+        songsAdapter = FilteredSongAdapter(onItemClick = { song ->
             val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@FilteredSongAdapter
             val service = activity.playbackService
             if (service != null) {
@@ -67,7 +67,7 @@ class CategoryListFragment : Fragment() {
                 )
                 service.playFile(song.filePath)
             }
-        }
+        })
 
         adapter = CategoryAdapter { name ->
             selectedCategoryValue = name

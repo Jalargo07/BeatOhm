@@ -44,6 +44,20 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun getSongById(id: String): LocalSong?
 
+    @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY artist ASC")
+    fun getFavoriteSongs(): Flow<List<LocalSong>>
+
+    @Query("UPDATE songs SET isFavorite = :isFavorite WHERE id = :songId")
+    suspend fun setFavorite(songId: String, isFavorite: Boolean)
+
+    @Query("""
+        SELECT s.* FROM songs s 
+        INNER JOIN playlist_songs ps ON s.id = ps.songId 
+        WHERE ps.playlistId = :playlistId 
+        ORDER BY ps.position ASC
+    """)
+    fun getSongsInPlaylist(playlistId: Long): Flow<List<LocalSong>>
+
     @Query("SELECT COUNT(*) FROM songs")
     fun getSongCount(): Flow<Int>
 }

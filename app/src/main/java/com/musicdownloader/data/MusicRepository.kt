@@ -22,6 +22,9 @@ class MusicRepository(private val context: Context) {
     fun getSongsByArtist(artist: String): Flow<List<LocalSong>> = dao.getSongsByArtist(artist)
     fun getSongsByGenre(genre: String): Flow<List<LocalSong>> = dao.getSongsByGenre(genre)
     fun getSongCount(): Flow<Int> = dao.getSongCount()
+    fun getFavoriteSongs(): Flow<List<LocalSong>> = dao.getFavoriteSongs()
+    suspend fun setFavorite(songId: String, isFavorite: Boolean) = dao.setFavorite(songId, isFavorite)
+    suspend fun getSongById(id: String): LocalSong? = dao.getSongById(id)
 
     suspend fun insertSong(song: LocalSong) = dao.insertSong(song)
     suspend fun deleteSong(song: LocalSong) = dao.deleteSong(song)

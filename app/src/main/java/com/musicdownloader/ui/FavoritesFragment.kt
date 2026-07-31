@@ -1,0 +1,53 @@
+package com.musicdownloader.ui
+
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.musicdownloader.R
+import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.toSong
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+
+class FavoritesFragment : Fragment() {
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var emptyView: TextView
+    private lateinit var adapter: FilteredSongAdapter
+    private lateinit var repository: MusicRepository
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        val view = inflater.inflate(R.layout.fragment_song_list, container, false)
+        recyclerView = view.findViewById(R.id.rv_songs)
+        emptyView = view.findViewById(R.id.tv_empty)
+        return view
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        repository = MusicRepository(requireContext())
+        adapter = FilteredSongAdapter(onItemClick = { song ->
+            val activity = requireActivity() as? com.musicdownloader.MainActivity
+            val service = activity?.playbackService
+            if (service != null) {
+                val vm = androidx.lifecycle.ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
+                vm.setPlaylist(listOf(song.toSong()), 0)
+                service.playFile(song.filePath)
+            }
+        })
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.adapter = adapter
+
+        lifecycleScope.launch {
+            repository.getFavoriteSongs().collectLatest { songs ->
+                adapter.submitList(songs)
+                emptyView.visibility = if (songs.isEmpty()) View.VISIBLE else View.GONE
+            }
+        }
+    }
+}

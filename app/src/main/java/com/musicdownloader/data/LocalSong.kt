@@ -16,7 +16,8 @@ data class LocalSong(
     val duration: Long = 0,
     val filePath: String = "",
     val thumbnailUrl: String = "",
-    val lyrics: String = ""
+    val lyrics: String = "",
+    val isFavorite: Boolean = false
 )
 
 fun LocalSong.toSong(): Song = Song(

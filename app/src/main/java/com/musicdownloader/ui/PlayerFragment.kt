@@ -1,5 +1,6 @@
 package com.musicdownloader.ui
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -7,19 +8,28 @@ import android.view.ViewGroup
 import android.widget.SeekBar
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import coil.load
 import com.musicdownloader.R
+import com.musicdownloader.data.AppDatabase
+import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.PlaylistSong
+import com.musicdownloader.data.toSong
 import com.musicdownloader.databinding.FragmentPlayerBinding
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class PlayerFragment : Fragment() {
 
     private var _binding: FragmentPlayerBinding? = null
     private val binding get() = _binding!!
     private lateinit var viewModel: PlayerViewModel
+    private lateinit var repository: MusicRepository
     private var isSeeking = false
     private var updateRunnable: Runnable? = null
+    private var currentSongFilePath: String? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentPlayerBinding.inflate(inflater, container, false)
@@ -29,6 +39,7 @@ class PlayerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel = ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
+        repository = MusicRepository(requireContext())
 
         setupObservers()
         setupControls()
@@ -37,6 +48,7 @@ class PlayerFragment : Fragment() {
     private fun setupObservers() {
         viewModel.currentSong.observe(viewLifecycleOwner) { song ->
             if (song != null) {
+                currentSongFilePath = song.youtubeUrl
                 binding.tvTitle.text = song.title
                 binding.tvArtist.text = song.artist.ifBlank { "Desconocido" }
                 binding.tvNoSong.visibility = View.GONE
@@ -53,11 +65,14 @@ class PlayerFragment : Fragment() {
                 } else {
                     binding.ivCover.setImageResource(R.drawable.ic_player)
                 }
+                updateFavoriteIcon(song.youtubeUrl)
             } else {
+                currentSongFilePath = null
                 binding.tvNoSong.visibility = View.VISIBLE
                 binding.tvTitle.text = "Título"
                 binding.tvArtist.text = "Artista"
                 binding.ivCover.setImageResource(R.drawable.ic_player)
+                binding.btnFavorite.setImageResource(android.R.drawable.btn_star_big_off)
             }
         }
 
@@ -71,6 +86,17 @@ class PlayerFragment : Fragment() {
         viewModel.duration.observe(viewLifecycleOwner) { dur ->
             binding.seekBar.max = if (dur > 0) (dur / 1000).toInt() else 100
             binding.tvTotalTime.text = formatTime(dur)
+        }
+    }
+
+    private fun updateFavoriteIcon(filePath: String) {
+        lifecycleScope.launch {
+            val song = repository.getSongById(filePath)
+            val isFav = song?.isFavorite ?: false
+            binding.btnFavorite.setImageResource(
+                if (isFav) android.R.drawable.btn_star_big_on
+                else android.R.drawable.btn_star_big_off
+            )
         }
     }
 
@@ -102,6 +128,36 @@ class PlayerFragment : Fragment() {
             }
         }
 
+        binding.btnFavorite.setOnClickListener {
+            val path = currentSongFilePath ?: return@setOnClickListener
+            lifecycleScope.launch {
+                val song = repository.getSongById(path)
+                if (song != null) {
+                    repository.setFavorite(path, !song.isFavorite)
+                    updateFavoriteIcon(path)
+                }
+            }
+        }
+
+        binding.btnRewind.setOnClickListener {
+            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
+            val service = activity.playbackService ?: return@setOnClickListener
+            val newPos = maxOf(0L, service.getCurrentPosition() - 10_000L)
+            service.seekTo(newPos)
+        }
+
+        binding.btnForward.setOnClickListener {
+            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
+            val service = activity.playbackService ?: return@setOnClickListener
+            val newPos = service.getCurrentPosition() + 10_000L
+            service.seekTo(newPos)
+        }
+
+        binding.btnAddPlaylist.setOnClickListener {
+            val path = currentSongFilePath ?: return@setOnClickListener
+            showAddToPlaylistDialog(path)
+        }
+
         binding.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {}
             override fun onStartTrackingTouch(seekBar: SeekBar?) { isSeeking = true }
@@ -112,7 +168,45 @@ class PlayerFragment : Fragment() {
             }
         })
 
+        binding.volumeSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return
+                val player = activity.playbackService?.getPlayer() ?: return
+                player.volume = progress / 100f
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
         startPositionUpdater()
+    }
+
+    private fun showAddToPlaylistDialog(songFilePath: String) {
+        val db = AppDatabase.getInstance(requireContext())
+        lifecycleScope.launch {
+            val list = db.playlistDao().getAllPlaylists().first()
+            if (list.isEmpty()) {
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Sin playlists")
+                    .setMessage("Crea una playlist primero desde la pestaña Playlists.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@launch
+            }
+            val names = list.map { it.name }.toTypedArray()
+            AlertDialog.Builder(requireContext())
+                .setTitle("Agregar a playlist")
+                .setItems(names) { _, which ->
+                    val playlist = list[which]
+                    lifecycleScope.launch {
+                        db.playlistDao().addSongToPlaylist(
+                            PlaylistSong(playlist.id, songFilePath, 0)
+                        )
+                    }
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
     }
 
     private fun startPositionUpdater() {
