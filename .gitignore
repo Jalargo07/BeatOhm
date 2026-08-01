@@ -12,6 +12,7 @@
 
 # Local configuration (sdk path, etc)
 local.properties
+secrets.properties
 
 # OpenCode (herramienta de desarrollo local, no forma parte de la app)
 opencode.json

@@ -12,6 +12,7 @@ import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.ArtworkFactory
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 class AudioDownloader(private val context: Context) {
@@ -116,6 +117,7 @@ class AudioDownloader(private val context: Context) {
         try {
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tagOrCreateAndSetDefault
+            tag.setEncoding(StandardCharsets.UTF_16)
             tag.setField(FieldKey.TITLE, song.title)
             tag.setField(FieldKey.ARTIST, song.artist)
             tag.setField(FieldKey.ALBUM, song.album)

@@ -4,61 +4,104 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.musicdownloader.model.Song
+import com.musicdownloader.network.NetworkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
+import java.text.Normalizer
 
 class MetadataFetcher {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    companion object {
+        private const val TAG = "MetadataFetcher"
+    }
+
+    private val client = NetworkModule.client
 
     private val gson = Gson()
 
+    /**
+     * Limpia el título que viene de iTunes eliminando sufijos de YouTube.
+     * Ejemplos:
+     *   "Bohemian Rhapsody (Official Video)" → "Bohemian Rhapsody"
+     *   "Shape of You [Lyrics]" → "Shape of You"
+     *   "Blinding Lights (Remix 2024)" → "Blinding Lights"
+     *   "Havana ft. Young Thug" → "Havana" (ft. se maneja aparte en el artista)
+     */
+    fun cleanTitle(title: String): String {
+        var clean = title
+        // Remover paréntesis y corchetes con contenido: (Official Video), [Lyrics], (Audio), (Live), etc.
+        clean = clean.replace(Regex("\\s*[\\(\\[].*?[\\)\\]]"), "")
+        // Remover "ft.", "feat.", "featuring" y lo que siga (a menos que esté al inicio)
+        clean = clean.replace(Regex("\\s+(?:ft\\.?|feat\\.?|featuring)\\s+.*$", RegexOption.IGNORE_CASE), "")
+        // Remover " - Official Video", " - Lyrics", etc. (guion largo o corto)
+        clean = clean.replace(Regex("\\s*[-–—]\\s*(?:Official|Lyrics|Audio|Live|HD|4K|Explicit|Clean|Remix|Cover|Version|Version).*", RegexOption.IGNORE_CASE), "")
+        // Remover "MV", "M/V" al final
+        clean = clean.replace(Regex("\\s+(?:MV|M/V)$"), "")
+        // Remover year al final si es "(2024)" o "[2024]"
+        clean = clean.replace(Regex("\\s*[\\(\\[]\\d{4}[\\)\\]]$"), "")
+        return clean.trim()
+    }
+
+    /**
+     * Limpia el artista de iTunes: remueve " - Topic", "VEVO", etc.
+     */
+    fun cleanArtist(artist: String): String {
+        var clean = artist
+        // Remover " - Topic" (canal de YouTube genérico)
+        clean = clean.replace(Regex("\\s*-?\\s*Topic$"), "")
+        // Remover "VEVO"
+        clean = clean.replace(Regex("\\s*VEVO$", RegexOption.IGNORE_CASE), "")
+        return clean.trim()
+    }
+
     suspend fun fetchFullMetadata(song: Song): Result<Song> = withContext(Dispatchers.IO) {
         try {
+            Log.e(TAG, "fetchFullMetadata INICIO: '${song.artist}' - '${song.title}'")
             val metadata = searchItunes(song.artist, song.title)
             if (metadata != null) {
-                return@withContext Result.success(
-                    song.copy(
-                        title = metadata.trackName ?: song.title,
-                        artist = metadata.artistName ?: song.artist,
-                        album = metadata.collectionName ?: "",
-                        genre = metadata.primaryGenreName ?: "",
-                        year = extractYear(metadata.releaseDate ?: ""),
-                        trackNumber = metadata.trackNumber ?: 0,
-                        thumbnailUrl = metadata.artworkUrl ?: song.thumbnailUrl
-                    )
+                val cleaned = song.copy(
+                    title = cleanTitle(metadata.trackName ?: song.title),
+                    artist = cleanArtist(metadata.artistName ?: song.artist),
+                    album = metadata.collectionName ?: "",
+                    genre = metadata.primaryGenreName ?: "",
+                    year = extractYear(metadata.releaseDate ?: ""),
+                    trackNumber = metadata.trackNumber ?: 0,
+                    thumbnailUrl = metadata.artworkUrl ?: song.thumbnailUrl
                 )
+                Log.e(TAG, "fetchFullMetadata iTunes OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
+                return@withContext Result.success(cleaned)
             }
+            Log.e(TAG, "fetchFullMetadata iTunes sin resultado, intentando MusicBrainz...")
 
             val mbMetadata = searchMusicBrainz(song.artist, song.title)
             if (mbMetadata != null) {
-                return@withContext Result.success(
-                    song.copy(
-                        title = mbMetadata.title ?: song.title,
-                        artist = mbMetadata.artist ?: song.artist,
-                        album = mbMetadata.album ?: "",
-                        genre = mbMetadata.genre ?: "",
-                        year = mbMetadata.year ?: ""
-                    )
+                val cleaned = song.copy(
+                    title = mbMetadata.title ?: song.title,
+                    artist = mbMetadata.artist ?: song.artist,
+                    album = mbMetadata.album ?: "",
+                    genre = mbMetadata.genre ?: "",
+                    year = mbMetadata.year ?: ""
                 )
+                Log.e(TAG, "fetchFullMetadata MusicBrainz OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
+                return@withContext Result.success(cleaned)
             }
+            Log.e(TAG, "fetchFullMetadata SIN RESULTADO para '${song.artist}' - '${song.title}'")
 
             Result.success(song)
         } catch (e: Exception) {
+            Log.e(TAG, "fetchFullMetadata ERROR: ${e.message}", e)
             Result.success(song)
         }
     }
 
     private fun searchItunes(artist: String, title: String): ITunesResult? {
         try {
-            val query = URLEncoder.encode("$artist $title", "UTF-8")
+            val cleanArtist = cleanChannelName(artist)
+            val cleanTitle = title.replace(Regex("\\s*\\(.*?\\)$"), "").replace(Regex("\\s*\\[.*?\\]$"), "").trim()
+            val query = URLEncoder.encode("$cleanArtist $cleanTitle", "UTF-8")
+            Log.e(TAG, "searchItunes query: '$cleanArtist $cleanTitle'")
             val url = "https://itunes.apple.com/search?term=$query&entity=song&limit=3"
             val request = Request.Builder().url(url).get().build()
             val response = client.newCall(request).execute()
@@ -93,7 +136,9 @@ class MetadataFetcher {
 
     private fun searchMusicBrainz(artist: String, title: String): MusicBrainzResult? {
         try {
-            val query = URLEncoder.encode("artist:\"$artist\" AND recording:\"$title\"", "UTF-8")
+            val cleanArtist = cleanChannelName(artist)
+            val cleanTitle = title.replace(Regex("\\s*\\(.*?\\)$"), "").replace(Regex("\\s*\\[.*?\\]$"), "").trim()
+            val query = URLEncoder.encode("artist:\"$cleanArtist\" AND recording:\"$cleanTitle\"", "UTF-8")
             val url = "https://musicbrainz.org/ws/2/recording/?query=$query&fmt=json&limit=3"
             val request = Request.Builder()
                 .url(url)
@@ -140,12 +185,35 @@ class MetadataFetcher {
         expectedArtist: String, actualArtist: String,
         expectedTitle: String, actualTitle: String
     ): Boolean {
-        val eArtist = expectedArtist.lowercase().filter { it.isLetterOrDigit() }
-        val aArtist = actualArtist.lowercase().filter { it.isLetterOrDigit() }
-        val eTitle = expectedTitle.lowercase().filter { it.isLetterOrDigit() }
-        val aTitle = actualTitle.lowercase().filter { it.isLetterOrDigit() }
+        val eArtist = normalizeForMatch(cleanChannelName(expectedArtist))
+        val aArtist = normalizeForMatch(actualArtist)
+        val eTitle = normalizeForMatch(expectedTitle)
+        val aTitle = normalizeForMatch(actualTitle)
         return (aArtist.contains(eArtist) || eArtist.contains(aArtist)) &&
                (aTitle.contains(eTitle) || eTitle.contains(aTitle))
+    }
+
+    /**
+     * Limpia sufijos de canales de YouTube del artista para mejorar el match con iTunes.
+     * Ej: "La Mosca Oficial" → "La Mosca", "BersuitTV" → "Bersuit", "elvecindariocalle13" → "calle13"
+     */
+    private fun cleanChannelName(artist: String): String {
+        var clean = artist
+        // Remover paréntesis/corchetes con contenido: "(Oficial)", "[Official]", etc.
+        clean = clean.replace(Regex("\\s*[\\(\\[].*?[\\)\\]]"), "")
+        // Remover sufijos comunes de canales
+        clean = clean.replace(Regex("\\s+(?:Oficial|Official|VEVO|Music|Videos|Audio|HD|4K|Latino|Realidad)$", RegexOption.IGNORE_CASE), "")
+        // Remover "TV" al final (BersuitTV, NickyJamTV, etc.)
+        clean = clean.replace(Regex("TV$"), "")
+        // Remover prefijos de canales concatenados: "elvecindariocalle13", "lamoscatsetsé"
+        clean = clean.replace(Regex("^(?:el|la|los|las)(?=[a-záéíóúñ])", RegexOption.IGNORE_CASE), "")
+        return clean.trim()
+    }
+
+    private fun normalizeForMatch(text: String): String {
+        return Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}"), "")
+            .filter { it.isLetterOrDigit() }
     }
 
     private fun extractYear(date: String): String {

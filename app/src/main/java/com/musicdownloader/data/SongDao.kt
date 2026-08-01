@@ -53,6 +53,12 @@ interface SongDao {
     @Delete
     suspend fun deleteSong(song: LocalSong)
 
+    @Query("DELETE FROM songs WHERE id = :songId")
+    suspend fun deleteSongById(songId: String)
+
+    @Query("DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs GROUP BY title, artist)")
+    suspend fun deleteDuplicateSongs()
+
     @Query("DELETE FROM songs")
     suspend fun deleteAll()
 

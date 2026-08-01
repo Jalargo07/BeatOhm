@@ -1,6 +1,8 @@
 package com.musicdownloader
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Binder
@@ -18,7 +20,9 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.model.Song
 import com.musicdownloader.ui.PlayerViewModel
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,27 +110,114 @@ class MusicPlaybackService : MediaSessionService() {
     }
 
     fun playFile(filePath: String) {
+        if (filePath.isBlank()) return
         playerViewModel?.setDuration(0L)
-        val uri = Uri.fromFile(File(filePath))
-        val fallbackTitle = File(filePath).nameWithoutExtension
-        val song = playerViewModel?.currentSong?.value
-        val mediaItem = MediaItem.Builder()
-            .setUri(uri)
-            .setMediaId(filePath)
-            .setMediaMetadata(MediaMetadata.Builder()
-                .setTitle(song?.title?.ifBlank { fallbackTitle } ?: fallbackTitle)
-                .setArtist(song?.artist)
-                .setAlbumTitle(song?.album)
-                .setArtworkUri(song?.thumbnailUrl?.takeIf { it.isNotBlank() }?.let { Uri.parse(it) })
-                .build())
-            .build()
-        player.setMediaItem(mediaItem)
+
+        val orderedQueue = buildOrderedQueue()
+            .filter { song -> song.filePath.ifBlank { song.youtubeUrl }.isNotBlank() }
+        val mediaItems = orderedQueue
+            .mapIndexed { index, song -> buildMediaItem(song, loadArtwork = index < MAX_ARTWORK_ITEMS) }
+            .mapNotNull { it }
+        val targetIndex = orderedQueue.indexOfFirst {
+            it.filePath == filePath || it.youtubeUrl == filePath
+        }
+
+        if (mediaItems.isNotEmpty() && targetIndex >= 0) {
+            player.setMediaItems(mediaItems, targetIndex, 0L)
+        } else {
+            player.setMediaItem(buildSingleMediaItem(filePath))
+        }
+        syncExoPlayerRepeatMode()
         player.prepare()
         player.play()
 
         val path = filePath
         playbackScope.launch {
             try { MusicRepository(applicationContext).incrementPlayCount(path) } catch (_: Exception) {}
+        }
+    }
+
+    private fun buildOrderedQueue(): List<Song> {
+        val display = playerViewModel?.displayPlaylist?.value
+        val base = playerViewModel?.playlist?.value ?: emptyList()
+        return if (!display.isNullOrEmpty()) display else base
+    }
+
+    private fun buildMediaItem(song: Song, loadArtwork: Boolean): MediaItem? {
+        val path = song.filePath.ifBlank { song.youtubeUrl }
+        if (path.isBlank()) return null
+        val fallbackTitle = File(path).nameWithoutExtension
+        return MediaItem.Builder()
+            .setUri(Uri.fromFile(File(path)))
+            .setMediaId(path)
+            .setMediaMetadata(MediaMetadata.Builder()
+                .setTitle(song.title.ifBlank { fallbackTitle })
+                .setArtist(song.artist)
+                .setAlbumTitle(song.album)
+                .setArtworkData(
+                    if (loadArtwork) loadArtworkBytes(song) else null,
+                    MediaMetadata.PICTURE_TYPE_FRONT_COVER
+                )
+                .build())
+            .build()
+    }
+
+    private fun buildSingleMediaItem(filePath: String): MediaItem {
+        val fallbackTitle = File(filePath).nameWithoutExtension
+        val song = playerViewModel?.currentSong?.value
+        val artworkData = song?.let { loadArtworkBytes(it) }
+        return MediaItem.Builder()
+            .setUri(Uri.fromFile(File(filePath)))
+            .setMediaId(filePath)
+            .setMediaMetadata(MediaMetadata.Builder()
+                .setTitle(song?.title?.ifBlank { fallbackTitle } ?: fallbackTitle)
+                .setArtist(song?.artist)
+                .setAlbumTitle(song?.album)
+                .setArtworkData(artworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                .build())
+            .build()
+    }
+
+    private fun loadArtworkBytes(song: Song): ByteArray? {
+        val candidate = song.thumbnailUrl.takeIf { it.isNotBlank() }
+            ?: song.youtubeUrl.takeIf { it.isNotBlank() }
+        if (candidate.isNullOrBlank()) return null
+        return try {
+            val file = File(candidate)
+            if (!file.exists() || file.length() <= 0) return null
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return file.readBytes()
+            ByteArrayOutputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                out.toByteArray()
+            }
+        } catch (_: Exception) { null }
+    }
+
+    private fun syncExoPlayerRepeatMode() {
+        player.repeatMode = if (playerViewModel?.repeatMode?.value == PlayerViewModel.RepeatMode.ONE) {
+            Player.REPEAT_MODE_ONE
+        } else {
+            Player.REPEAT_MODE_OFF
+        }
+    }
+
+    private fun syncViewModelToExoPlayer() {
+        val currentMediaId = player.currentMediaItem?.mediaId
+        if (currentMediaId.isNullOrBlank()) return
+        val currentSong = playerViewModel?.currentSong?.value
+        val currentPath = currentSong?.let { it.filePath.ifBlank { it.youtubeUrl } }
+        if (currentMediaId == currentPath) return
+
+        val advanced = playerViewModel?.notifySongEnded()
+        val advancedPath = advanced?.let { it.filePath.ifBlank { it.youtubeUrl } }
+        if (advancedPath.isNullOrBlank()) {
+            // La cola del ViewModel quedó vacía: detener para no reproducir items stale.
+            player.stop()
+            return
+        }
+        if (advancedPath != currentMediaId) {
+            // Cola desincronizada (shuffle/edición mid-playback): re-sincronizar desde el ViewModel.
+            playFile(advancedPath)
         }
     }
 
@@ -173,7 +264,10 @@ class MusicPlaybackService : MediaSessionService() {
                 }
                 if (playbackState == Player.STATE_ENDED) {
                     val queueSize = playerViewModel?.playlist?.value?.size ?: 0
-                    if (queueSize > 0) {
+                    // Solo delegar al ViewModel cuando ExoPlayer no puede avanzar solo (fin real
+                    // de su cola). Si hay siguiente item, ExoPlayer auto-avanza y el sync del
+                    // ViewModel ocurre en onMediaItemTransition(AUTO) — evita doble avance.
+                    if (queueSize > 0 && !player.hasNextMediaItem()) {
                         mainHandler.post { onSongEnded() }
                     }
                 }
@@ -181,11 +275,15 @@ class MusicPlaybackService : MediaSessionService() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 playerViewModel?.setDuration(0L)
                 checkAndSetDuration()
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    syncViewModelToExoPlayer()
+                }
             }
         })
     }
 
     companion object {
         private const val CHANNEL_ID = "music_playback_channel"
+        private const val MAX_ARTWORK_ITEMS = 50
     }
 }

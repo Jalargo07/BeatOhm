@@ -288,7 +288,7 @@ class PlayerFragment : Fragment() {
         isLyricsVisible = !isLyricsVisible
         if (isLyricsVisible) {
             val song = viewModel.currentSong.value
-            binding.tvLyrics.text = song?.lyrics ?: ""
+            binding.tvLyrics.text = stripLrcTimestamps(song?.lyrics ?: "")
             binding.svLyrics.visibility = View.VISIBLE
             binding.ivCover.visibility = View.INVISIBLE
             binding.svLyrics.alpha = 0f
@@ -299,6 +299,20 @@ class PlayerFragment : Fragment() {
                 binding.ivCover.visibility = View.VISIBLE
             }.start()
         }
+    }
+
+    private fun stripLrcTimestamps(text: String): String {
+        val timestampRegex = Regex("\\[\\d{1,2}:\\d{2}(\\.\\d+)?\\]")
+        if (!text.contains(timestampRegex)) return text
+        return text.lines()
+            .map { line ->
+                val trimmed = line.trimStart()
+                if (trimmed.contains(Regex("^\\[\\d{1,2}:\\d{2}(\\.\\d+)?\\]"))) {
+                    trimmed.replace(timestampRegex, "").trim()
+                } else line
+            }
+            .joinToString("\n")
+            .trim()
     }
 
     private fun showAddToPlaylistDialog(songFilePath: String) {

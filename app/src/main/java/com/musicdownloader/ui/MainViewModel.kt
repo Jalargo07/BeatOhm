@@ -91,7 +91,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     val lyricsResult = lyricsFetcher.fetchLyrics(enrichedSong.artist, enrichedSong.title)
                     val finalSong = if (lyricsResult.isSuccess) {
-                        val l = lyricsResult.getOrThrow()
+                        val result = lyricsResult.getOrThrow()
+                        val l = result.syncedLrc ?: result.plainText
                         Log.e(TAG, "Letras: ${l.take(50)}...")
                         enrichedSong.copy(lyrics = l)
                     } else {

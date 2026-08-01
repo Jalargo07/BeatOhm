@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.ArtworkFactory
+import com.musicdownloader.data.MusicRepository
 
 object AudioTagWriter {
     private val SUPPORTED = setOf("mp3", "m4a", "flac", "ogg")
@@ -15,9 +16,9 @@ object AudioTagWriter {
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tagOrCreateAndSetDefault
             tag.setEncoding(StandardCharsets.UTF_16)
-            tag.setField(FieldKey.TITLE, song.title)
-            tag.setField(FieldKey.ARTIST, song.artist)
-            tag.setField(FieldKey.ALBUM, song.album)
+            tag.setField(FieldKey.TITLE, MusicRepository.fixMojibake(song.title))
+            tag.setField(FieldKey.ARTIST, MusicRepository.fixMojibake(song.artist))
+            tag.setField(FieldKey.ALBUM, MusicRepository.fixMojibake(song.album))
             tag.setField(FieldKey.GENRE, song.genre)
             tag.setField(FieldKey.YEAR, song.year)
             if (song.lyrics.isNotBlank()) {

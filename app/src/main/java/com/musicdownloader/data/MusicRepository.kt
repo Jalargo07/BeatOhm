@@ -86,6 +86,7 @@ class MusicRepository(private val context: Context) {
     suspend fun scanMusicFolder(): List<LocalSong> = scanLibrary().songs
 
     suspend fun scanLibrary(): ScanResult {
+        cleanupDuplicates()
         val existing = dao.getAllSongsNow().associate { it.id to it }
         val artCacheDir = getAlbumArtCacheDir()
         if (!artCacheDir.exists()) artCacheDir.mkdirs()
@@ -159,10 +160,10 @@ class MusicRepository(private val context: Context) {
         return try {
             val meta = MediaMetadataRetriever()
             meta.setDataSource(path)
-            val title = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension
-            val artist = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
-            val album = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
-            val genre = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: ""
+            val title = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension)
+            val artist = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "")
+            val album = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: "")
+            val genre = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: "")
             val year = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR) ?: ""
             val track = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)?.toIntOrNull() ?: 0
             val duration = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
@@ -264,8 +265,16 @@ class MusicRepository(private val context: Context) {
         skipTagWrite: Boolean = false,
         fetchLyrics: Boolean = false
     ): LocalSong {
-        val existing = dao.getSongById(song.id) ?: song
+        Log.e("MusicRepository", "enrichSong INICIO: '${song.artist}' - '${song.title}' fetchLyrics=$fetchLyrics")
+        val existing = dao.getSongById(song.id)?.let {
+            it.copy(
+                title = fixMojibake(it.title),
+                artist = fixMojibake(it.artist),
+                album = fixMojibake(it.album)
+            )
+        } ?: song
         val enriched = metadataFetcher.fetchFullMetadata(song.toSong()).getOrNull() ?: song.toSong()
+        Log.e("MusicRepository", "enrichSong metadata: '${enriched.artist}' - '${enriched.title}' [${enriched.album}]")
 
         var thumbnailUrl = enriched.thumbnailUrl
         if (thumbnailUrl.startsWith("http")) {
@@ -294,7 +303,8 @@ class MusicRepository(private val context: Context) {
             try {
                 val lyricsResult = lyricsFetcher.fetchLyrics(updated.artist, updated.title)
                 if (lyricsResult.isSuccess) {
-                    val lyrics = lyricsResult.getOrNull().orEmpty()
+                    val result = lyricsResult.getOrNull()
+                    val lyrics = (result?.syncedLrc ?: result?.plainText).orEmpty()
                     if (lyrics.isNotBlank()) {
                         updated = updated.copy(lyrics = lyrics)
                     }
@@ -304,8 +314,25 @@ class MusicRepository(private val context: Context) {
 
         dao.insertSong(updated)
 
+        // Renombrar archivo si cambió artista o título
         if (!skipTagWrite) {
-            AudioTagWriter.writeTags(File(song.filePath), updated)
+            val oldFile = File(song.filePath)
+            if (oldFile.exists()) {
+                val newFileName = "${fixMojibake(updated.artist)} - ${fixMojibake(updated.title)}".replace(Regex("[/\\\\:*?\"<>|]"), "_")
+                val newFile = File(oldFile.parent, "${newFileName}.${oldFile.extension}")
+                if (newFile.absolutePath != oldFile.absolutePath && !newFile.exists()) {
+                    if (oldFile.renameTo(newFile)) {
+                        val oldId = updated.id
+                        updated = updated.copy(id = newFile.absolutePath, filePath = newFile.absolutePath)
+                        dao.insertSong(updated)
+                        if (oldId != updated.id) {
+                            dao.deleteSongById(oldId)
+                        }
+                        Log.e("MusicRepository", "Archivo renombrado: ${oldFile.name} → ${newFile.name}")
+                    }
+                }
+            }
+            AudioTagWriter.writeTags(File(updated.filePath), updated)
         }
         return updated
     }
@@ -337,6 +364,33 @@ class MusicRepository(private val context: Context) {
         } catch (_: Exception) {}
     }
 
+    private suspend fun cleanupDuplicates() {
+        try {
+            val allSongs = dao.getAllSongsNow()
+            val orphaned = allSongs.filter { !File(it.id).exists() }
+            orphaned.forEach { dao.deleteSongById(it.id) }
+            if (orphaned.isNotEmpty()) {
+                Log.e("MusicRepository", "Eliminados ${orphaned.size} registros huérfanos")
+            }
+            val groups = allSongs.filter { File(it.id).exists() }
+                .groupBy { "${it.title.lowercase().trim()}|${it.artist.lowercase().trim()}" }
+            var dedupCount = 0
+            for ((_, songs) in groups) {
+                if (songs.size > 1) {
+                    for (dupe in songs.drop(1)) {
+                        dao.deleteSongById(dupe.id)
+                        dedupCount++
+                    }
+                }
+            }
+            if (dedupCount > 0) {
+                Log.e("MusicRepository", "Eliminados $dedupCount duplicados")
+            }
+        } catch (e: Exception) {
+            Log.e("MusicRepository", "cleanupDuplicates error: ${e.message}")
+        }
+    }
+
     private fun foldersPrefs() =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -352,5 +406,19 @@ class MusicRepository(private val context: Context) {
         private const val KEY_FOLDERS = "library_folders"
         private const val MAX_SCAN_DEPTH = 4
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav")
+
+        /**
+         * Detecta y repara doble encoding UTF-8 (mojibake).
+         * Ejemplo: "Â¿QuÃ©" → "¿Qué"
+         */
+        fun fixMojibake(text: String): String {
+            if (!text.contains("Â") && !text.contains("Ã")) return text
+            try {
+                val bytes = text.toByteArray(Charsets.ISO_8859_1)
+                val decoded = String(bytes, Charsets.UTF_8)
+                if (decoded != text && !decoded.contains("�")) return decoded
+            } catch (_: Exception) {}
+            return text
+        }
     }
 }

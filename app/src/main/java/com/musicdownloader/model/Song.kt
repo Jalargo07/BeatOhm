@@ -15,5 +15,17 @@ data class Song(
     val lyrics: String = ""
 ) {
     val fileName: String
-        get() = "${artist} - ${title}".replace(Regex("[/\\\\:*?\"<>|]"), "_")
+        get() = "${fixMojibake(artist)} - ${fixMojibake(title)}".replace(Regex("[/\\\\:*?\"<>|]"), "_")
+
+    companion object {
+        fun fixMojibake(text: String): String {
+            if (!text.contains("Â") && !text.contains("Ã")) return text
+            try {
+                val bytes = text.toByteArray(Charsets.ISO_8859_1)
+                val decoded = String(bytes, Charsets.UTF_8)
+                if (decoded != text && !decoded.contains("\uFFFD")) return decoded
+            } catch (_: Exception) {}
+            return text
+        }
+    }
 }
