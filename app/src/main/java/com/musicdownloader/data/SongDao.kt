@@ -5,8 +5,23 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SongDao {
-    @Query("SELECT * FROM songs ORDER BY artist ASC, album ASC, trackNumber ASC")
+    @Query("SELECT * FROM songs ORDER BY artist COLLATE NOCASE ASC, album COLLATE NOCASE ASC, trackNumber ASC")
     fun getAllSongs(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs ORDER BY title COLLATE NOCASE ASC")
+    fun getAllSongsByTitle(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs ORDER BY artist COLLATE NOCASE ASC, album COLLATE NOCASE ASC, trackNumber ASC")
+    fun getAllSongsByArtist(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs ORDER BY album COLLATE NOCASE ASC, trackNumber ASC")
+    fun getAllSongsByAlbum(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs ORDER BY duration ASC")
+    fun getAllSongsByDuration(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs")
+    suspend fun getAllSongsNow(): List<LocalSong>
 
     @Query("SELECT * FROM songs WHERE album = :album ORDER BY trackNumber ASC")
     fun getSongsByAlbum(album: String): Flow<List<LocalSong>>
@@ -60,4 +75,16 @@ interface SongDao {
 
     @Query("SELECT COUNT(*) FROM songs")
     fun getSongCount(): Flow<Int>
+
+    @Query("SELECT * FROM songs ORDER BY playCount DESC, title COLLATE NOCASE ASC")
+    fun getMostPlayedSongs(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs WHERE year = :year ORDER BY artist COLLATE NOCASE ASC, album COLLATE NOCASE ASC, trackNumber ASC")
+    fun getSongsByYear(year: String): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs WHERE filePath LIKE :folderPath || '/%' ORDER BY title COLLATE NOCASE ASC")
+    fun getSongsInFolder(folderPath: String): Flow<List<LocalSong>>
+
+    @Query("UPDATE songs SET playCount = playCount + 1 WHERE id = :songId")
+    suspend fun incrementPlayCount(songId: String)
 }

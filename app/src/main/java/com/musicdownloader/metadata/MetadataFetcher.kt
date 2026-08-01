@@ -31,7 +31,8 @@ class MetadataFetcher {
                         album = metadata.collectionName ?: "",
                         genre = metadata.primaryGenreName ?: "",
                         year = extractYear(metadata.releaseDate ?: ""),
-                        trackNumber = metadata.trackNumber ?: 0
+                        trackNumber = metadata.trackNumber ?: 0,
+                        thumbnailUrl = metadata.artworkUrl ?: song.thumbnailUrl
                     )
                 )
             }
@@ -72,6 +73,7 @@ class MetadataFetcher {
                 val primaryGenreName = best.get("primaryGenreName")?.asString
                 val releaseDate = best.get("releaseDate")?.asString
                 val trackNumber = best.get("trackNumber")?.asInt
+                val artworkUrl100 = best.get("artworkUrl100")?.asString
 
                 if (isGoodMatch(artist, artistName ?: "", title, trackName ?: "")) {
                     return ITunesResult(
@@ -80,7 +82,8 @@ class MetadataFetcher {
                         collectionName = collectionName,
                         primaryGenreName = primaryGenreName,
                         releaseDate = releaseDate,
-                        trackNumber = trackNumber
+                        trackNumber = trackNumber,
+                        artworkUrl = artworkUrl100?.replace("100x100bb", "600x600bb")
                     )
                 }
             }
@@ -155,7 +158,8 @@ class MetadataFetcher {
         val collectionName: String?,
         val primaryGenreName: String?,
         val releaseDate: String?,
-        val trackNumber: Int?
+        val trackNumber: Int?,
+        val artworkUrl: String?
     )
 
     private data class MusicBrainzResult(

@@ -1,12 +1,13 @@
 package com.musicdownloader.ui
 
+import android.app.Application
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -24,7 +25,7 @@ class CategoryListFragment : Fragment() {
     private var recyclerView: RecyclerView? = null
     private var emptyView: TextView? = null
     private var headerBar: View? = null
-    private var backButton: TextView? = null
+    private var backButton: ImageView? = null
     private var categoryTitle: TextView? = null
     private lateinit var adapter: CategoryAdapter
     private lateinit var songsAdapter: FilteredSongAdapter
@@ -53,7 +54,7 @@ class CategoryListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         repository = MusicRepository(requireContext())
-        playerViewModel = ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
+        playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
 
         songsAdapter = FilteredSongAdapter(onItemClick = { song ->
             val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@FilteredSongAdapter
@@ -96,6 +97,7 @@ class CategoryListFragment : Fragment() {
                 "album" -> repository.getAllAlbums()
                 "artist" -> repository.getAllArtists()
                 "genre" -> repository.getAllGenres()
+                "year" -> repository.getAllYears()
                 else -> repository.getAllAlbums()
             }
             flow.collectLatest { items ->
@@ -121,6 +123,7 @@ class CategoryListFragment : Fragment() {
                 "album" -> repository.getSongsByAlbum(name)
                 "artist" -> repository.getSongsByArtist(name)
                 "genre" -> repository.getSongsByGenre(name)
+                "year" -> repository.getSongsByYear(name)
                 else -> repository.getAllSongs()
             }
             flow.collectLatest { songs ->

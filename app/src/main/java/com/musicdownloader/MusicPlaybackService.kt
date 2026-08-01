@@ -6,20 +6,31 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.ui.PlayerViewModel
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class MusicPlaybackService : android.app.Service() {
 
@@ -31,10 +42,23 @@ class MusicPlaybackService : android.app.Service() {
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSessionCompat
     private var playerViewModel: PlayerViewModel? = null
+    private val playbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var durationCheckRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
+        val audioManager = getSystemService(AudioManager::class.java)
+        val sessionId = audioManager.generateAudioSessionId()
         player = ExoPlayer.Builder(this).build()
+        player.setAudioSessionId(sessionId)
+        player.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build(),
+            true
+        )
         mediaSession = MediaSessionCompat(this, "MusicPlaybackService")
         mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
         setupPlayerListeners()
@@ -48,6 +72,8 @@ class MusicPlaybackService : android.app.Service() {
     }
 
     override fun onDestroy() {
+        durationCheckRunnable?.let { mainHandler.removeCallbacks(it) }
+        playbackScope.cancel()
         player.release()
         mediaSession.release()
         super.onDestroy()
@@ -58,6 +84,7 @@ class MusicPlaybackService : android.app.Service() {
     }
 
     fun playFile(filePath: String) {
+        playerViewModel?.setDuration(0L)
         val uri = android.net.Uri.fromFile(File(filePath))
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
@@ -70,6 +97,11 @@ class MusicPlaybackService : android.app.Service() {
         player.play()
         startForeground(NOTIFICATION_ID, buildNotification("Reproduciendo", File(filePath).nameWithoutExtension))
         updateMediaSession(filePath)
+
+        val path = filePath
+        playbackScope.launch {
+            try { MusicRepository(applicationContext).incrementPlayCount(path) } catch (_: Exception) {}
+        }
     }
 
     fun play() { player.play() }
@@ -79,6 +111,24 @@ class MusicPlaybackService : android.app.Service() {
     fun getCurrentPosition(): Long = player.currentPosition
     fun getDuration(): Long = player.duration
     fun getPlayer(): ExoPlayer = player
+    fun getAudioSessionId(): Int = player.audioSessionId
+
+    fun onSongEnded() {
+        val next = playerViewModel?.notifySongEnded() ?: return
+        val path = next.filePath.ifBlank { next.youtubeUrl }
+        if (path.isNotBlank()) playFile(path)
+    }
+
+    private fun checkAndSetDuration(retriesLeft: Int = 5) {
+        durationCheckRunnable?.let { mainHandler.removeCallbacks(it) }
+        val dur = player.duration
+        if (dur != C.TIME_UNSET && dur > 0) {
+            playerViewModel?.setDuration(dur)
+        } else if (retriesLeft > 0) {
+            durationCheckRunnable = Runnable { checkAndSetDuration(retriesLeft - 1) }
+            mainHandler.postDelayed(durationCheckRunnable!!, 300)
+        }
+    }
 
     private fun setupPlayerListeners() {
         player.addListener(object : Player.Listener {
@@ -88,11 +138,19 @@ class MusicPlaybackService : android.app.Service() {
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
-                    playerViewModel?.setDuration(player.duration)
+                    checkAndSetDuration()
+                }
+                if (playbackState == Player.STATE_ENDED) {
+                    val queueSize = playerViewModel?.playlist?.value?.size ?: 0
+                    if (queueSize > 0) {
+                        mainHandler.post { onSongEnded() }
+                    }
                 }
             }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                playerViewModel?.setDuration(0L)
                 updateNotification()
+                checkAndSetDuration()
             }
         })
     }
@@ -124,7 +182,7 @@ class MusicPlaybackService : android.app.Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(R.drawable.ic_player)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setSilent(true)

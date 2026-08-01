@@ -16,9 +16,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupWithNavController
+import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.databinding.ActivityMainBinding
+import com.musicdownloader.ui.ArtworkLoader
 import com.musicdownloader.ui.MainViewModel
 import com.musicdownloader.ui.PlayerViewModel
 
@@ -27,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     lateinit var binding: ActivityMainBinding
     var playbackService: MusicPlaybackService? = null
         private set
+    private lateinit var navController: NavController
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -51,18 +56,28 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        ArtworkLoader.init(MusicRepository(this).getAlbumArtCacheDir())
+
         ViewModelProvider(this)[MainViewModel::class.java]
 
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(true)
 
         val navHost = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHost.navController
+        navController = navHost.navController
         binding.bottomNav.setupWithNavController(navController)
+
+        val appBarConfiguration = AppBarConfiguration(
+            setOf(R.id.playerFragment, R.id.libraryFragment, R.id.downloadsFragment)
+        )
+        binding.toolbar.setupWithNavController(navController, appBarConfiguration)
 
         checkPermissions()
         bindPlaybackService()
     }
+
+    override fun onSupportNavigateUp(): Boolean =
+        navController.navigateUp() || super.onSupportNavigateUp()
 
     private fun bindPlaybackService() {
         val intent = Intent(this, MusicPlaybackService::class.java)

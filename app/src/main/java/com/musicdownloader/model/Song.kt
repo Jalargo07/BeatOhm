@@ -9,6 +9,7 @@ data class Song(
     val trackNumber: Int = 0,
     val duration: Long = 0,
     val thumbnailUrl: String = "",
+    val filePath: String = "",
     val youtubeUrl: String = "",
     val youtubeId: String = "",
     val lyrics: String = ""

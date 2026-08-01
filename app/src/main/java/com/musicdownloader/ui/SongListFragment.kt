@@ -1,13 +1,16 @@
 package com.musicdownloader.ui
 
+import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.ImageView
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -18,7 +21,7 @@ import coil.load
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
@@ -27,21 +30,30 @@ class SongListFragment : Fragment() {
 
     private var recyclerView: RecyclerView? = null
     private var emptyView: TextView? = null
+    private var sortSpinner: Spinner? = null
     private lateinit var adapter: SongItemAdapter
     private lateinit var repository: MusicRepository
     private lateinit var playerViewModel: PlayerViewModel
+    private var collectJob: Job? = null
+    private var folderPath: String = ""
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        folderPath = arguments?.getString(ARG_FOLDER_PATH, "").orEmpty()
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.fragment_song_list, container, false)
         recyclerView = view.findViewById(R.id.rv_songs)
         emptyView = view.findViewById(R.id.tv_empty)
+        sortSpinner = view.findViewById(R.id.spinner_sort)
         return view
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         repository = MusicRepository(requireContext())
-        playerViewModel = ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
+        playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
 
         adapter = SongItemAdapter { song ->
             val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@SongItemAdapter
@@ -60,8 +72,67 @@ class SongListFragment : Fragment() {
         recyclerView?.layoutManager = LinearLayoutManager(requireContext())
         recyclerView?.adapter = adapter
 
-        lifecycleScope.launch {
-            repository.getAllSongs().collectLatest { songs ->
+        if (folderPath.isNotBlank()) {
+            sortSpinner?.visibility = View.GONE
+            view.findViewById<TextView>(R.id.tv_list_title)?.text =
+                folderPath.substringAfterLast(File.separator).ifBlank { folderPath }
+            collectFolderSongs()
+        } else {
+            setupSortSpinner()
+        }
+    }
+
+    private fun collectFolderSongs() {
+        collectJob?.cancel()
+        collectJob = lifecycleScope.launch {
+            repository.getSongsInFolder(folderPath).collectLatest { songs ->
+                adapter.submitList(songs)
+                if (songs.isEmpty()) {
+                    recyclerView?.visibility = View.GONE
+                    emptyView?.visibility = View.VISIBLE
+                } else {
+                    recyclerView?.visibility = View.VISIBLE
+                    emptyView?.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    private fun setupSortSpinner() {
+        val spinner = sortSpinner ?: return
+        spinner.visibility = View.VISIBLE
+        val options = resources.getStringArray(R.array.sort_options)
+        spinner.adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_item,
+            options
+        ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+
+        val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val saved = prefs.getString(PREFS_SORT_ORDER, SORT_TITLE) ?: SORT_TITLE
+        spinner.setSelection(sortKeys.indexOf(saved).coerceAtLeast(0))
+
+        spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val key = sortKeys[position]
+                prefs.edit().putString(PREFS_SORT_ORDER, key).apply()
+                collectSongs(key)
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+    }
+
+    private fun collectSongs(sortKey: String) {
+        collectJob?.cancel()
+        collectJob = lifecycleScope.launch {
+            val flow = when (sortKey) {
+                SORT_ARTIST -> repository.getAllSongsByArtist()
+                SORT_ALBUM -> repository.getAllSongsByAlbum()
+                SORT_DURATION -> repository.getAllSongsByDuration()
+                else -> repository.getAllSongsByTitle()
+            }
+            flow.collectLatest { songs ->
                 adapter.submitList(songs)
                 if (songs.isEmpty()) {
                     recyclerView?.visibility = View.GONE
@@ -75,9 +146,22 @@ class SongListFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        collectJob?.cancel()
         recyclerView = null
         emptyView = null
+        sortSpinner = null
         super.onDestroyView()
+    }
+
+    companion object {
+        private const val ARG_FOLDER_PATH = "folderPath"
+        private const val PREFS_NAME = "player_prefs"
+        private const val PREFS_SORT_ORDER = "sort_order"
+        private const val SORT_TITLE = "title"
+        private const val SORT_ARTIST = "artist"
+        private const val SORT_ALBUM = "album"
+        private const val SORT_DURATION = "duration"
+        private val sortKeys = listOf(SORT_TITLE, SORT_ARTIST, SORT_ALBUM, SORT_DURATION)
     }
 }
 
@@ -96,12 +180,17 @@ class SongItemAdapter(private val onItemClick: (LocalSong) -> Unit) :
         holder.artist.text = song.artist.ifBlank { "Desconocido" }
 
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
+            holder.thumbnail.tag = null
             holder.thumbnail.load(File(song.thumbnailUrl)) {
                 crossfade(true)
                 placeholder(R.drawable.ic_player)
                 error(R.drawable.ic_player)
             }
+        } else if (song.filePath.isNotBlank() && File(song.filePath).exists()) {
+            holder.thumbnail.tag = song.filePath
+            ArtworkLoader.loadArtFromAudioFile(holder.thumbnail, song.filePath)
         } else {
+            holder.thumbnail.tag = null
             holder.thumbnail.setImageResource(R.drawable.ic_player)
         }
 

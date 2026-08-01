@@ -1,24 +1,31 @@
 package com.musicdownloader.ui
 
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
+import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import androidx.viewpager2.adapter.FragmentStateAdapter
-import com.google.android.material.tabs.TabLayoutMediator
-import com.musicdownloader.data.MusicRepository
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentLibraryBinding
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class LibraryFragment : Fragment() {
 
     private var _binding: FragmentLibraryBinding? = null
     private val binding get() = _binding!!
-    private lateinit var playerViewModel: PlayerViewModel
+    private lateinit var libraryViewModel: LibraryViewModel
+    private var enrichmentTotal = 0
+    private var wasEnriching = false
+    private var hasScanned = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentLibraryBinding.inflate(inflater, container, false)
@@ -27,46 +34,185 @@ class LibraryFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        playerViewModel = ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
+        libraryViewModel = ViewModelProvider(requireActivity())[LibraryViewModel::class.java]
 
-        val tabs = listOf("Canciones", "Albumes", "Artistas", "Generos", "Favoritos", "Playlists")
-        val pager = binding.viewPager
-        pager.isUserInputEnabled = true
+        val adapter = LibraryMenuAdapter(
+            onCategoryClick = { category -> navigateToCategory(category) },
+            onFolderClick = { path -> navigateToFolder(path) }
+        )
+        binding.rvLibraryCategories.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvLibraryCategories.adapter = adapter
 
-        pager.adapter = object : FragmentStateAdapter(this) {
-            override fun getItemCount() = 6
-            override fun createFragment(position: Int): Fragment {
-                return when (position) {
-                    0 -> SongListFragment()
-                    1 -> CategoryListFragment().apply {
-                        arguments = Bundle().apply { putString("category", "album") }
-                    }
-                    2 -> CategoryListFragment().apply {
-                        arguments = Bundle().apply { putString("category", "artist") }
-                    }
-                    3 -> CategoryListFragment().apply {
-                        arguments = Bundle().apply { putString("category", "genre") }
-                    }
-                    4 -> FavoritesFragment()
-                    5 -> PlaylistsFragment()
-                    else -> SongListFragment()
+        libraryViewModel.folders.observe(viewLifecycleOwner) { folders ->
+            val items = buildList {
+                addAll(categories.map { LibraryMenuItem.Category(it) })
+                val current = folders ?: emptyList()
+                if (current.isNotEmpty()) {
+                    add(LibraryMenuItem.Section(R.string.my_folders))
+                    current.forEach { add(LibraryMenuItem.Folder(it)) }
                 }
             }
+            adapter.submitList(items)
         }
 
-        TabLayoutMediator(binding.tabLayout, pager) { tab, position ->
-            tab.text = tabs[position]
-        }.attach()
+        observeEnrichment()
+        observeIncompleteCount()
+
+        if (!hasScanned) {
+            libraryViewModel.refreshLibrary()
+            hasScanned = true
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        val repo = MusicRepository(requireContext())
-        lifecycleScope.launch(Dispatchers.IO) { repo.scanMusicFolder() }
+        libraryViewModel.refreshFolders()
+    }
+
+    private fun navigateToFolder(path: String) {
+        findNavController().navigate(R.id.songListFragment, bundleOf("folderPath" to path))
+    }
+
+    private fun navigateToCategory(category: LibraryCategory) {
+        val navController = findNavController()
+        when (category.id) {
+            "songs" -> navController.navigate(R.id.songListFragment)
+            "artists" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "artist"))
+            "genres" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "genre"))
+            "albums" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "album"))
+            "years" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "year"))
+            "playlists" -> navController.navigate(R.id.playlistsFragment)
+            "favorites" -> navController.navigate(R.id.favoritesFragment)
+            "most_played" -> navController.navigate(R.id.mostPlayedFragment)
+            "folders" -> navController.navigate(R.id.foldersFragment)
+        }
+    }
+
+    private fun observeIncompleteCount() {
+        binding.btnEnrichManual.visibility = View.VISIBLE
+        binding.btnEnrichManual.text = getString(R.string.enrich_manual)
+        binding.btnEnrichManual.setOnClickListener {
+            showSongSelectorDialog()
+        }
+    }
+
+    private fun showSongSelectorDialog() {
+        val allSongs = libraryViewModel.allSongs.value.orEmpty()
+        if (allSongs.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.no_songs_available, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val incompleteIds = allSongs.filter { libraryViewModel.isIncomplete(it) }.map { it.id }.toSet()
+        val adapter = SongSelectorAdapter(allSongs, incompleteIds)
+
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_song_selector, null)
+
+        val rvSelector = dialogView.findViewById<RecyclerView>(R.id.rv_song_selector)
+        rvSelector.layoutManager = LinearLayoutManager(requireContext())
+        rvSelector.adapter = adapter
+
+        val tvCount = dialogView.findViewById<TextView>(R.id.tv_selection_count)
+        val btnSelectAll = dialogView.findViewById<TextView>(R.id.btn_select_all)
+        val cbLyrics = dialogView.findViewById<MaterialCheckBox>(R.id.cb_fetch_lyrics)
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.select_songs_title)
+            .setView(dialogView)
+            .setPositiveButton(R.string.enrich_selected) { _, _ ->
+                val selected = adapter.getSelectedSongs()
+                if (selected.isNotEmpty()) {
+                    libraryViewModel.startEnrichment(selected, cbLyrics.isChecked)
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+
+        fun updateCount() {
+            val count = adapter.getSelectedCount()
+            tvCount.text = getString(R.string.select_songs_selected_count, count, allSongs.size)
+            btnSelectAll.text = getString(if (count == allSongs.size) R.string.deselect_all else R.string.select_all)
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).isEnabled = count > 0
+        }
+
+        adapter.onSelectionChanged = { updateCount() }
+        btnSelectAll.setOnClickListener {
+            if (adapter.getSelectedCount() == allSongs.size) {
+                adapter.deselectAll()
+            } else {
+                adapter.selectAll()
+            }
+        }
+        updateCount()
+    }
+
+    private fun observeEnrichment() {
+        libraryViewModel.offerEnrichment.observe(viewLifecycleOwner) { count ->
+            if (count != null && count > 0) {
+                val dialogView = LayoutInflater.from(requireContext())
+                    .inflate(R.layout.dialog_enrich_offer, null)
+                dialogView.findViewById<TextView>(R.id.tv_offer_message).text =
+                    getString(R.string.enrich_dialog_message, count)
+                val cbOfferLyrics = dialogView.findViewById<MaterialCheckBox>(R.id.cb_offer_lyrics)
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.enrich_dialog_title)
+                    .setView(dialogView)
+                    .setPositiveButton(R.string.enrich_accept) { _, _ ->
+                        libraryViewModel.startEnrichment(cbOfferLyrics.isChecked)
+                    }
+                    .setNegativeButton(R.string.enrich_decline) { _, _ ->
+                        libraryViewModel.dismissEnrichmentOffer()
+                    }
+                    .setCancelable(false)
+                    .show()
+            }
+        }
+
+        libraryViewModel.enrichmentProgress.observe(viewLifecycleOwner) { progress ->
+            if (progress != null) {
+                wasEnriching = true
+                enrichmentTotal = progress.total
+                binding.progressEnrich.visibility = View.VISIBLE
+                binding.progressEnrich.max = progress.total
+                binding.progressEnrich.progress = progress.done
+                binding.tvEnrichProgress.visibility = View.VISIBLE
+                binding.tvEnrichProgress.text = if (progress.withLyrics) {
+                    getString(R.string.enrich_progress_with_lyrics, progress.done, progress.total)
+                } else {
+                    getString(R.string.enrich_progress, progress.done, progress.total)
+                }
+            } else {
+                binding.progressEnrich.visibility = View.GONE
+                binding.tvEnrichProgress.visibility = View.GONE
+                if (wasEnriching) {
+                    wasEnriching = false
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.enrich_done, enrichmentTotal),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
     }
 
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
+    }
+
+    companion object {
+        private val categories = listOf(
+            LibraryCategory("songs", R.string.songs, R.drawable.ic_music_note),
+            LibraryCategory("artists", R.string.by_artist, R.drawable.ic_mic),
+            LibraryCategory("genres", R.string.by_genre, R.drawable.ic_genres),
+            LibraryCategory("albums", R.string.albums, R.drawable.ic_album),
+            LibraryCategory("years", R.string.by_year, R.drawable.ic_calendar),
+            LibraryCategory("playlists", R.string.playlists_menu, R.drawable.ic_playlist),
+            LibraryCategory("favorites", R.string.favorites, R.drawable.ic_favorite),
+            LibraryCategory("most_played", R.string.most_played, R.drawable.ic_trending_up),
+            LibraryCategory("folders", R.string.folders, R.drawable.ic_folder)
+        )
     }
 }

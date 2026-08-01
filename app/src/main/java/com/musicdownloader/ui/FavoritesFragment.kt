@@ -1,5 +1,6 @@
 package com.musicdownloader.ui
 
+import android.app.Application
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -25,6 +26,9 @@ class FavoritesFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_song_list, container, false)
         recyclerView = view.findViewById(R.id.rv_songs)
         emptyView = view.findViewById(R.id.tv_empty)
+        val listTitle = view.findViewById<android.widget.TextView>(R.id.tv_list_title)
+        listTitle.text = getString(R.string.favorites)
+        view.findViewById<View>(R.id.spinner_sort).visibility = View.GONE
         return view
     }
 
@@ -35,8 +39,13 @@ class FavoritesFragment : Fragment() {
             val activity = requireActivity() as? com.musicdownloader.MainActivity
             val service = activity?.playbackService
             if (service != null) {
-                val vm = androidx.lifecycle.ViewModelProvider(requireActivity())[PlayerViewModel::class.java]
-                vm.setPlaylist(listOf(song.toSong()), 0)
+                val vm = PlayerViewModel.getInstance(requireActivity().application as Application)
+                val songs = adapter.currentList
+                val index = songs.indexOf(song)
+                vm.setPlaylist(
+                    songs.map { it.toSong() },
+                    if (index >= 0) index else 0
+                )
                 service.playFile(song.filePath)
             }
         })

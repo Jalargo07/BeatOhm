@@ -1,11 +1,46 @@
+# IntelliJ / Android Studio
 *.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
+.idea/
+
+# Gradle
+.gradle/
 /build
+/app/build
+
+# Kotlin
+.kotlin/
+
+# Local configuration (sdk path, etc)
+local.properties
+
+# OpenCode (herramienta de desarrollo local, no forma parte de la app)
+opencode.json
+.opencode/
+
+# Documentación de trabajo (planes y notas del proceso, no del producto)
+PLAN*.md
+REVIEW*.md
+MANUAL_*.md
+docs/
+PROJECT_INDEX.json
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs y dumps de memoria
+*.log
+*.err
+*.hprof
+
+# Capturas y build nativo
 /captures
 .externalNativeBuild
 .cxx
-local.properties
-/app/build
+
+# APKs / paquetes / firmas
+*.apk
+*.aab
+*.keystore
+*.jks

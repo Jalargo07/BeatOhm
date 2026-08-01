@@ -6,7 +6,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -17,6 +16,7 @@ import com.musicdownloader.data.toSong
 import com.musicdownloader.ui.FilteredSongAdapter
 import com.musicdownloader.ui.PlayerViewModel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class PlaylistDetailActivity : AppCompatActivity() {
@@ -32,24 +32,25 @@ class PlaylistDetailActivity : AppCompatActivity() {
         tvTitle = findViewById(R.id.tv_playlist_title)
         recyclerView = findViewById(R.id.rv_playlist_songs)
 
-        tvTitle.text = playlistName
+        setSupportActionBar(findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar))
         supportActionBar?.title = playlistName
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        tvTitle.text = playlistName
+
         adapter = FilteredSongAdapter(
             onItemClick = { song ->
-                val vm = ViewModelProvider(this)[PlayerViewModel::class.java]
+                val vm = PlayerViewModel.getInstance(application)
                 lifecycleScope.launch {
-                    db.songDao().getSongsInPlaylist(playlistId).collectLatest { songs ->
+                    db.songDao().getSongsInPlaylist(playlistId).first().let { songs ->
                         val index = songs.indexOf(song)
                         vm.setPlaylist(songs.map { it.toSong() }, if (index >= 0) index else 0)
                     }
+                    val intent = Intent(this@PlaylistDetailActivity, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    }
+                    startActivity(intent)
                 }
-                val activity = this@PlaylistDetailActivity
-                val intent = Intent(activity, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                }
-                startActivity(intent)
             },
             onItemLongClick = { song ->
                 AlertDialog.Builder(this)

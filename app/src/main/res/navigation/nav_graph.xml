@@ -8,18 +8,58 @@
     <fragment
         android:id="@+id/playerFragment"
         android:name="com.musicdownloader.ui.PlayerFragment"
-        android:label="Player"
+        android:label="@string/player_title"
         tools:layout="@layout/fragment_player" />
 
     <fragment
         android:id="@+id/libraryFragment"
         android:name="com.musicdownloader.ui.LibraryFragment"
-        android:label="Library"
+        android:label="@string/library_title"
         tools:layout="@layout/fragment_library" />
 
     <fragment
         android:id="@+id/downloadsFragment"
         android:name="com.musicdownloader.ui.DownloadsFragment"
-        android:label="Downloads"
+        android:label="@string/downloads_title"
         tools:layout="@layout/fragment_downloads" />
+
+    <fragment
+        android:id="@+id/songListFragment"
+        android:name="com.musicdownloader.ui.SongListFragment"
+        android:label="@string/songs">
+        <argument
+            android:name="folderPath"
+            android:defaultValue=""
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/categoryListFragment"
+        android:name="com.musicdownloader.ui.CategoryListFragment"
+        android:label="@string/categories">
+        <argument
+            android:name="category"
+            android:defaultValue="album"
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/favoritesFragment"
+        android:name="com.musicdownloader.ui.FavoritesFragment"
+        android:label="@string/favorites" />
+
+    <fragment
+        android:id="@+id/playlistsFragment"
+        android:name="com.musicdownloader.ui.PlaylistsFragment"
+        android:label="@string/playlists_menu" />
+
+    <fragment
+        android:id="@+id/mostPlayedFragment"
+        android:name="com.musicdownloader.ui.MostPlayedFragment"
+        android:label="@string/most_played" />
+
+    <fragment
+        android:id="@+id/foldersFragment"
+        android:name="com.musicdownloader.ui.FoldersFragment"
+        android:label="@string/folders" />
 </navigation>
