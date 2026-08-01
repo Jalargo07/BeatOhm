@@ -126,10 +126,15 @@ class AudioDownloader(private val context: Context) {
             if (song.trackNumber > 0) tag.setField(FieldKey.TRACK, song.trackNumber.toString())
             if (song.lyrics.isNotBlank()) tag.setField(FieldKey.LYRICS, song.lyrics)
             if (song.thumbnailUrl.isNotBlank()) {
-                try { tag.setField(ArtworkFactory.createLinkedArtworkFromURL(song.thumbnailUrl)) } catch (_: Exception) {}
+                try { tag.setField(ArtworkFactory.createLinkedArtworkFromURL(song.thumbnailUrl)) } catch (e: Exception) {
+                    Log.e(TAG, "Error artwork: ${e.message}")
+                }
             }
             AudioFileIO.write(audioFile)
-        } catch (_: Exception) {}
+            Log.e(TAG, "Tags escritos en descarga: ${file.name} [${file.extension.uppercase()}]")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error writeMetadata en descarga: ${file.name} - ${e.message}")
+        }
     }
 
     companion object {
