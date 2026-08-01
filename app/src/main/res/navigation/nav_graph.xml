@@ -21,7 +21,17 @@
         android:id="@+id/downloadsFragment"
         android:name="com.musicdownloader.ui.DownloadsFragment"
         android:label="@string/downloads_title"
-        tools:layout="@layout/fragment_downloads" />
+        tools:layout="@layout/fragment_downloads">
+        <action
+            android:id="@+id/action_downloadsFragment_to_settingsFragment"
+            app:destination="@id/settingsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.musicdownloader.ui.SettingsFragment"
+        android:label="@string/settings_title"
+        tools:layout="@layout/fragment_settings" />
 
     <fragment
         android:id="@+id/songListFragment"

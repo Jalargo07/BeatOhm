@@ -34,6 +34,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _playlist = MutableLiveData<List<Song>>(emptyList())
     val playlist: LiveData<List<Song>> = _playlist
 
+    private val _displayPlaylist = MutableLiveData<List<Song>>(emptyList())
+    val displayPlaylist: LiveData<List<Song>> = _displayPlaylist
+
     private val _isShuffle = MutableLiveData(false)
     val isShuffle: LiveData<Boolean> = _isShuffle
 
@@ -43,6 +46,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var currentIndex = 0
     private var shuffleIndex = 0
     private val shuffleOrder = mutableListOf<Int>()
+
+    private fun updateDisplayPlaylist() {
+        val base = _playlist.value ?: emptyList()
+        if (_isShuffle.value == true && shuffleOrder.isNotEmpty()) {
+            _displayPlaylist.value = shuffleOrder.mapNotNull { base.getOrNull(it) }
+        } else {
+            _displayPlaylist.value = base
+        }
+    }
 
     fun setSong(song: Song) {
         _currentSong.value = song
@@ -72,6 +84,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (_isShuffle.value == true) buildShuffleOrder()
             setSong(songs[currentIndex])
         }
+        updateDisplayPlaylist()
     }
 
     fun toggleShuffle() {
@@ -86,6 +99,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             buildShuffleOrder()
             _isShuffle.value = true
         }
+        updateDisplayPlaylist()
     }
 
     private fun buildShuffleOrder() {
@@ -93,6 +107,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (list.isNullOrEmpty()) {
             shuffleOrder.clear()
             shuffleIndex = 0
+            updateDisplayPlaylist()
             return
         }
         val n = list.size
@@ -100,6 +115,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             shuffleOrder.clear()
             shuffleOrder.add(0)
             shuffleIndex = 0
+            updateDisplayPlaylist()
             return
         }
         shuffleOrder.clear()
@@ -109,6 +125,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         shuffleOrder.add(currentIndex)
         shuffleOrder.addAll(remaining)
         shuffleIndex = 0
+        updateDisplayPlaylist()
     }
 
     fun toggleRepeatMode() {
@@ -120,36 +137,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun nextSong(): Song? {
-        val list = _playlist.value ?: return null
-        if (list.isEmpty()) return null
-
-        if (_repeatMode.value == RepeatMode.ONE) {
-            val song = list[currentIndex.coerceIn(0, list.size - 1)]
-            setSong(song)
-            return song
-        }
-
-        val isShuffled = _isShuffle.value == true && shuffleOrder.size > 1
-        if (_repeatMode.value == RepeatMode.OFF && !isShuffled && currentIndex >= list.size - 1) {
-            return null
-        }
-
-        if (isShuffled) {
-            if (shuffleIndex >= shuffleOrder.size - 1) {
-                buildShuffleOrder()
-                shuffleIndex = if (shuffleOrder.size > 1) 1 else 0
-            } else {
-                shuffleIndex++
-            }
-            currentIndex = shuffleOrder[shuffleIndex]
-        } else {
-            currentIndex = (currentIndex + 1) % list.size
-        }
-        val song = list[currentIndex]
-        setSong(song)
-        return song
-    }
+    fun nextSong(): Song? = onSongFinished()
 
     fun playAt(index: Int) {
         val list = _playlist.value ?: return
@@ -160,24 +148,105 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         setSong(list[index])
     }
 
+    fun playAtDisplay(index: Int) {
+        val list = _playlist.value ?: return
+        if (list.isEmpty()) return
+        if (_isShuffle.value == true && shuffleOrder.isNotEmpty()) {
+            val baseIndex = shuffleOrder.getOrElse(index) { return }
+            playAt(baseIndex)
+        } else {
+            playAt(index)
+        }
+    }
+
     fun removeFromQueue(index: Int) {
-        val list = _playlist.value?.toMutableList() ?: return
+        val list = _playlist.value ?: return
         if (index < 0 || index >= list.size) return
+
+        if (_isShuffle.value == true && shuffleOrder.isNotEmpty()) {
+            val baseIndex = shuffleOrder.getOrElse(index) { return }
+            val wasCurrent = baseIndex == currentIndex
+
+            val newList = list.toMutableList()
+            newList.removeAt(baseIndex)
+            _playlist.value = newList
+
+            val newShuffleOrder = mutableListOf<Int>()
+            for (i in shuffleOrder) {
+                if (i == baseIndex) continue
+                newShuffleOrder.add(if (i > baseIndex) i - 1 else i)
+            }
+            shuffleOrder.clear()
+            shuffleOrder.addAll(newShuffleOrder)
+
+            if (wasCurrent) {
+                if (newList.isEmpty()) {
+                    currentIndex = 0
+                    _currentSong.value = null
+                } else {
+                    shuffleIndex = index.coerceIn(0, shuffleOrder.size - 1)
+                    currentIndex = shuffleOrder[shuffleIndex]
+                    setSong(newList[currentIndex])
+                }
+            } else if (baseIndex < currentIndex) {
+                currentIndex--
+            }
+            updateDisplayPlaylist()
+            return
+        }
+
+        val newList = list.toMutableList()
         val wasCurrent = index == currentIndex
-        list.removeAt(index)
-        _playlist.value = list
+        newList.removeAt(index)
+        _playlist.value = newList
         if (wasCurrent) {
-            if (list.isEmpty()) {
+            if (newList.isEmpty()) {
                 currentIndex = 0
                 _currentSong.value = null
             } else {
-                currentIndex = currentIndex.coerceAtMost(list.size - 1)
-                setSong(list[currentIndex])
+                currentIndex = currentIndex.coerceAtMost(newList.size - 1)
+                setSong(newList[currentIndex])
             }
         } else if (index < currentIndex) {
             currentIndex--
         }
-        if (_isShuffle.value == true && list.isNotEmpty()) buildShuffleOrder()
+        if (_isShuffle.value == true && newList.isNotEmpty()) buildShuffleOrder()
+        updateDisplayPlaylist()
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        val list = _playlist.value ?: return
+        if (fromIndex < 0 || fromIndex >= list.size || toIndex < 0 || toIndex >= list.size) return
+        if (fromIndex == toIndex) return
+
+        if (_isShuffle.value == true && shuffleOrder.isNotEmpty()) {
+            val currentDisplayIndex = shuffleOrder.indexOf(currentIndex)
+            val movedBase = shuffleOrder.removeAt(fromIndex)
+            shuffleOrder.add(toIndex, movedBase)
+            shuffleIndex = when {
+                currentDisplayIndex == fromIndex -> toIndex
+                fromIndex < currentDisplayIndex && toIndex >= currentDisplayIndex -> shuffleIndex - 1
+                fromIndex > currentDisplayIndex && toIndex <= currentDisplayIndex -> shuffleIndex + 1
+                else -> shuffleIndex
+            }
+            updateDisplayPlaylist()
+            return
+        }
+
+        val newList = list.toMutableList()
+        val item = newList.removeAt(fromIndex)
+        newList.add(toIndex, item)
+
+        currentIndex = when (currentIndex) {
+            fromIndex -> toIndex
+            in (fromIndex + 1)..toIndex -> currentIndex - 1
+            in toIndex until fromIndex -> currentIndex + 1
+            else -> currentIndex
+        }
+
+        _playlist.value = newList
+        if (_isShuffle.value == true && newList.isNotEmpty()) buildShuffleOrder()
+        updateDisplayPlaylist()
     }
 
     fun prevSong(): Song? {
@@ -199,7 +268,93 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         return song
     }
 
-    fun notifySongEnded(): Song? = nextSong()
+    fun onSongFinished(): Song? {
+        val list = _playlist.value ?: return null
+        if (list.isEmpty()) return null
+
+        if (_repeatMode.value == RepeatMode.ONE) {
+            val song = list[currentIndex.coerceIn(0, list.size - 1)]
+            setSong(song)
+            return song
+        }
+
+        return if (_isShuffle.value == true && shuffleOrder.isNotEmpty()) {
+            advanceAfterFinishedShuffled()
+        } else {
+            advanceAfterFinishedSequential()
+        }
+    }
+
+    private fun advanceAfterFinishedSequential(): Song? {
+        val list = _playlist.value ?: return null
+        if (list.isEmpty()) return null
+
+        val finishedIndex = currentIndex
+        val isLast = finishedIndex >= list.size - 1
+
+        if (isLast && _repeatMode.value == RepeatMode.OFF) {
+            removeFinishedSong(finishedIndex)
+            return null
+        }
+
+        val nextInOldList = if (isLast) 0 else finishedIndex + 1
+        val newList = removeFinishedSong(finishedIndex)
+        if (newList.isEmpty()) return null
+
+        var nextIndex = if (nextInOldList > finishedIndex) nextInOldList - 1 else nextInOldList
+        nextIndex = nextIndex.coerceIn(0, newList.size - 1)
+        currentIndex = nextIndex
+        val song = newList[currentIndex]
+        setSong(song)
+        return song
+    }
+
+    private fun advanceAfterFinishedShuffled(): Song? {
+        val list = _playlist.value ?: return null
+        if (list.isEmpty()) return null
+
+        val finishedBase = shuffleOrder[shuffleIndex]
+        val isLastDisplay = shuffleIndex >= shuffleOrder.size - 1
+
+        if (isLastDisplay && _repeatMode.value == RepeatMode.OFF) {
+            removeFinishedSong(finishedBase)
+            return null
+        }
+
+        val newList = removeFinishedSong(finishedBase)
+        if (newList.isEmpty()) return null
+
+        if (isLastDisplay) {
+            currentIndex = shuffleOrder.getOrElse(shuffleOrder.lastIndex) { 0 }
+            buildShuffleOrder()
+        } else {
+            currentIndex = shuffleOrder[shuffleIndex]
+        }
+        val song = newList[currentIndex]
+        setSong(song)
+        return song
+    }
+
+    private fun removeFinishedSong(finishedBase: Int): List<Song> {
+        val list = _playlist.value ?: return emptyList()
+        val newList = list.toMutableList()
+        newList.removeAt(finishedBase)
+        _playlist.value = newList
+
+        if (_isShuffle.value == true && shuffleOrder.isNotEmpty()) {
+            val newOrder = mutableListOf<Int>()
+            for (baseIndex in shuffleOrder) {
+                if (baseIndex == finishedBase) continue
+                newOrder.add(if (baseIndex > finishedBase) baseIndex - 1 else baseIndex)
+            }
+            shuffleOrder.clear()
+            shuffleOrder.addAll(newOrder)
+        }
+        updateDisplayPlaylist()
+        return newList
+    }
+
+    fun notifySongEnded(): Song? = onSongFinished()
 
     enum class RepeatMode { ALL, ONE, OFF }
 

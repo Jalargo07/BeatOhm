@@ -28,6 +28,7 @@ class AudioDownloader(private val context: Context) {
         mimeType: String,
         song: Song,
         outputDir: File,
+        outputFileName: String? = null,
         onProgress: (Int) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
@@ -35,9 +36,9 @@ class AudioDownloader(private val context: Context) {
 
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val ext = detectExtension(mimeType, audioUrl)
-            val tempFile = File(outputDir, "${song.fileName}_temp$ext")
-            val finalFile = File(outputDir, "${song.fileName}.mp3")
+            val name = outputFileName ?: "${song.fileName}.mp3"
+            val tempFile = File(outputDir, "${name}_temp")
+            val finalFile = File(outputDir, name)
 
             if (finalFile.exists()) {
                 if (finalFile.length() > 0) {
@@ -127,18 +128,6 @@ class AudioDownloader(private val context: Context) {
             }
             AudioFileIO.write(audioFile)
         } catch (_: Exception) {}
-    }
-
-    private fun detectExtension(mimeType: String, url: String): String {
-        return when {
-            mimeType.contains("mp3") || mimeType.contains("mpeg") -> ".mp3"
-            mimeType.contains("mp4") || mimeType.contains("aac") -> ".m4a"
-            mimeType.contains("webm") -> ".webm"
-            mimeType.contains("opus") -> ".opus"
-            mimeType.contains("ogg") -> ".ogg"
-            url.contains(".mp3") -> ".mp3"
-            else -> ".m4a"
-        }
     }
 
     companion object {

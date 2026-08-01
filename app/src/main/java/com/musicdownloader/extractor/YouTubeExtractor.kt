@@ -1,9 +1,9 @@
 package com.musicdownloader.extractor
 
 import android.util.Log
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.musicdownloader.model.SearchResult
 import com.musicdownloader.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,7 +38,7 @@ class YouTubeExtractor {
                 return@withContext Result.failure(Exception("Could not get player response"))
             }
 
-            val videoDetails = innerTubeResponse.asJsonObject.getAsJsonObject("videoDetails")
+            val videoDetails = innerTubeResponse.getAsJsonObject("videoDetails")
             if (videoDetails != null) {
                 val title = videoDetails.get("title")?.asString ?: "Unknown"
                 val author = videoDetails.get("author")?.asString ?: "Unknown"
@@ -56,7 +56,7 @@ class YouTubeExtractor {
                 )
                 Result.success(song)
             } else {
-                val playability = innerTubeResponse.asJsonObject.getAsJsonObject("playabilityStatus")
+                val playability = innerTubeResponse.getAsJsonObject("playabilityStatus")
                 val status = playability?.get("status")?.asString ?: "UNKNOWN"
                 val reason = playability?.get("reason")?.asString ?: playability?.get("status")?.asString ?: ""
                 Log.w(TAG, "Video no disponible: status=$status reason=$reason")
@@ -85,7 +85,7 @@ class YouTubeExtractor {
                 return@withContext Result.failure(Exception("Could not get playlist data"))
             }
 
-            val videoIds = extractVideoIdsFromInnerTubeBrowse(response.asJsonObject)
+            val videoIds = extractVideoIdsFromInnerTubeBrowse(response)
             if (videoIds.isEmpty()) {
                 Log.w(TAG, "No videoIds en InnerTube browse response")
                 return@withContext Result.failure(Exception("No videos found in playlist"))
@@ -117,7 +117,7 @@ class YouTubeExtractor {
                 return@withContext Result.failure(Exception("Could not get player response"))
             }
 
-            val formats = parseFormats(innerTubeResponse.asJsonObject)
+            val formats = parseFormats(innerTubeResponse)
             if (formats.isEmpty()) {
                 Log.w(TAG, "No audio formats found")
                 return@withContext Result.failure(Exception("No audio streams available"))
@@ -140,25 +140,44 @@ class YouTubeExtractor {
         return java.net.URLDecoder.decode(match.groupValues[1], "UTF-8")
     }
 
-    private fun callInnerTubePlayer(videoId: String): JsonElement? {
-        return try {
-            val jsonBody = JsonObject().apply {
-                add("context", JsonObject().apply {
-                    add("client", JsonObject().apply {
-                        addProperty("clientName", "IOS")
-                        addProperty("clientVersion", "21.03.2")
-                        addProperty("deviceModel", "iPhone16,2")
-                        addProperty("osVersion", "18.7.2.22H124")
-                        addProperty("hl", "en")
-                        addProperty("gl", "US")
-                    })
-                })
-                addProperty("videoId", videoId)
-            }
+    private fun callInnerTubePlayer(videoId: String): JsonObject? {
+        val jsonBody = buildClientContext().apply { addProperty("videoId", videoId) }
+        return postInnerTube("player", jsonBody, IOS_USER_AGENT)
+    }
 
+    private fun callInnerTubeBrowse(url: String): JsonObject? {
+        val listId = extractListId(url) ?: return null
+        val jsonBody = buildClientContext().apply { addProperty("browseId", "VL$listId") }
+        return postInnerTube("browse", jsonBody, IOS_USER_AGENT)
+    }
+
+    private fun buildClientContext(
+        clientName: String = "IOS",
+        clientVersion: String = IOS_CLIENT_VERSION,
+        deviceModel: String = "iPhone16,2",
+        osVersion: String = "18.7.2.22H124"
+    ): JsonObject {
+        return JsonObject().apply {
+            add("context", JsonObject().apply {
+                add("client", JsonObject().apply {
+                    addProperty("clientName", clientName)
+                    addProperty("clientVersion", clientVersion)
+                    if (clientName == "IOS") {
+                        addProperty("deviceModel", deviceModel)
+                        addProperty("osVersion", osVersion)
+                    }
+                    addProperty("hl", "en")
+                    addProperty("gl", "US")
+                })
+            })
+        }
+    }
+
+    private fun postInnerTube(endpoint: String, jsonBody: JsonObject, userAgent: String): JsonObject? {
+        return try {
             val request = Request.Builder()
-                .url("https://www.youtube.com/youtubei/v1/player")
-                .header("User-Agent", "com.google.ios.youtube/21.03.2 (iPhone16,2; U; CPU iOS 18_7_2 like Mac OS X)")
+                .url("https://www.youtube.com/youtubei/v1/$endpoint")
+                .header("User-Agent", userAgent)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
@@ -166,53 +185,123 @@ class YouTubeExtractor {
 
             val response = client.newCall(request).execute()
             val body = response.body?.string() ?: return null
-            Log.d(TAG, "Player API: ${response.code}")
+            Log.d(TAG, "$endpoint API: ${response.code}")
             if (response.code != 200) {
-                Log.w(TAG, "Player response body: ${body.take(300)}")
+                Log.w(TAG, "$endpoint response body: ${body.take(300)}")
+                return null
             }
-            JsonParser.parseString(body)
+            JsonParser.parseString(body).takeIf { it.isJsonObject }?.asJsonObject
         } catch (e: Exception) {
-            Log.e(TAG, "Player API error", e)
+            Log.e(TAG, "$endpoint API error", e)
             null
         }
     }
 
-    private fun callInnerTubeBrowse(url: String): JsonElement? {
-        return try {
-            val listId = extractListId(url) ?: return null
-            val jsonBody = JsonObject().apply {
-                add("context", JsonObject().apply {
-                    add("client", JsonObject().apply {
-                        addProperty("clientName", "IOS")
-                        addProperty("clientVersion", "21.03.2")
-                        addProperty("deviceModel", "iPhone16,2")
-                        addProperty("osVersion", "18.7.2.22H124")
-                        addProperty("hl", "en")
-                        addProperty("gl", "US")
-                    })
-                })
-                addProperty("browseId", "VL$listId")
+    suspend fun searchSongs(query: String): Result<List<SearchResult>> = withContext(Dispatchers.IO) {
+        try {
+            val response = callInnerTubeSearch(query)
+            if (response == null) {
+                return@withContext Result.failure(Exception("No se pudo contactar el buscador"))
             }
-
-            val request = Request.Builder()
-                .url("https://www.youtube.com/youtubei/v1/browse")
-                .header("User-Agent", "com.google.ios.youtube/21.03.2 (iPhone16,2; U; CPU iOS 18_7_2 like Mac OS X)")
-                .header("Content-Type", "application/json")
-                .header("Accept", "application/json")
-                .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                .build()
-
-            val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return null
-            Log.d(TAG, "Browse API: ${response.code}")
-            if (response.code != 200) {
-                Log.w(TAG, "Browse response body: ${body.take(300)}")
+            val results = parseSearchResults(response)
+            if (results == null) {
+                Log.w(TAG, "No se pudo parsear la respuesta del buscador (estructura inesperada)")
+                return@withContext Result.failure(Exception("Respuesta inesperada del buscador"))
             }
-            JsonParser.parseString(body)
+            Log.d(TAG, "Resultados de búsqueda: ${results.size}")
+            Result.success(results)
         } catch (e: Exception) {
-            Log.e(TAG, "Browse API error", e)
+            Log.e(TAG, "Error en searchSongs", e)
+            Result.failure(e)
+        }
+    }
+
+    private fun callInnerTubeSearch(query: String): JsonObject? {
+        val jsonBody = buildClientContext(
+            clientName = "WEB",
+            clientVersion = "2.20240611.01.00"
+        ).apply {
+            addProperty("query", query)
+            addProperty("contentCheckOk", true)
+            addProperty("racyCheckOk", true)
+        }
+        return postInnerTube("search", jsonBody, WEB_USER_AGENT)
+    }
+
+    private fun parseSearchResults(json: JsonObject): List<SearchResult>? {
+        val results = mutableListOf<SearchResult>()
+        val sectionList = try {
+            json
+                .getAsJsonObject("contents")
+                ?.getAsJsonObject("twoColumnSearchResultsRenderer")
+                ?.getAsJsonObject("primaryContents")
+                ?.getAsJsonObject("sectionListRenderer")
+                ?.getAsJsonArray("contents")
+        } catch (e: Exception) {
             null
         }
+        if (sectionList == null) {
+            Log.w(TAG, "Estructura de respuesta inesperada. Keys: ${json.keySet()}")
+            Log.d(TAG, "Body: ${json.toString().take(500)}")
+            return null
+        }
+        try {
+            for (section in sectionList) {
+                val items = section.asJsonObject
+                    ?.getAsJsonObject("itemSectionRenderer")
+                    ?.getAsJsonArray("contents") ?: continue
+
+                for (item in items) {
+                    val videoRenderer = item.asJsonObject
+                        ?.getAsJsonObject("videoRenderer") ?: continue
+
+                    try {
+                        val videoId = videoRenderer.get("videoId")?.asString ?: continue
+                        if (videoId.length != 11) continue
+
+                        val title = videoRenderer
+                            .getAsJsonObject("title")?.getAsJsonArray("runs")
+                            ?.firstOrNull()?.asJsonObject?.get("text")?.asString ?: "Unknown"
+
+                        val channel = videoRenderer
+                            .getAsJsonObject("ownerText")?.getAsJsonArray("runs")
+                            ?.firstOrNull()?.asJsonObject?.get("text")?.asString ?: "Unknown"
+
+                        val durationText = videoRenderer
+                            .getAsJsonObject("lengthText")?.get("simpleText")?.asString ?: "0:00"
+
+                        val thumbnails = videoRenderer
+                            .getAsJsonObject("thumbnail")?.getAsJsonArray("thumbnails")
+                        val thumbnailUrl = thumbnails?.lastOrNull()?.asJsonObject
+                            ?.get("url")?.asString ?: ""
+
+                        results.add(SearchResult(
+                            videoId = videoId,
+                            title = title,
+                            channelName = channel,
+                            durationText = durationText,
+                            durationSeconds = parseDuration(durationText),
+                            thumbnailUrl = thumbnailUrl
+                        ))
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parseando resultados de búsqueda", e)
+        }
+        return results
+    }
+
+    private fun parseDuration(text: String): Long {
+        return try {
+            val parts = text.split(":").map { it.toLong() }
+            when (parts.size) {
+                3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
+                2 -> parts[0] * 60 + parts[1]
+                1 -> parts[0]
+                else -> 0L
+            }
+        } catch (_: Exception) { 0L }
     }
 
     private fun parseFormats(json: JsonObject): List<AudioFormat> {
@@ -350,5 +439,8 @@ class YouTubeExtractor {
     companion object {
         private const val TAG = "MusicDownloader"
         private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.165 Mobile Safari/537.36"
+        private const val IOS_CLIENT_VERSION = "20.10.4"
+        private const val IOS_USER_AGENT = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_7_2 like Mac OS X)"
+        private const val WEB_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     }
 }

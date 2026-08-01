@@ -1,7 +1,7 @@
 package com.musicdownloader.ui
 
 import android.app.Application
-import android.os.Build
+import android.content.Context
 import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -17,6 +17,8 @@ import com.musicdownloader.metadata.MetadataFetcher
 import com.musicdownloader.metadata.LyricsFetcher
 import com.musicdownloader.model.DownloadState
 import com.musicdownloader.model.DownloadStatus
+import com.musicdownloader.model.SearchResult
+import com.musicdownloader.util.FolderPatternParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,6 +32,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isDownloading = MutableLiveData(false)
     val isDownloading: LiveData<Boolean> = _isDownloading
+
+    private val _searchResults = MutableLiveData<List<SearchResult>>(emptyList())
+    val searchResults: LiveData<List<SearchResult>> = _searchResults
+
+    private val _isSearching = MutableLiveData(false)
+    val isSearching: LiveData<Boolean> = _isSearching
+
+    private val _searchError = MutableLiveData<String?>(null)
+    val searchError: LiveData<String?> = _searchError
 
     private val extractor = YouTubeExtractor()
     private val metadataFetcher = MetadataFetcher()
@@ -101,7 +112,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     val audioStream = audioResult.getOrThrow()
-                    val downloadDir = getDownloadDirectory()
+                    val pattern = currentFolderPattern()
+                    val (_, fileName) = FolderPatternParser.resolvePattern(pattern, finalSong)
+                    val downloadDir = getDownloadDirectory(finalSong)
 
                     // Try proxy download (loader.to) for reliable delivery
                     Log.e(TAG, "Obteniendo URL de proxy...")
@@ -118,6 +131,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             mimeType = "audio/mpeg",
                             song = finalSong,
                             outputDir = downloadDir,
+                            outputFileName = "$fileName.mp3",
                             onProgress = { progress ->
                                 updateState(downloadId, DownloadStatus.DOWNLOADING, progress)
                             }
@@ -129,6 +143,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             mimeType = audioStream.mimeType,
                             song = finalSong,
                             outputDir = downloadDir,
+                            outputFileName = "$fileName.mp3",
                             onProgress = { progress ->
                                 updateState(downloadId, DownloadStatus.DOWNLOADING, progress)
                             }
@@ -175,13 +190,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun getDownloadDirectory(): File {
+    private fun currentFolderPattern(): String {
+        val prefs = getApplication<Application>().getSharedPreferences(
+            FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE
+        )
+        return prefs.getString(FolderPatternParser.KEY_FOLDER_PATTERN, FolderPatternParser.DEFAULT_PATTERN)
+            ?: FolderPatternParser.DEFAULT_PATTERN
+    }
+
+    private fun getDownloadDirectory(song: com.musicdownloader.model.Song? = null): File {
         val ctx = getApplication<Application>()
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val target = File(dir, "MusicDownloader")
-        if (!target.exists()) target.mkdirs()
-        Log.e(TAG, "Dir: ${target.absolutePath}")
-        return target
+        val baseDir = File(dir, "MusicDownloader")
+        if (song == null) {
+            if (!baseDir.exists()) baseDir.mkdirs()
+            Log.e(TAG, "Dir: ${baseDir.absolutePath}")
+            return baseDir
+        }
+        val (subDir, _) = FolderPatternParser.resolvePattern(currentFolderPattern(), song)
+        val targetDir = File(baseDir, subDir)
+        if (!targetDir.exists()) targetDir.mkdirs()
+        Log.e(TAG, "Dir: ${targetDir.absolutePath}")
+        return targetDir
+    }
+
+    fun searchSongs(query: String) {
+        if (query.isBlank()) return
+        viewModelScope.launch {
+            Log.e(TAG, "searchSongs iniciado: query=$query")
+            _isSearching.value = true
+            _searchError.value = null
+            _searchResults.value = emptyList()
+
+            val result = extractor.searchSongs(query)
+            if (result.isSuccess) {
+                val results = result.getOrThrow()
+                _searchResults.value = results
+                Log.e(TAG, "searchSongs OK: ${results.size} resultados")
+                if (results.isEmpty()) {
+                    _searchError.value = "No se encontraron resultados"
+                }
+            } else {
+                val err = result.exceptionOrNull()?.localizedMessage ?: "Error de búsqueda"
+                Log.e(TAG, "searchSongs ERROR: $err", result.exceptionOrNull())
+                _searchError.value = err
+            }
+            _isSearching.value = false
+        }
+    }
+
+    fun clearSearch() {
+        _searchResults.value = emptyList()
+        _searchError.value = null
+    }
+
+    fun downloadFromSearch(result: SearchResult) {
+        startDownload(result.youtubeUrl)
     }
 
     private fun addDownload(state: DownloadState) {

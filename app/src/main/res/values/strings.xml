@@ -88,4 +88,33 @@
         <item>Álbum</item>
         <item>Duración</item>
     </string-array>
+
+    <!-- Feature 3: Settings / patrón de carpetas -->
+    <string name="settings_title">Configuración</string>
+    <string name="settings_description">Las descargas se organizan automáticamente en carpetas según el patrón. Usá los placeholders para personalizar la estructura.</string>
+    <string name="folder_pattern_hint">Patrón de carpetas</string>
+    <string name="folder_pattern_placeholder_title">Vista previa</string>
+    <string name="folder_pattern_placeholders">Placeholders disponibles: {Artist} {Album} {Title} {Track} {Year} {Genre} {ArtistInitial}</string>
+    <string name="folder_pattern_save">Guardar</string>
+    <string name="folder_pattern_reset">Restablecer</string>
+    <string name="folder_pattern_saved">Patrón guardado</string>
+    <string name="folder_pattern_invalid">El patrón no puede estar vacío</string>
+    <string name="folder_pattern_tokens_title">Tokens disponibles (mantené presionado para arrastrar)</string>
+    <string name="folder_pattern_builder_title">Tu patrón</string>
+    <string name="folder_pattern_builder_hint">Soltá acá los tokens para armar el patrón</string>
+    <string name="folder_pattern_token_drag">Arrastrar token</string>
+    <string name="folder_pattern_token_remove">Quitar token</string>
+    <string name="downloads_empty">No hay descargas. Pega una URL de YouTube arriba.</string>
+
+    <!-- Feature 4: Búsqueda de canciones -->
+    <string name="search_hint">Buscar canción...</string>
+    <string name="search_button">Buscar</string>
+    <string name="search_empty">Escribí el nombre de una canción</string>
+    <string name="search_no_results">No se encontraron resultados</string>
+    <string name="search_error">Error de búsqueda</string>
+    <string name="search_query_required">Ingresá un nombre de canción</string>
+    <string name="download_url_required">Ingresa una URL</string>
+    <string name="download_url_invalid">URL de YouTube inválida</string>
+    <string name="drag_handle">Arrastrar para reordenar</string>
+    <string name="media_playback_channel_name">Reproducción de música</string>
 </resources>
