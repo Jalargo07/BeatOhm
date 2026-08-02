@@ -55,10 +55,11 @@ class LibraryFragment : Fragment() {
             onFolderClick = { path -> navigateToFolder(path) }
         )
 
-        val gridLayoutManager = GridLayoutManager(requireContext(), GRID_COLUMNS).apply {
+        val gridColumns = calculateGridColumns()
+        val gridLayoutManager = GridLayoutManager(requireContext(), gridColumns).apply {
             spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
                 override fun getSpanSize(position: Int): Int {
-                    return if (adapter.currentList[position] is LibraryMenuItem.Category) 1 else GRID_COLUMNS
+                    return if (adapter.currentList[position] is LibraryMenuItem.Category) 1 else gridColumns
                 }
             }
         }
@@ -227,6 +228,16 @@ class LibraryFragment : Fragment() {
         findNavController().navigate(destinationId, args, options)
     }
 
+    private fun calculateGridColumns(): Int {
+        val widthDp = resources.configuration.screenWidthDp
+        return when {
+            widthDp >= 1000 -> 4
+            widthDp >= 720 -> 3
+            widthDp >= 500 -> 3
+            else -> 2
+        }
+    }
+
     private fun observeIncompleteCount() {
         binding.btnEnrichManual.visibility = View.VISIBLE
         binding.btnEnrichManual.text = getString(R.string.enrich_manual)
@@ -299,7 +310,6 @@ class LibraryFragment : Fragment() {
     }
 
     companion object {
-        private const val GRID_COLUMNS = 2
         private const val MAX_FAVORITES = 5
 
         private val categories = listOf(

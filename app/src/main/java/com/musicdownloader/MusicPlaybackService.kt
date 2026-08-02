@@ -283,8 +283,9 @@ class MusicPlaybackService : MediaSessionService() {
         val advanced = playerViewModel?.notifySongEnded()
         val advancedPath = advanced?.let { it.filePath.ifBlank { it.youtubeUrl } }
         if (advancedPath.isNullOrBlank()) {
-            // La cola del ViewModel quedó vacía: detener para no reproducir items stale.
-            player.stop()
+            // La cola del ViewModel quedó vacía: pausar (no stop) para conservar la media
+            // y que play() pueda reanudar.
+            player.pause()
             return
         }
         if (advancedPath != currentMediaId) {

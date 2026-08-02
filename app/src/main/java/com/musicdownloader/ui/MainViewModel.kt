@@ -104,20 +104,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Descargando ${finalSong.title}... (${index + 1}/${songs.size})")
                     updateSong(downloadId, finalSong)
 
-                    val audioResult = extractor.getBestAudioStream(finalSong.youtubeUrl)
-                    Log.e(TAG, "Audio stream result: ${audioResult.isSuccess}")
-                    if (audioResult.isFailure) {
-                        updateState(downloadId, DownloadStatus.ERROR, 0,
-                            "No se pudo obtener audio: ${audioResult.exceptionOrNull()?.localizedMessage}")
-                        continue
-                    }
-
-                    val audioStream = audioResult.getOrThrow()
                     val pattern = currentFolderPattern()
                     val (_, fileName) = FolderPatternParser.resolvePattern(pattern, finalSong)
                     val downloadDir = getDownloadDirectory(finalSong)
 
-                    // Try proxy download (loader.to) for reliable delivery
+                    // 1) Proxy primero: solo necesita la URL de YouTube, no la extracción.
+                    //    Así funciona aunque YouTube bloquee la extracción (bot-check).
                     Log.e(TAG, "Obteniendo URL de proxy...")
                     updateState(downloadId, DownloadStatus.DOWNLOADING, 0,
                         "Obteniendo descarga via proxy...")
@@ -138,7 +130,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         )
                     } else {
+                        // 2) Fallback directo: necesita extraer el stream de YouTube
                         Log.e(TAG, "Proxy fallo: ${proxyResult.exceptionOrNull()?.message}, intentando directo...")
+                        val audioResult = extractor.getBestAudioStream(finalSong.youtubeUrl)
+                        if (audioResult.isFailure) {
+                            updateState(downloadId, DownloadStatus.ERROR, 0,
+                                "No se pudo obtener audio: ${audioResult.exceptionOrNull()?.localizedMessage}")
+                            continue
+                        }
+                        val audioStream = audioResult.getOrThrow()
                         fileResult = audioDownloader.downloadAudio(
                             audioUrl = audioStream.url,
                             mimeType = audioStream.mimeType,

@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
 
         val navHost = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHost.navController
-        binding.bottomNav.setupWithNavController(navController)
+        setupNavView(navController)
 
         val appBarConfiguration = AppBarConfiguration(
             setOf(R.id.playerFragment, R.id.libraryFragment, R.id.downloadsFragment)
@@ -108,6 +108,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSupportNavigateUp(): Boolean =
         navController.navigateUp() || super.onSupportNavigateUp()
+
+    private fun setupNavView(navController: NavController) {
+        val bottomNav = findViewById<View?>(R.id.bottom_nav)
+        val rail = findViewById<View?>(R.id.nav_rail)
+        val navView = bottomNav ?: rail ?: return
+        when (navView) {
+            is com.google.android.material.bottomnavigation.BottomNavigationView ->
+                navView.setupWithNavController(navController)
+            is com.google.android.material.navigationrail.NavigationRailView ->
+                navView.setupWithNavController(navController)
+        }
+    }
 
     private fun setupMiniPlayer() {
         findViewById<View>(R.id.mini_player_container).setOnClickListener {

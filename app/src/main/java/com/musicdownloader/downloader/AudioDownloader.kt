@@ -95,6 +95,15 @@ class AudioDownloader(private val context: Context) {
 
             val mp3File = convertToMp3(tempFile, finalFile)
             if (mp3File.exists()) tempFile.delete()
+
+            // Validar que sea un MP3 real; si el proxy devolvió data corrupta o de otro
+            // formato, fallar limpio en vez de marcar éxito con un archivo inservible.
+            if (!isValidMp3(mp3File)) {
+                mp3File.delete()
+                Log.e(TAG, "Archivo inválido/corrupto tras descarga: ${mp3File.name}")
+                return@withContext Result.failure(Exception("Archivo corrupto o formato no soportado"))
+            }
+
             writeMetadata(mp3File, song)
 
             Log.e(TAG, "OK: ${mp3File.name} (${mp3File.length() / 1024}KB)")
@@ -102,6 +111,22 @@ class AudioDownloader(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error downloadAudio: ${e.message}")
             Result.failure(e)
+        }
+    }
+
+    private fun isValidMp3(file: File): Boolean {
+        return try {
+            java.io.FileInputStream(file).use { input ->
+                val header = ByteArray(4)
+                val read = input.read(header)
+                if (read < 2) return false
+                // ID3v2
+                if (header[0] == 0x49.toByte() && header[1] == 0x44.toByte() && header[2] == 0x33.toByte()) return true
+                // Frame sync de MPEG: 0xFF 0xE0-0xFF
+                header[0] == 0xFF.toByte() && (header[1].toInt() and 0xE0) == 0xE0
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -118,22 +143,63 @@ class AudioDownloader(private val context: Context) {
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tagOrCreateAndSetDefault
             tag.setEncoding(StandardCharsets.UTF_16)
-            tag.setField(FieldKey.TITLE, song.title)
-            tag.setField(FieldKey.ARTIST, song.artist)
-            tag.setField(FieldKey.ALBUM, song.album)
-            tag.setField(FieldKey.GENRE, com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(song.genre))
-            tag.setField(FieldKey.YEAR, song.year)
-            if (song.trackNumber > 0) tag.setField(FieldKey.TRACK, song.trackNumber.toString())
-            if (song.lyrics.isNotBlank()) tag.setField(FieldKey.LYRICS, song.lyrics)
+            setField(tag, FieldKey.TITLE, song.title)
+            setField(tag, FieldKey.ARTIST, song.artist)
+            setField(tag, FieldKey.ALBUM, song.album)
+            setField(tag, FieldKey.GENRE, com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(song.genre))
+            setField(tag, FieldKey.YEAR, song.year)
+            if (song.trackNumber > 0) setField(tag, FieldKey.TRACK, song.trackNumber.toString())
+            if (song.lyrics.isNotBlank()) setField(tag, FieldKey.LYRICS, song.lyrics)
             if (song.thumbnailUrl.isNotBlank()) {
-                try { tag.setField(ArtworkFactory.createLinkedArtworkFromURL(song.thumbnailUrl)) } catch (e: Exception) {
+                try { embedArtwork(tag, song.thumbnailUrl) } catch (e: Exception) {
                     Log.e(TAG, "Error artwork: ${e.message}")
                 }
             }
-            AudioFileIO.write(audioFile)
-            Log.e(TAG, "Tags escritos en descarga: ${file.name} [${file.extension.uppercase()}]")
+            try {
+                AudioFileIO.write(audioFile)
+                Log.e(TAG, "Tags escritos en descarga: ${file.name}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error AudioFileIO.write en descarga: ${file.name} - ${e.message}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error writeMetadata en descarga: ${file.name} - ${e.message}")
+        }
+    }
+
+    private fun setField(tag: org.jaudiotagger.tag.Tag, key: FieldKey, value: String) {
+        try {
+            if (value.isNotBlank()) tag.setField(key, value)
+        } catch (_: Exception) {}
+    }
+
+    private fun embedArtwork(tag: org.jaudiotagger.tag.Tag, thumbnailUrl: String) {
+        try {
+            val artwork = when {
+                thumbnailUrl.startsWith("http") -> {
+                    val bytes = downloadArtworkBytes(thumbnailUrl) ?: return
+                    val tmp = File.createTempFile("artwork", ".jpg", context.cacheDir)
+                    tmp.writeBytes(bytes)
+                    ArtworkFactory.createArtworkFromFile(tmp).also { tmp.delete() }
+                }
+                else -> {
+                    val file = File(thumbnailUrl)
+                    if (!file.exists()) return
+                    ArtworkFactory.createArtworkFromFile(file)
+                }
+            }
+            tag.deleteArtworkField()
+            tag.setField(artwork)
+        } catch (_: Exception) {}
+    }
+
+    private fun downloadArtworkBytes(url: String): ByteArray? {
+        return try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.bytes() else null
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 

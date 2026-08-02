@@ -100,10 +100,16 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
                     binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.text_secondary))
                 }
                 DownloadStatus.DOWNLOADING -> {
-                    binding.progressBar.isIndeterminate = false
-                    binding.progressBar.visibility = View.VISIBLE
-                    binding.progressBar.progress = state.progress
-                    binding.tvStatus.text = "${state.progress}%"
+                    if (state.progress <= 0) {
+                        binding.progressBar.isIndeterminate = true
+                        binding.progressBar.visibility = View.VISIBLE
+                        binding.tvStatus.text = "Descargando..."
+                    } else {
+                        binding.progressBar.isIndeterminate = false
+                        binding.progressBar.visibility = View.VISIBLE
+                        binding.progressBar.progress = state.progress
+                        binding.tvStatus.text = "${state.progress}%"
+                    }
                     binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.text_secondary))
                 }
                 DownloadStatus.TAGGING -> {
