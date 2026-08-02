@@ -60,6 +60,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 if (pending.isNotEmpty()) {
                     _offerEnrichment.postValue(pending.size)
                 }
+                // Extract waveforms in background (non-blocking, limited concurrency)
+                repo.extractMissingWaveforms(result.songs) { done, total ->
+                    Log.d(TAG, "Waveform extraction: $done/$total")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error scanning library", e)
             } finally {

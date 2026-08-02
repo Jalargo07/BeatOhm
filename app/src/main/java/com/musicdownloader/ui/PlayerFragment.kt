@@ -162,7 +162,7 @@ class PlayerFragment : Fragment() {
                 binding.emptyPlayerState.visibility = View.GONE
                 animateSongChange(song, path)
                 updateFavoriteIcon(path)
-                loadWaveform(path)
+                loadWaveform(path, song.duration)
             } else {
                 currentSongFilePath = null
                 binding.emptyPlayerState.visibility = View.VISIBLE
@@ -240,7 +240,7 @@ class PlayerFragment : Fragment() {
         }
     }
 
-    private fun loadWaveform(path: String) {
+    private fun loadWaveform(path: String, durationMs: Long = 180_000L) {
         lifecycleScope.launch {
             val waveform = withContext(Dispatchers.IO) {
                 // 1. Check memory cache first
@@ -256,8 +256,7 @@ class PlayerFragment : Fragment() {
                     ?: run {
                         // 4. Not in DB yet — extract now (background)
                         try {
-                            val dur = viewModel.duration.value ?: 180_000L
-                            val numBars = com.musicdownloader.audio.WaveformExtractor.barsForDuration(dur)
+                            val numBars = com.musicdownloader.audio.WaveformExtractor.barsForDuration(durationMs)
                             val data = com.musicdownloader.audio.WaveformExtractor.extract(path, numBars)
                             WaveformSeekBar.cacheWaveform(path, data)
                             // Store in DB for future
@@ -528,7 +527,15 @@ class PlayerFragment : Fragment() {
 
         binding.btnLyrics.setOnClickListener {
             val song = viewModel.currentSong.value ?: return@setOnClickListener
-            if (song.lyrics.isBlank()) {
+            var lyrics = song.lyrics
+            // Try reading from file tags if DB lyrics are empty
+            if (lyrics.isBlank()) {
+                val path = song.filePath.ifBlank { song.youtubeUrl }
+                if (path.isNotBlank()) {
+                    lyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
+                }
+            }
+            if (lyrics.isBlank()) {
                 Toast.makeText(requireContext(), R.string.no_lyrics, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -752,7 +759,15 @@ class PlayerFragment : Fragment() {
         isLyricsVisible = !isLyricsVisible
         if (isLyricsVisible) {
             val song = viewModel.currentSong.value
-            binding.syncedLyricsView.setLyrics(song?.lyrics ?: "")
+            var lyrics = song?.lyrics.orEmpty()
+            // Try reading from file tags if DB lyrics are empty
+            if (lyrics.isBlank()) {
+                val path = song?.filePath?.ifBlank { song.youtubeUrl }.orEmpty()
+                if (path.isNotBlank()) {
+                    lyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
+                }
+            }
+            binding.syncedLyricsView.setLyrics(lyrics)
             binding.syncedLyricsView.onLineClicked = { positionMs ->
                 (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.seekTo(positionMs)
             }

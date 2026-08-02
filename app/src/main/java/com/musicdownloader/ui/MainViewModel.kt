@@ -240,11 +240,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun clearSearch() {
-        _searchResults.value = emptyList()
-        _searchError.value = null
-    }
-
     fun downloadFromSearch(result: SearchResult) {
         startDownload(result.youtubeUrl)
     }

@@ -5,9 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.musicdownloader.data.MusicRepository
-import com.musicdownloader.data.toSong
 import com.musicdownloader.model.Song
-import kotlinx.coroutines.runBlocking
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -381,12 +379,4 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun notifySongEnded(): Song? = onSongFinished()
 
     enum class RepeatMode { ALL, ONE, OFF }
-
-    fun scanMusicFiles(): List<Song> {
-        val repo = MusicRepository(getApplication())
-        val localSongs = runBlocking { repo.scanMusicFolder() }
-        val songs = localSongs.map { it.toSong() }
-        setPlaylist(songs, 0)
-        return songs
-    }
 }

@@ -14,7 +14,13 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -51,16 +57,6 @@ class MusicRepository(private val context: Context) {
     suspend fun insertSong(song: LocalSong) = dao.insertSong(song)
     suspend fun deleteSong(song: LocalSong) = dao.deleteSong(song)
     suspend fun incrementPlayCount(songId: String) = dao.incrementPlayCount(songId)
-
-    suspend fun extractAndStoreWaveform(song: LocalSong) {
-        if (song.waveformData.isNotBlank()) return // already extracted
-        try {
-            val numBars = WaveformExtractor.barsForDuration(song.duration)
-            val data = WaveformExtractor.extract(song.filePath, numBars)
-            val json = Gson().toJson(data.toList())
-            dao.updateWaveform(song.id, json)
-        } catch (_: Exception) {}
-    }
 
     suspend fun updateWaveform(songId: String, json: String) {
         dao.updateWaveform(songId, json)
@@ -151,18 +147,39 @@ class MusicRepository(private val context: Context) {
                 || it.thumbnailUrl.isBlank() || it.lyrics.isBlank() || it.year.isBlank()
         }
 
-        // Extract waveforms in background for songs missing them
-        val songsNeedingWaveform = songs.filter { it.waveformData.isBlank() }
-        for (song in songsNeedingWaveform) {
-            try {
-                val numBars = WaveformExtractor.barsForDuration(song.duration)
-                val data = WaveformExtractor.extract(song.filePath, numBars)
-                val json = Gson().toJson(data.toList())
-                dao.updateWaveform(song.id, json)
-            } catch (_: Exception) {}
-        }
-
         return ScanResult(songs, incompleteSongs)
+    }
+
+    /**
+     * Extracts waveforms for songs missing them. Runs in background with concurrency limit.
+     * Call this AFTER scanLibrary() completes, from a coroutine scope.
+     */
+    suspend fun extractMissingWaveforms(
+        songs: List<LocalSong>,
+        onProgress: ((done: Int, total: Int) -> Unit)? = null
+    ) = withContext(Dispatchers.IO) {
+        val songsNeedingWaveform = songs.filter { it.waveformData.isBlank() }
+        if (songsNeedingWaveform.isEmpty()) return@withContext
+
+        val semaphore = Semaphore(3)
+        val total = songsNeedingWaveform.size
+        var done = 0
+
+        songsNeedingWaveform.map { song ->
+            async {
+                semaphore.withPermit {
+                    try {
+                        val numBars = WaveformExtractor.barsForDuration(song.duration)
+                        val data = WaveformExtractor.extract(song.filePath, numBars)
+                        val json = Gson().toJson(data.toList())
+                        dao.updateWaveform(song.id, json)
+                    } catch (_: Exception) {} finally {
+                        done++
+                        onProgress?.invoke(done, total)
+                    }
+                }
+            }
+        }.awaitAll()
     }
 
     private fun audioFilesIn(root: File, maxDepth: Int): List<File> {
