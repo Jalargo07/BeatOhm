@@ -29,7 +29,7 @@ import java.io.File
 class SongListFragment : Fragment() {
 
     private var recyclerView: RecyclerView? = null
-    private var emptyView: TextView? = null
+    private var emptyView: View? = null
     private var sortSpinner: Spinner? = null
     private lateinit var adapter: SongItemAdapter
     private lateinit var repository: MusicRepository
@@ -47,7 +47,7 @@ class SongListFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.fragment_song_list, container, false)
         recyclerView = view.findViewById(R.id.rv_songs)
-        emptyView = view.findViewById(R.id.tv_empty)
+        emptyView = view.findViewById(R.id.ll_song_list_empty)
         sortSpinner = view.findViewById(R.id.spinner_sort)
         return view
     }

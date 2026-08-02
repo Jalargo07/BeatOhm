@@ -9,8 +9,10 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.snackbar.Snackbar
 import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentDownloadsBinding
+import com.musicdownloader.model.DownloadStatus
 
 class DownloadsFragment : Fragment() {
 
@@ -19,6 +21,7 @@ class DownloadsFragment : Fragment() {
     private lateinit var viewModel: MainViewModel
     private lateinit var adapter: DownloadAdapter
     private lateinit var searchAdapter: SearchResultAdapter
+    private val seenErrorIds = mutableSetOf<String>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentDownloadsBinding.inflate(inflater, container, false)
@@ -30,8 +33,8 @@ class DownloadsFragment : Fragment() {
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
         adapter = DownloadAdapter()
         searchAdapter = SearchResultAdapter { result ->
+            searchAdapter.setDownloading(result.videoId)
             viewModel.downloadFromSearch(result)
-            viewModel.clearSearch()
         }
 
         binding.rvDownloads.layoutManager = LinearLayoutManager(requireContext())
@@ -58,12 +61,25 @@ class DownloadsFragment : Fragment() {
 
         viewModel.downloads.observe(viewLifecycleOwner) { list ->
             adapter.submitList(list)
-            binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+            updateEmptyVisibility()
+            list.forEach { state ->
+                val videoId = state.url.substringAfter("v=", "").take(11)
+                if (videoId.isNotBlank()) {
+                    when (state.status) {
+                        DownloadStatus.COMPLETED -> searchAdapter.setCompleted(videoId)
+                        DownloadStatus.ERROR -> searchAdapter.setIdle(videoId)
+                        else -> Unit
+                    }
+                }
+                if (state.status == DownloadStatus.ERROR && seenErrorIds.add(state.id)) {
+                    Snackbar.make(binding.root, R.string.error_download_generic, Snackbar.LENGTH_LONG).show()
+                }
+            }
         }
 
         viewModel.searchResults.observe(viewLifecycleOwner) { results ->
             searchAdapter.submitList(results)
-            binding.tvEmptySearch.visibility = if (results.isEmpty()) View.VISIBLE else View.GONE
+            updateEmptyVisibility()
         }
 
         viewModel.isSearching.observe(viewLifecycleOwner) { searching ->
@@ -72,8 +88,27 @@ class DownloadsFragment : Fragment() {
         }
 
         viewModel.searchError.observe(viewLifecycleOwner) { error ->
-            binding.tvEmptySearch.text = error ?: getString(R.string.search_empty)
+            binding.tvEmptySearch.text = friendlySearchError(error)
+            updateEmptyVisibility()
         }
+    }
+
+    private fun friendlySearchError(raw: String?): String {
+        val text = raw.orEmpty()
+        if (text.isBlank()) return getString(R.string.search_empty)
+        val lower = text.lowercase()
+        val looksLikeNetwork = lower.contains("host") || lower.contains("connect") ||
+            lower.contains("timeout") || lower.contains("internet") || lower.contains("network") ||
+            lower.contains("unreachable") || lower.contains("resolve")
+        return if (looksLikeNetwork) getString(R.string.error_no_internet) else text
+    }
+
+    private fun updateEmptyVisibility() {
+        val downloadsEmpty = viewModel.downloads.value.orEmpty().isEmpty()
+        val searchEmpty = viewModel.searchResults.value.orEmpty().isEmpty()
+        val hasError = viewModel.searchError.value != null
+        binding.tvEmpty.visibility = if (downloadsEmpty && searchEmpty && !hasError) View.VISIBLE else View.GONE
+        binding.tvEmptySearch.visibility = if (searchEmpty && hasError) View.VISIBLE else View.GONE
     }
 
     private fun startSearch() {
@@ -82,6 +117,7 @@ class DownloadsFragment : Fragment() {
             binding.etSearch.error = getString(R.string.search_query_required)
             return
         }
+        searchAdapter.resetStates()
         viewModel.searchSongs(query)
         binding.etSearch.clearFocus()
     }

@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -18,14 +17,14 @@ import kotlinx.coroutines.launch
 
 class FavoritesFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
-    private lateinit var emptyView: TextView
+    private lateinit var emptyView: View
     private lateinit var adapter: FilteredSongAdapter
     private lateinit var repository: MusicRepository
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.fragment_song_list, container, false)
         recyclerView = view.findViewById(R.id.rv_songs)
-        emptyView = view.findViewById(R.id.tv_empty)
+        emptyView = view.findViewById(R.id.ll_song_list_empty)
         val listTitle = view.findViewById<android.widget.TextView>(R.id.tv_list_title)
         listTitle.text = getString(R.string.favorites)
         view.findViewById<View>(R.id.spinner_sort).visibility = View.GONE

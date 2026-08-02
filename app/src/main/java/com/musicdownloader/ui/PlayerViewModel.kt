@@ -139,6 +139,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun nextSong(): Song? = onSongFinished()
 
+    fun peekNext(): Song? {
+        val list = _playlist.value ?: return null
+        if (list.isEmpty()) return null
+        if (_repeatMode.value == RepeatMode.ONE) return list[currentIndex.coerceIn(0, list.size - 1)]
+        return if (_isShuffle.value == true && shuffleOrder.size > 1) {
+            val idx = if (shuffleIndex < shuffleOrder.size - 1) shuffleIndex + 1 else 0
+            list.getOrNull(shuffleOrder[idx])
+        } else {
+            list.getOrNull(if (currentIndex < list.size - 1) currentIndex + 1 else 0)
+        }
+    }
+
+    fun peekPrev(): Song? {
+        val list = _playlist.value ?: return null
+        if (list.isEmpty()) return null
+        if (_repeatMode.value == RepeatMode.ONE) return list[currentIndex.coerceIn(0, list.size - 1)]
+        return if (_isShuffle.value == true && shuffleOrder.size > 1) {
+            val idx = if (shuffleIndex > 0) shuffleIndex - 1 else shuffleOrder.size - 1
+            list.getOrNull(shuffleOrder[idx])
+        } else {
+            list.getOrNull(if (currentIndex > 0) currentIndex - 1 else list.size - 1)
+        }
+    }
+
     fun playAt(index: Int) {
         val list = _playlist.value ?: return
         if (list.isEmpty()) return

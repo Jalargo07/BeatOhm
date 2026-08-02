@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Environment
 import android.util.Log
+import com.google.gson.Gson
+import com.musicdownloader.audio.WaveformExtractor
 import com.musicdownloader.metadata.LyricsFetcher
 import com.musicdownloader.metadata.MetadataFetcher
 import java.io.File
@@ -50,6 +52,20 @@ class MusicRepository(private val context: Context) {
     suspend fun deleteSong(song: LocalSong) = dao.deleteSong(song)
     suspend fun incrementPlayCount(songId: String) = dao.incrementPlayCount(songId)
 
+    suspend fun extractAndStoreWaveform(song: LocalSong) {
+        if (song.waveformData.isNotBlank()) return // already extracted
+        try {
+            val numBars = WaveformExtractor.barsForDuration(song.duration)
+            val data = WaveformExtractor.extract(song.filePath, numBars)
+            val json = Gson().toJson(data.toList())
+            dao.updateWaveform(song.id, json)
+        } catch (_: Exception) {}
+    }
+
+    suspend fun updateWaveform(songId: String, json: String) {
+        dao.updateWaveform(songId, json)
+    }
+
     fun getLibraryFolders(): List<String> {
         val defaultDir = getMusicDir().absolutePath
         val set = foldersPrefs().getStringSet(KEY_FOLDERS, null)
@@ -86,6 +102,13 @@ class MusicRepository(private val context: Context) {
     suspend fun scanMusicFolder(): List<LocalSong> = scanLibrary().songs
 
     suspend fun scanLibrary(): ScanResult {
+        // One-time: clear old waveform data so new density formula is applied
+        val prefs = context.getSharedPreferences("waveform_migration", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("v2_cleared", false)) {
+            dao.clearAllWaveforms()
+            prefs.edit().putBoolean("v2_cleared", true).apply()
+        }
+
         cleanupDuplicates()
         val existing = dao.getAllSongsNow().associate { it.id to it }
         val artCacheDir = getAlbumArtCacheDir()
@@ -127,6 +150,18 @@ class MusicRepository(private val context: Context) {
             it.artist.isBlank() || it.album.isBlank() || it.genre.isBlank()
                 || it.thumbnailUrl.isBlank() || it.lyrics.isBlank() || it.year.isBlank()
         }
+
+        // Extract waveforms in background for songs missing them
+        val songsNeedingWaveform = songs.filter { it.waveformData.isBlank() }
+        for (song in songsNeedingWaveform) {
+            try {
+                val numBars = WaveformExtractor.barsForDuration(song.duration)
+                val data = WaveformExtractor.extract(song.filePath, numBars)
+                val json = Gson().toJson(data.toList())
+                dao.updateWaveform(song.id, json)
+            } catch (_: Exception) {}
+        }
+
         return ScanResult(songs, incompleteSongs)
     }
 
@@ -203,7 +238,8 @@ class MusicRepository(private val context: Context) {
                 thumbnailUrl = thumbnailUrl.ifBlank { existing?.thumbnailUrl.orEmpty() },
                 lyrics = existing?.lyrics ?: "",
                 isFavorite = existing?.isFavorite ?: false,
-                playCount = existing?.playCount ?: 0
+                playCount = existing?.playCount ?: 0,
+                waveformData = existing?.waveformData ?: ""
             )
         } catch (_: Exception) {
             LocalSong(
@@ -212,7 +248,8 @@ class MusicRepository(private val context: Context) {
                 filePath = path,
                 lyrics = existing?.lyrics ?: "",
                 isFavorite = existing?.isFavorite ?: false,
-                playCount = existing?.playCount ?: 0
+                playCount = existing?.playCount ?: 0,
+                waveformData = existing?.waveformData ?: ""
             )
         }
     }

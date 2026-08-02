@@ -170,7 +170,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ))
 
                         updateState(downloadId, DownloadStatus.TAGGING, 100,
-                            "OK ${file.name} (${file.length() / 1024} KB)")
+                            "OK ${file.name} (${file.length() / 1024} KB)", file.absolutePath)
                         successCount++
                     } else {
                         val err = fileResult.exceptionOrNull()
@@ -256,11 +256,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isDownloading.value = true
     }
 
-    private fun updateState(id: String, status: DownloadStatus, progress: Int = 0, message: String? = null) {
+    private fun updateState(id: String, status: DownloadStatus, progress: Int = 0, message: String? = null, filePath: String = "") {
         val list = _downloads.value?.toMutableList() ?: return
         val idx = list.indexOfFirst { it.id == id }
         if (idx < 0) return
-        list[idx] = list[idx].copy(status = status, progress = progress, errorMessage = message ?: list[idx].errorMessage)
+        list[idx] = list[idx].copy(
+            status = status,
+            progress = progress,
+            errorMessage = message ?: list[idx].errorMessage,
+            filePath = filePath.ifBlank { list[idx].filePath }
+        )
         _downloads.value = list
         _isDownloading.value = list.any { it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.EXTRACTING || it.status == DownloadStatus.FETCHING_METADATA || it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.TAGGING }
     }

@@ -18,7 +18,8 @@ data class LocalSong(
     val thumbnailUrl: String = "",
     val lyrics: String = "",
     val isFavorite: Boolean = false,
-    val playCount: Int = 0
+    val playCount: Int = 0,
+    val waveformData: String = ""
 )
 
 fun LocalSong.toSong(): Song = Song(

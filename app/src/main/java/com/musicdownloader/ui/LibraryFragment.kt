@@ -75,6 +75,13 @@ class LibraryFragment : Fragment() {
 
         libraryViewModel.folders.observe(viewLifecycleOwner) { submitLibraryItems() }
 
+        libraryViewModel.isScanning.observe(viewLifecycleOwner) { scanning ->
+            binding.pbLibraryScan.visibility = if (scanning) View.VISIBLE else View.GONE
+            updateLibraryEmptyState()
+        }
+
+        libraryViewModel.allSongs.observe(viewLifecycleOwner) { updateLibraryEmptyState() }
+
         observeFavorites()
         observeCategoryCounts()
         observeEnrichment()
@@ -109,6 +116,15 @@ class LibraryFragment : Fragment() {
             }
         }
         adapter.submitList(items)
+    }
+
+    private fun updateLibraryEmptyState() {
+        val scanning = libraryViewModel.isScanning.value == true
+        val isEmpty = libraryViewModel.allSongs.value.orEmpty().isEmpty()
+        val showEmpty = hasScanned && !scanning && isEmpty
+        binding.llLibraryEmpty.visibility = if (showEmpty) View.VISIBLE else View.GONE
+        binding.rvLibraryCategories.visibility = if (showEmpty) View.GONE else View.VISIBLE
+        binding.llFavoritesHeader.visibility = if (showEmpty) View.GONE else View.VISIBLE
     }
 
     private fun observeFavorites() {

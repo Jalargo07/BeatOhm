@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 class MostPlayedFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
-    private lateinit var emptyView: TextView
+    private lateinit var emptyView: View
     private lateinit var listTitle: TextView
     private lateinit var adapter: FilteredSongAdapter
     private lateinit var repository: MusicRepository
@@ -26,7 +26,7 @@ class MostPlayedFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.fragment_song_list, container, false)
         recyclerView = view.findViewById(R.id.rv_songs)
-        emptyView = view.findViewById(R.id.tv_empty)
+        emptyView = view.findViewById(R.id.ll_song_list_empty)
         listTitle = view.findViewById(R.id.tv_list_title)
         view.findViewById<View>(R.id.spinner_sort).visibility = View.GONE
         return view

@@ -1,22 +1,29 @@
 package com.musicdownloader.ui
 
+import android.animation.ValueAnimator
 import android.app.Application
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.card.MaterialCardView
 import com.musicdownloader.MainActivity
 import com.musicdownloader.R
 import com.musicdownloader.databinding.BottomSheetQueueBinding
 import com.musicdownloader.model.Song
+import java.io.File
 
 class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
@@ -100,6 +107,10 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
             adapter.setCurrentPath(song?.filePath.orEmpty())
             scrollToCurrentSong()
         }
+
+        playerViewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
+            adapter.setPlaying(playing)
+        }
     }
 
     private fun scrollToCurrentSong() {
@@ -126,17 +137,26 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
         private val items = mutableListOf<Song>()
         private var currentPath: String = ""
+        private var isPlaying = false
 
         fun submitSongs(songs: List<Song>) {
             if (items == songs) return
+            val diffResult = DiffUtil.calculateDiff(QueueDiffCallback(items, songs))
             items.clear()
             items.addAll(songs)
-            notifyDataSetChanged()
+            diffResult.dispatchUpdatesTo(this)
         }
 
         fun setCurrentPath(path: String) {
             if (currentPath != path) {
                 currentPath = path
+                notifyDataSetChanged()
+            }
+        }
+
+        fun setPlaying(playing: Boolean) {
+            if (isPlaying != playing) {
+                isPlaying = playing
                 notifyDataSetChanged()
             }
         }
@@ -149,11 +169,32 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
             notifyItemMoved(from, to)
         }
 
+        private class QueueDiffCallback(
+            private val oldItems: List<Song>,
+            private val newItems: List<Song>
+        ) : DiffUtil.Callback() {
+
+            override fun getOldListSize(): Int = oldItems.size
+
+            override fun getNewListSize(): Int = newItems.size
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                oldItems[oldItemPosition].filePath == newItems[newItemPosition].filePath
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                oldItems[oldItemPosition] == newItems[newItemPosition]
+        }
+
         override fun getItemCount(): Int = items.size
+
+        override fun onViewRecycled(holder: ViewHolder) {
+            super.onViewRecycled(holder)
+            holder.stopPlayingAnimation()
+        }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_queue_song, parent, false)
+                .inflate(R.layout.item_queue_song_modern, parent, false)
             return ViewHolder(view)
         }
 
@@ -163,16 +204,23 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
             holder.title.text = song.title
             holder.title.setTypeface(
                 holder.title.typeface,
-                if (isCurrent) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
+                if (isCurrent) Typeface.BOLD else Typeface.NORMAL
             )
             holder.artist.text = song.artist.ifBlank { "Desconocido" }
-            holder.root.setBackgroundColor(
-                if (isCurrent) {
-                    ContextCompat.getColor(holder.root.context, R.color.queue_current_bg)
-                } else {
-                    android.graphics.Color.TRANSPARENT
-                }
+            holder.card.setCardBackgroundColor(
+                ContextCompat.getColorStateList(
+                    holder.root.context,
+                    if (isCurrent) R.color.queue_current_bg else R.color.surface
+                )
             )
+            holder.card.strokeColor = ContextCompat.getColor(
+                holder.root.context,
+                if (isCurrent) R.color.primary else R.color.outline
+            )
+            holder.card.strokeWidth = if (isCurrent) 2 else 0
+            holder.playing.visibility = if (isCurrent) View.VISIBLE else View.GONE
+            if (isCurrent && isPlaying) holder.startPlayingAnimation() else holder.stopPlayingAnimation()
+            loadArtwork(holder.artwork, song)
             holder.root.setOnClickListener { onItemClick(position, song) }
             holder.btnRemove.setOnClickListener { onRemove(position) }
             holder.ivDragHandle.setOnTouchListener { _, event ->
@@ -181,14 +229,67 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 }
                 true
             }
+            holder.itemView.alpha = 0f
+            holder.itemView.translationY = 20f
+            holder.itemView.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(200)
+                .setStartDelay(position * 30L)
+                .start()
+        }
+
+        private fun loadArtwork(iv: ImageView, song: Song) {
+            if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
+                iv.tag = null
+                iv.load(File(song.thumbnailUrl)) {
+                    crossfade(true)
+                    placeholder(R.drawable.ic_music_note)
+                    error(R.drawable.ic_music_note)
+                }
+            } else if (song.filePath.isNotBlank() && File(song.filePath).exists()) {
+                iv.tag = song.filePath
+                ArtworkLoader.loadArtFromAudioFile(iv, song.filePath)
+            } else {
+                iv.tag = null
+                iv.setImageResource(R.drawable.ic_music_note)
+            }
         }
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val root: View = view.findViewById(R.id.root)
+            val root: MaterialCardView = view.findViewById(R.id.root)
+            val card: MaterialCardView = view.findViewById(R.id.root)
             val title: TextView = view.findViewById(R.id.tv_title)
             val artist: TextView = view.findViewById(R.id.tv_artist)
             val btnRemove: ImageButton = view.findViewById(R.id.btn_remove)
             val ivDragHandle: ImageView = view.findViewById(R.id.iv_drag_handle)
+            val artwork: ImageView = view.findViewById(R.id.iv_artwork)
+            val playing: ImageView = view.findViewById(R.id.iv_playing)
+            private var playingAnimator: ValueAnimator? = null
+
+            fun startPlayingAnimation() {
+                if (playingAnimator != null) return
+                val animator = ValueAnimator.ofFloat(1f, 0.55f).apply {
+                    duration = 500L
+                    interpolator = AccelerateDecelerateInterpolator()
+                    repeatCount = ValueAnimator.INFINITE
+                    repeatMode = ValueAnimator.REVERSE
+                    addUpdateListener { anim ->
+                        val value = anim.animatedValue as Float
+                        playing.scaleX = value
+                        playing.scaleY = value
+                    }
+                    start()
+                }
+                playingAnimator = animator
+            }
+
+            fun stopPlayingAnimation() {
+                playingAnimator?.cancel()
+                playingAnimator = null
+                playing.scaleX = 1f
+                playing.scaleY = 1f
+            }
         }
     }
 }

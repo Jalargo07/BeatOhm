@@ -10,12 +10,15 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageButton
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -43,6 +46,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navController: NavController
     private lateinit var playerViewModel: PlayerViewModel
     private var miniPlayerVisible = false
+    private val miniHandler = Handler(Looper.getMainLooper())
+    private val miniProgressUpdate: Runnable = object : Runnable {
+        override fun run() {
+            updateMiniProgress()
+            miniHandler.postDelayed(this, 500)
+        }
+    }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -85,6 +95,11 @@ class MainActivity : AppCompatActivity() {
         )
         binding.toolbar.setupWithNavController(navController, appBarConfiguration)
 
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            binding.toolbar.visibility =
+                if (destination.id == R.id.playerFragment) View.GONE else View.VISIBLE
+        }
+
         setupMiniPlayer()
 
         checkPermissions()
@@ -119,6 +134,11 @@ class MainActivity : AppCompatActivity() {
             findViewById<ImageButton>(R.id.btn_mini_play_pause).setImageResource(
                 if (playing) R.drawable.ic_pause else R.drawable.ic_play
             )
+            if (playing) {
+                miniHandler.post(miniProgressUpdate)
+            } else {
+                miniHandler.removeCallbacks(miniProgressUpdate)
+            }
         }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
@@ -149,6 +169,7 @@ class MainActivity : AppCompatActivity() {
     private fun hideMiniPlayer() {
         if (!miniPlayerVisible) return
         miniPlayerVisible = false
+        miniHandler.removeCallbacks(miniProgressUpdate)
         val offset = 48 * resources.displayMetrics.density
         val container = findViewById<View>(R.id.mini_player_container)
         container.animate()
@@ -184,6 +205,15 @@ class MainActivity : AppCompatActivity() {
             cover.setImageResource(R.drawable.ic_player)
         }
         cover.animate().alpha(1f).setDuration(200).start()
+    }
+
+    private fun updateMiniProgress() {
+        val service = playbackService ?: return
+        val pos = service.getCurrentPosition()
+        val dur = service.getDuration()
+        if (dur > 0) {
+            findViewById<ProgressBar>(R.id.mini_progress_bar).progress = (pos * 1000 / dur).toInt()
+        }
     }
 
     private fun bindPlaybackService() {

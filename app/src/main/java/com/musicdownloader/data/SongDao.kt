@@ -93,4 +93,10 @@ interface SongDao {
 
     @Query("UPDATE songs SET playCount = playCount + 1 WHERE id = :songId")
     suspend fun incrementPlayCount(songId: String)
+
+    @Query("UPDATE songs SET waveformData = :data WHERE id = :songId")
+    suspend fun updateWaveform(songId: String, data: String)
+
+    @Query("UPDATE songs SET waveformData = ''")
+    suspend fun clearAllWaveforms()
 }

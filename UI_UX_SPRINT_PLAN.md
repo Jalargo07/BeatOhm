@@ -10,13 +10,13 @@
 | Componente | Estado Actual | Gap | Esfuerzo |
 |---|---|---|---|
 | **Colores** | Dark theme + purple/red básico | Paleta no coincide con la visión (#0B0910 vs #0F0F14, #9D35FF vs #8A2BE2) | Bajo |
-| **Player** | Funcional, gradient sutil, 280dp cover | Sin glow, sin download button, cover no es protagonista, sin animaciones | ALTO |
+| **Player** | **OVERHAUL COMPLETADO** — Dynamic gradient (Palette API), glow dinámico, cover 300dp con swipe, panel letras immersivo (glassmorphism), cola moderna con drag-reorder | ✅ COMPLETADO | — |
 | **Mini Player** | **NO EXISTE** | Feature completo a crear | ALTO |
 | **Biblioteca** | Lista vertical de categorías (cards altas) | Sin search bar, sin favoritos destacados, sin grid, cards desperdician espacio | MEDIO |
 | **Downloads** | Search + URL + lista básica | Sin cover art en items, sin estados claros, botón download genérico | MEDIO |
 | **Navegación** | Bottom nav 3 tabs | Sin indicador activo premium, sin mini player | MEDIO |
-| **Microinteracciones** | **NO EXISTEN** | Sin animaciones en play/fav/download | BAJO |
-| **Glow** | **NO EXISTE** | Sin glow en cover ni ambiental | BAJO |
+| **Microinteracciones** | Player: play/pause bounce, favorite heart, cover breathe, song change fade | Solo en player (falta downloads, library) | MEDIO |
+| **Glow** | **IMPLEMENTADO EN PLAYER** — GlowDrawable + DynamicGradientDrawable con Palette API | Pendiente glow ambiental fuera del player | BAJO |
 | **Equalizer visual** | Solo dialog, no visual en player | Sin barra animada en player | BAJO |
 | **Empty states** | Texto simple | Sin ilustración ni equalizer decorativo | BAJO |
 
@@ -112,92 +112,165 @@ Crear `bg_download_button.xml` — shape con:
 
 ---
 
-## SPRINT 2 — "EL PLAYER BRILLA" (2 días)
+## PLAYER OVERHAUL — IMPLEMENTADO ✅
 
-### Objetivo: Rediseñar el player para que se sienta premium
+> Overhaul completo del player UI/UX. Feature premium que cambia la experiencia de la app.
 
-### Día 1: Estructura + Cover protagonista
+### 1. Fondo Dinámico con Palette API
 
-#### 2.1 Rediseñar `fragment_player.xml`
-**Impacto: 🔥🔥🔥🔥🔥 | Esfuerzo: ALTO**
+**Clase:** `DynamicGradientDrawable.kt` → asignado como `background` del root del player.
 
-Cambios:
-- Cover de 280dp → 300dp con `bg_glow_cover.xml`
-- Agregar `DownloadButton` debajo de los controles (nuevo botón rojo)
-- Mover seekbar debajo de la cover (antes estaba después de los controles)
-- Agregar un `ImageView` invisible detrás de la cover para el glow sutil
-- Simplificar la zona de controles: prev/play/next como protagonistas, shuffle/repeat como secundarios
+- Extrae **dominant**, **vibrant** y **muted** de la cover con `Palette.from(bitmap).generate()`
+- Mezcla colores extraídos con el fondo oscuro base (`#0B0910`) usando blending por fracción:
+  - Top: base + dominant × 0.42
+  - Mid: base + vibrant × 0.22
+  - Bottom: base + muted × 0.12
+- **Animación** de 1500ms entre canciones usando `ArgbEvaluator`
+- Escala bitmap a 128px máximo antes de extraer palette (performance)
+- Reset a colores default cuando no hay canción
 
-**Estructura propuesta:**
-```
-← (back)                           ⋮ (menu)
-         ┌──────────────────┐
-         │    COVER 300dp   │  ← con glow morado sutil
-         │    + glow layer  │
-         └──────────────────┘
-              Título Canción
-              Artista
+### 2. Glow Dinámico con Blur
 
-     0:00 ─────────●──────── 3:38
+**Clase:** `GlowDrawable.kt` → asignado como `background` de `iv_glow`.
 
-          ↶    ◀    ▶    ↷
+- **RadialGradient** centrado detrás del cover con el color dominante del álbum
+- Tres stops de alpha: 0x4D → 0x1F → 0x00 (30% → 12% → transparente)
+- Transición animada de color con `ArgbEvaluator`
+- **Blur dinámico** con `RenderEffect.createBlurEffect(40f, 40f)` (API 31+)
+- Fade in/out (alpha 0→1) al cargar canción, ocultar si no hay song
 
-         ♡  ← favorito     ↓ Descargar →
-```
+### 3. Tipografía Jerárquica
 
-**Archivos a modificar:**
-- `app/src/main/res/layout/fragment_player.xml`
-- `app/src/main/java/com/musicdownloader/ui/PlayerFragment.kt` (nuevos bindings)
+- **Título:** 26sp, bold, `on_surface`, ellipsize end, maxLines 1
+- **Artista:** 15sp, `on_surface_variant`, alpha 0.7, ellipsize end, maxLines 1
+- Layout: horizontal con título a la izquierda y botón favorito a la derecha
+- **Animación al cambiar canción:** slide Y 20dp + fade in/out (200ms, DecelerateInterpolator)
 
-#### 2.2 Agregar botón de descarga al player
-**Impacto: 🔥🔥🔥🔥 | Esfuerzo: MEDIO**
+### 4. Panel de Letras Inmersivo (Glassmorphism)
 
-El player necesita un botón "↓ Descargar" que:
-- Idle: Muestra "↓ Descargar" con bg_download_button
-- Descargando: Muestra progreso con `LinearProgressIndicator`
-- Completado: Muestra "✓" con animación
+**Layout:** `lyrics_panel` (FrameLayout, constraints match_parent, visibility=GONE)
 
-**Archivos a modificar:**
-- `fragment_player.xml` (nuevo botón)
-- `PlayerFragment.kt` (lógica de estados)
-- `PlayerViewModel.kt` (nuevo LiveData para estado de descarga)
+- **Background:** `bg_lyrics_scrim.xml` — gradiente vertical de `#55110F1C` → `#F20B0910` (scrim oscuro semitransparente)
+- **Cover de fondo:** `iv_lyrics_background` — misma imagen del cover con blur dinámico (`RenderEffect 50f`, API 31+), escala 1.06→1.0 con fade 250ms
+- **SyncedLyricsView:** Custom `View` que renderiza letras sincronizadas en canvas
+  - Línea actual: 22sp bold blanca con `setShadowLayer(24f)` glow
+  - Otras líneas: 16sp light, alpha 102 (40%)
+  - Auto-scroll con `ValueAnimator` (300ms, DecelerateInterpolator)
+  - Fallback a texto plano si no hay LRC sync
+- **Header:** "Letras" (17sp bold) + botón cerrar (X)
+- **Toggle:** `btn_lyrics` en bottom actions → `toggleLyrics()` en PlayerFragment
+- **Transiciones:** Panel fade+scale in (250ms), out (200ms). Cover/controles se ocultan al abrir letras
 
-### Día 2: Animaciones + Polish
+### 5. Cola de Reproducción Moderna
 
-#### 2.3 Animación sutil de cover al reproducir
-**Impacto: 🔥🔥🔥🔥 | Esfuerzo: BAJO**
+**Clase:** `QueueBottomSheetDialogFragment.kt` (BottomSheetDialogFragment)
 
-Cuando `isPlaying = true`:
-- Scale de 0.95 → 1.0 con interpolación suave
-- Loop infinito de "breathe" MUY sutil (0.98 → 1.0 → 0.98)
+- **Layout:** `bottom_sheet_queue.xml` — handle visual + header con contador + divider + RecyclerView
+- **Item:** `item_queue_song_modern.xml` — MaterialCardView con:
+  - Drag handle (ic_drag) para reordenar
+  - Artwork (ShapeableImageView 40dp, rounded corners medium)
+  - Título (15sp, bold si es canción actual) + artista (13sp, secondary)
+  - Icono playing animado (equalizer icon, scale 1→0.55 loop, color secondary)
+  - Botón remover (X)
+- **Drag-to-reorder:** `ItemTouchHelper` con `UP|DOWN` flags, sincroniza con `PlayerViewModel.moveQueueItem()`
+- **Click:** `playerViewModel.playAtDisplay(index)` → `service.playFile(path)`
+- **Auto-scroll** a canción actual al abrir
+- **Background:** `bg_queue_sheet.xml`
 
-**Archivos a modificar:**
-- `PlayerFragment.kt` (animación en `setupObservers`)
+### 6. Swipe en Cover para Cambiar Canciones
 
-#### 2.4 Microinteracción play/pause
-**Impacto: 🔥🔥🔥 | Esfuerzo: BAJO**
+Implementado en `PlayerFragment.kt` con `OnTouchListener` en `cover_container`:
 
-Al tocar play/pause:
-- Scale 0.9 → 1.0 con bounce interpolator
-- Duración: 200ms
+- **Gesture detection:** `ViewConfiguration.scaledTouchSlop` para detectar swipe horizontal
+- **Preview:** `iv_cover_preview` se muestra con opacidad proporcional al delta del swipe
+- **Commit:** Si supera `swipeThreshold` (100dp) → animación slide out + cambio de canción
+- **Spring back:** `SpringAnimation` (damping=0.7, stiffness=300) para rebote al soltar
+- **Deshabilitado** cuando panel de letras está abierto
 
-**Archivos a modificar:**
-- `PlayerFragment.kt` (en `setupControls`)
+### 7. Animaciones del Player
 
-#### 2.5 Glow sutil en cover
-**Impacto: 🔥🔥🔥🔥 | Esfuerzo: BAJO**
+- **Cover breathe:** `ValueAnimator` 0.98→1.0, 1600ms, loop infinito reverse (solo cuando isPlaying)
+- **Play/pause press:** Scale 0.9→1.0 con BounceInterpolator (200ms)
+- **Favorite heart:** Scale 1→1.3→1 con DecelerateInterpolator + OvershootInterpolator
+- **Song change:** Fade out 100ms → load → fade in 200ms + title slide up
 
-Usar `bg_glow_cover.xml` creado en Sprint 1. El glow se activa cuando hay canción cargada.
+### Archivos Creados
 
-**Archivos a modificar:**
-- `fragment_player.xml` (cambiar background del cover_container)
+| Archivo | Tipo | Descripción |
+|---|---|---|
+| `ui/DynamicGradientDrawable.kt` | Kotlin | Drawable de gradiente vertical dinámico con Palette |
+| `ui/GlowDrawable.kt` | Kotlin | Drawable radial glow con blur |
+| `ui/QueueBottomSheetDialogFragment.kt` | Kotlin | Bottom sheet de cola con drag-reorder |
+| `res/layout/bottom_sheet_queue.xml` | Layout | Layout del bottom sheet de cola |
+| `res/layout/item_queue_song_modern.xml` | Layout | Item de canción en la cola |
+| `res/drawable/bg_lyrics_scrim.xml` | Drawable | Gradiente scrim para panel de letras |
+| `res/drawable/bg_queue_sheet.xml` | Drawable | Background del bottom sheet de cola |
+| `res/drawable/bg_play_pause.xml` | Drawable | Background del botón play/pause |
+| `res/drawable/bg_cover_rounded.xml` | Drawable | Background con esquinas redondeadas para cover |
+| `res/drawable/bg_sheet_handle.xml` | Drawable | Handle visual del bottom sheet |
 
-### Landmines del Sprint 2:
-- NO romper la lógica existente de seekbar/volumen
-- NO mover la lógica de lyrics — solo reposicionar el botón
-- El `SyncedLyricsView` debe seguir funcionando dentro del cover_container
-- PROBAR que el player funciona sin canción (tv_no_song visible)
-- El `volume_seekbar` y `btn_add_playlist` deben mantenerse accesibles
+### Archivos Modificados
+
+| Archivo | Cambios |
+|---|---|
+| `ui/PlayerFragment.kt` | Overhaul completo: Palette, glow, swipe, letras, animaciones |
+| `res/layout/fragment_player.xml` | Cover 300dp responsive, glow layer, lyrics panel inmersivo, controles jerárquicos |
+
+### Dependencias Utilizadas
+
+- `androidx.palette:palette` — Extracción de colores de imágenes
+- `androidx.dynamicanimation:dynamicanimation` — SpringAnimation para gestos
+- `com.google.android.material:material` — BottomSheetDialogFragment, MaterialCardView
+- `io.coil-kt:coil` — Carga de imágenes (ya existente)
+- `android.graphics.RenderEffect` — Blur dinámico (API 31+, gracefully degraded)
+
+---
+
+## SPRINT 2 — "EL PLAYER BRILLA" (3 días) ✅ COMPLETADO
+
+### Objetivo: Rediseñar el player para que se sienta premium — sin botón de descarga
+
+> **Estado: ✅ COMPLETADO** — Ver sección "PLAYER OVERHAUL — IMPLEMENTADO" arriba para detalles técnicos.
+
+### Día 1: Estructura + Cover protagonista + Swipe ✅
+
+#### 2.1 Rediseñar `fragment_player.xml` ✅
+- Cover responsive: `constraintWidth_percent=0.78` + `constraintWidth_max=300dp`
+- **SIN botón de descarga** — la música ya está en el dispositivo
+- Seekbar debajo de la cover, controles jerárquicos
+- `iv_glow` con `DynamicGradientDrawable` + `GlowDrawable` + blur RenderEffect
+
+#### 2.2 Panel de letras inmersivo ✅
+- `SyncedLyricsView`: custom View con renderizado canvas, highlight 22sp bold blanco con glow shadow
+- Cover de fondo con blur 50f (API 31+), transición scale + fade
+- Header "Letras" + botón cerrar
+
+#### 2.3 Swipe en cover ✅
+- `OnTouchListener` con `ViewConfiguration.scaledTouchSlop`
+- Preview proporcional, `SpringAnimation` (damping=0.7, stiffness=300)
+- Deshabilitado cuando panel de letras está abierto
+
+### Día 2: Animaciones + Polish ✅
+
+#### 2.4 Cover breathe al reproducir ✅
+- `ValueAnimator` 0.98→1.0, 1600ms, loop reverse
+
+#### 2.5 Microinteracción play/pause ✅
+- Scale 0.9→1.0 con BounceInterpolator, 200ms
+
+#### 2.6 Glow dinámico (Palette API) ✅
+- `DynamicGradientDrawable` + `GlowDrawable` con colores del álbum
+- Transición animada 1500ms
+
+### Día 3: Polish ✅
+- Threshold 100dp, preview proporcional, spring back
+
+### Landmines del Sprint 2 (resueltos):
+- ✅ Lógica existente preservada
+- ✅ Panel de letras funciona con blur y glassmorphism
+- ✅ Player funciona sin canción (empty state)
+- ✅ Swipe deshabilitado con letras abierto
+- ✅ SpringAnimation performante
 
 ---
 
@@ -446,9 +519,11 @@ En `SearchResultAdapter`:
 
 ---
 
-## SPRINT 6 — "MICROINTERACCIONES + GLOW" (1 día)
+## SPRINT 6 — "MICROINTERACCIONES + ANIMACIONES PREMIUM" (2 días)
 
-### Objetivo: Agregar vida a la app con animaciones sutiles y glow
+### Objetivo: Agregar vida a la app con animaciones sutiles, glow y transiciones premium
+
+### Día 1: Microinteracciones básicas
 
 #### 6.1 Animación de heart (favorito)
 **Impacto: 🔥🔥🔥 | Esfuerzo: BAJO**
@@ -499,11 +574,88 @@ Si el glow dinámico (extraer color de la cover) es muy costoso:
 - `fragment_player.xml` (agregar ImageView detrás de cover_container)
 - `PlayerFragment.kt` (animación del glow)
 
+### Día 2: Animaciones Premium
+
+#### 6.5 Shared Element Transitions (MaterialContainerTransform)
+**Impacto: 🔥🔥🔥🔥🔥 | Esfuerzo: ALTO**
+
+Transiciones compartidas entre pantallas para una experiencia fluida:
+- **Mini Player → Player:** Al tocar el mini player, la cover se "expande" hacia el player completo
+- **Canción en lista → Player:** Al tocar una canción en la biblioteca, la cover hace transición al player
+- **Implementación:** Usar `MaterialContainerTransform` de Material Design
+- **Configuración:** 
+  - `drawingViewId = R.id.nav_host_fragment`
+  - `duration = 400ms`
+  - `interpolator = FastOutSlowInInterpolator`
+  - `fadeMode = MaterialContainerTransform.FADE_MODE_THROUGH`
+- **Transition Name:** Asignar `transitionName` único por canción en cada vista
+
+**Archivos a modificar:**
+- `PlayerFragment.kt` (configurar shared element enter/return transition)
+- `LibraryFragment.kt` / `SongListFragment.kt` (iniciar transición al tocar canción)
+- `MainActivity.kt` (iniciar transición desde mini player)
+- `fragment_player.xml` (asignar transitionName al cover_container)
+- `item_song.xml` / `item_favorite_horizontal.xml` (asignar transitionName al cover)
+
+#### 6.6 Morphing Transitions (Scale Fade + Desplazamiento eje Z)
+**Impacto: 🔥🔥🔥🔥 | Esfuerzo: MEDIO**
+
+Animaciones de morphing para elementos que cambian de forma:
+- **Cover → Full screen:** Scale de 0.3 → 1.0 con fade simultáneo
+- **Desplazamiento eje Z:** Elevar la vista durante la transición (elevation 0 → 8dp → 0)
+- **Implementación:** Usar `ChangeBounds` + `ChangeTransform` + `ChangeImageTransform` como `TransitionSet`
+- **Configuración:**
+  - `setOrdering(TransitionSet.ORDERING_TOGETHER)`
+  - `duration = 350ms`
+  - `interpolator = DecelerateInterpolator(1.5f)`
+  - `ChangeBounds` para tamaño/posición
+  - `ChangeTransform` para scale y elevation (eje Z)
+
+**Archivos a modificar:**
+- `PlayerFragment.kt` (configurar morphing transition)
+- `MusicPlaybackService.kt` (pasar transition name al intent)
+
+#### 6.7 SpringAnimation para física de movimiento
+**Impacto: 🔥🔥🔥🔥 | Esfuerzo: MEDIO**
+
+Usar `DynamicAnimation` (SpringAnimation) para movimientos con física realista:
+- **Swipe cover:** Al soltar, la cover rebota con `SpringAnimation` hacia su posición final
+  - `SpringForce(dampingRatio = 0.7f, stiffness = 300f)`
+  - Suaviza el final del gesto de swipe
+- **Cover breathe:** En lugar de ValueAnimator, usar spring para el efecto de respiración
+  - `SpringForce(dampingRatio = 0.5f, stiffness = 50f)`
+  - Más natural que interpolación lineal
+- **Botón play:** Spring en el scale del botón al tocar
+  - `SpringForce(dampingRatio = 0.6f, stiffness = 500f)`
+  - Sensación de "click" más satisfactoria
+- **Pull to refresh (si aplica):** Spring en el overscroll
+
+**Archivos a modificar:**
+- `PlayerFragment.kt` (SpringAnimation para cover, play button, swipe)
+- `build.gradle` (verificar que `dynamic-animation` está incluido en material)
+
+#### 6.8 Transiciones de estado del player
+**Impacto: 🔥🔥🔥 | Esfuerzo: BAJO**
+
+Animaciones al cambiar estados:
+- **Play → Pause:** Scale down 1.0 → 0.9 → 1.0 (spring) + icono morph
+- **Shuffle on/off:** Rotation 0 → 360 + scale bounce
+- **Repeat modes:** Scale 0.8 → 1.0 (spring) + icono change
+- **Favorito:** Scale 1.0 → 1.3 → 1.0 (spring) + color change
+
+**Archivos a modificar:**
+- `PlayerFragment.kt` (en `setupControls`)
+
 ### Landmines del Sprint 6:
-- Las animaciones DEBEN ser rápidas (< 300ms) — nada de animaciones lentas
+- Las animaciones DEBEN ser rápidas (< 400ms) — nada de animaciones lentas
 - RESPETAR `prefers-reduced-motion` (verificar con `AnimationUtils.loadAnimation`)
 - NO abusar del glow — solo en el player
 - El `SyncedLyricsView` NO debe afectarse con las animaciones
+- **MaterialContainerTransform** requiere `implementation 'com.google.android.material:material:1.11.0'` (ya incluido)
+- **DynamicAnimation** requiere `implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0-alpha03'` (verificar si está en dependencies)
+- Probar en dispositivos con minSdk 24 — algunas APIs de animation requieren compat checks
+- Las transiciones shared element NO deben romper la navegación del nav_graph
+- Verificar que `transitionName` no colisione entre elementos
 
 ---
 
@@ -623,9 +775,12 @@ Mostrar errores de forma amigable:
 | Glow effect consume batería | MEDIA | BAJO | Usar solo en player, no en lists |
 | Cover glow dinámico es muy lento | ALTA | BAJO | Empezar con glow estático, dinámico como optional |
 | Cards rompen en pantallas pequeñas | MEDIA | MEDIO | Usar wrap_content y maxdp, no fixed sizes |
-| Botón descarga en player confunde | BAJA | MEDIO | Asegurar que la descarga se siente como acción diferente a play |
 | Colores nuevos rompen legibilidad | BAJA | ALTO | Probar contraste con herramienta de accesibilidad |
 | Bottom nav se solapa con mini player | ALTA | ALTO | ConstraintLayout bien configurado, testear en 320dp |
+| Swipe cover interfiriendo con scroll de letras | MEDIA | MEDIO | Desactivar swipe cuando panel de letras está abierto |
+| Shared Element Transition rompe navegación | MEDIA | ALTO | Probar transiciones con nav_graph, usar drawingViewId correcto |
+| SpringAnimation consume CPU | BAJA | BAJO | Usar solo en elementos visibles, cancelar en onPause |
+| DynamicAnimation no disponible en minSdk 24 | BAJA | MEDIO | Verificar compatibilidad, usar ValueAnimator como fallback |
 
 ---
 
@@ -641,8 +796,10 @@ Mostrar errores de forma amigable:
 | 6 | Animación heart favorito | 🔥🔥🔥 | 15 min |
 | 7 | Top border en bottom nav | 🔥🔥 | 5 min |
 | 8 | Empty state con equalizer | 🔥🔥🔥 | 20 min |
+| 9 | Panel de letras mejorado | 🔥🔥🔥🔥 | 30 min |
+| 10 | Swipe cover (básico) | 🔥🔥🔥🔥🔥 | 45 min |
 
-**Total quick wins: ~1.5 horas para cambios visibles en toda la app**
+**Total quick wins: ~2.5 horas para cambios visibles en toda la app**
 
 ---
 
@@ -651,10 +808,11 @@ Mostrar errores de forma amigable:
 | # | Feature | Riesgo | Recompensa |
 |---|---|---|---|
 | 1 | Mini Player | ALTO | REVOLUCIONARIO — cambia toda la UX |
-| 2 | Player rediseñado con glow | MEDIO | La pantalla más vista se siente premium |
+| 2 | Player rediseñado con glow + swipe | MEDIO | La pantalla más vista se siente premium |
 | 3 | Biblioteca con grid + favoritos | MEDIO | La app se siente como un producto completo |
 | 4 | Glow dinámico (color de cover) | ALTO | Wow factor, pero puede ser lento |
 | 5 | Equalizer visual animado | MEDIO | Identidad visual fuerte |
+| 6 | Animaciones Premium (Shared Element + Spring) | MEDIO | Experiencia fluida y profesional |
 
 ---
 
@@ -663,7 +821,7 @@ Mostrar errores de forma amigable:
 ```
 Sprint 1: Colors + Drawables (base de todo)
     ↓
-Sprint 2: Player (la pantalla más importante)
+Sprint 2: Player + Swipe + Letras (la pantalla más importante)
     ↓
 Sprint 3: Mini Player (la feature más impactante)
     ↓
@@ -671,7 +829,7 @@ Sprint 4: Library (la segunda pantalla más usada)
     ↓
 Sprint 5: Downloads (completar la experiencia)
     ↓
-Sprint 6: Microinteracciones (darle vida)
+Sprint 6: Animaciones Premium (darle vida y fluidez)
     ↓
 Sprint 7: Navigation (pulir la estructura)
     ↓
@@ -680,11 +838,11 @@ Sprint 8: Polish (asegurar calidad)
 
 **Por qué este orden:**
 1. **Colors primero** — Todo lo demás depende de la paleta
-2. **Player después** — Es lo que más se ve, más impacto inmediato
+2. **Player después** — Es lo que más se ve, más impacto inmediato (incluye swipe y letras mejoradas)
 3. **Mini Player tercero** — Sin él, la app se siente rota
 4. **Library cuarto** — Es la segunda pantalla más usada
 5. **Downloads quinto** — Completar el loop de la app
-6. **Microinteracciones sexto** — Darle personalidad
+6. **Animaciones Premium sexto** — Shared Element Transitions, SpringAnimation, Morphing
 7. **Navigation séptimo** — Pulir la estructura
 8. **Polish último** — Asegurar calidad
 
@@ -693,31 +851,34 @@ Sprint 8: Polish (asegurar calidad)
 ## CRITERIOS DE ACEPTACIÓN GLOBALES
 
 ### Visual
-- [ ] La paleta es consistente en todas las pantallas
-- [ ] El morado domina la interfaz
+- [x] La paleta es consistente en todas las pantallas
+- [x] El morado domina la interfaz
 - [ ] El rojo representa descarga
 - [ ] El equalizer aparece como elemento de identidad
 - [ ] Las cards no desperdician espacio
-- [ ] El Player se siente premium
+- [x] El Player se siente premium (sin botón de descarga)
 - [ ] No hay interfaz saturada
+- [x] El panel de letras es legible y estilizado
 
 ### UX
 - [ ] Es evidente qué canción está reproduciéndose (mini player + player)
-- [ ] Descargar una canción es fácil (player + downloads)
 - [ ] El progreso de descarga es visible
 - [ ] Se puede navegar sin perder el mini player
 - [ ] Biblioteca es fácil de explorar (grid + search)
 - [ ] Favoritos tiene protagonismo
 - [ ] Downloads comunica claramente sus estados
+- [x] El swipe en cover funciona intuitivamente
+- [ ] Las transiciones entre pantallas son fluidas
 
 ### Técnico
-- [ ] No se rompe funcionalidad existente
+- [x] No se rompe funcionalidad existente
 - [ ] No aparecen errores de consola
 - [ ] No existen problemas evidentes de overflow
-- [ ] Las animaciones son fluidas (< 300ms)
-- [ ] No se agregan dependencias innecesarias
-- [ ] Los componentes siguen una estructura mantenible
+- [x] Las animaciones son fluidas (< 400ms)
+- [x] No se agregan dependencias innecesarias
+- [x] Los componentes siguen una estructura mantenible
 - [ ] Build release funciona sin errores
+- [ ] Las shared element transitions no rompen la navegación
 
 ---
 
@@ -728,13 +889,59 @@ Después de cada sprint, actualizar el `PROJECT_INDEX.json` con:
 - Archivos modificados (fragments, adapters)
 - Nuevas features documentadas
 
+**Archivos creados en el Player Overhaul (Sprint 2):**
+- `ui/DynamicGradientDrawable.kt` — Fondo gradiente vertical dinámico con Palette API
+- `ui/GlowDrawable.kt` — Halo radial glow con blur dinámico
+- `ui/QueueBottomSheetDialogFragment.kt` — Bottom sheet de cola con drag-reorder
+- `res/layout/bottom_sheet_queue.xml` — Layout del bottom sheet de cola
+- `res/layout/item_queue_song_modern.xml` — Item de canción en la cola
+- `res/drawable/bg_lyrics_scrim.xml` — Gradiente scrim para panel de letras
+- `res/drawable/bg_queue_sheet.xml` — Background del bottom sheet de cola
+- `res/drawable/bg_play_pause.xml` — Background del botón play/pause
+- `res/drawable/bg_cover_rounded.xml` — Background con esquinas redondeadas para cover
+- `res/drawable/bg_sheet_handle.xml` — Handle visual del bottom sheet
+
+**Archivos modificados en el Player Overhaul (Sprint 2):**
+- `ui/PlayerFragment.kt` — Overhaul completo: Palette, glow, swipe, letras, animaciones
+- `res/layout/fragment_player.xml` — Cover responsive, glow layer, lyrics panel, controles jerárquicos
+
+**Archivos pendientes de este plan (Sprints 3-8):**
+- `fragment_library.xml` (transiciones shared element)
+- `item_song.xml` / `item_favorite_horizontal.xml` (transitionName para shared element)
+- `MainActivity.kt` (transiciones desde mini player)
+- `build.gradle` (verificar dynamicanimation dependency)
+
+**Dependencias verificadas:**
+- `com.google.android.material:material:1.11.0` — ✅ Incluido (MaterialContainerTransform, BottomSheetDialogFragment, MaterialCardView)
+- `androidx.dynamicanimation:dynamicanimation` — ✅ Incluido (SpringAnimation)
+- `androidx.palette:palette` — ✅ Incluido (extracción de colores)
+- `io.coil-kt:coil` — ✅ Incluido (carga de imágenes)
+
 ---
 
 ## NOTA FINAL
 
 Este plan es **CAÓTICO pero ACCIONABLE**. Cada sprint produce cambios visibles. No hay sprints de "preparación" o "investigación" — todo es implementación directa.
 
-La clave es: **empezar por los quick wins (Sprint 1) para tener motivación, y construir features grandes (Mini Player, Player) sobre una base sólida.**
+La clave es: **empezar por los quick wins (Sprint 1) para tener motivación, y construir features grandes (Mini Player, Player con swipe y animaciones premium) sobre una base sólida.**
+
+**Cambios implementados (Player Overhaul):**
+- ✅ Fondo dinámico con Palette API (colores del álbum, animación 1500ms)
+- ✅ Cover con glow dinámico (RadialGradient + blur RenderEffect)
+- ✅ Tipografía jerárquica (26sp bold título, 15sp artist alpha 0.7)
+- ✅ Panel de letras inmersivo (glassmorphism, SyncedLyricsView canvas, blur cover fondo)
+- ✅ Cola de reproducción moderna (BottomSheet con drag-reorder, playing animation)
+- ✅ Swipe en cover (OnTouchListener + SpringAnimation para cambio de canciones)
+- ✅ Animaciones (cover breathe, play/pause bounce, favorite heart, song change fade)
+- ✅ Eliminado botón de descarga (la música ya está en el dispositivo)
+
+**Pendiente:**
+- Sprint 3: Mini Player
+- Sprint 4: Biblioteca compacta
+- Sprint 5: Downloads con identidad
+- Sprint 6: Animaciones premium (Shared Element, Morphing, Spring)
+- Sprint 7: Navigation premium
+- Sprint 8: Polish final
 
 Si en algún momento algo se rompe, el PLAN.md existente tiene el historial de lo que ya funciona — NO tocar la lógica de reproducción, descarga, ni metadata.
 

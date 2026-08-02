@@ -19,7 +19,7 @@ android {
         applicationId = "com.musicdownloader"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
+        versionCode = 7
         versionName = "2.2-night"
 
         buildConfigField("String", "GENIUS_ACCESS_TOKEN", "\"${secrets.getProperty("GENIUS_ACCESS_TOKEN", "")}\"")
@@ -93,8 +93,14 @@ dependencies {
     // Coil para carátulas
     implementation("io.coil-kt:coil:2.6.0")
 
+    // Palette API para colores dinámicos del reproductor
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // ViewPager2
     implementation("androidx.viewpager2:viewpager2:1.0.0")
+
+    // Animaciones con física (SpringAnimation)
+    implementation("androidx.dynamicanimation:dynamicanimation:1.0.0-alpha03")
 
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")

@@ -23,6 +23,12 @@ object ArtworkLoader {
         this.cacheDir = cacheDir
     }
 
+    /**
+     * Devuelve el bitmap de la carátula embebida (usa la misma cache que el ImageView).
+     * Lo usa el PlayerFragment para extraer colores con Palette.
+     */
+    suspend fun loadBitmapFor(filePath: String): Bitmap? = loadBitmap(filePath)
+
     fun loadArtFromAudioFile(imageView: ImageView, filePath: String) {
         imageView.setImageResource(R.drawable.ic_player)
         imageView.tag = filePath

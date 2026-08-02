@@ -22,4 +22,5 @@
     <color name="accent_gradient_end">#FF304F</color>
     <color name="splash_background">#0B0910</color>
     <color name="queue_current_bg">#339D35FF</color>
+    <color name="success">#4CAF50</color>
 </resources>

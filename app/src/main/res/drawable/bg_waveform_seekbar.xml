@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Waveform decorativo detrás del seekbar (ondas sutiles ▁▂▃▅▇▅▃▂▁▂▃▅▇▅▃▂▁).
+     Se usa como android:background del SeekBar; al ser un vector, las barras
+     escalan proporcionalmente con el ancho real de la vista. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="340dp"
+    android:height="14dp"
+    android:viewportWidth="340"
+    android:viewportHeight="14">
+
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M7 6 h6 v2 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M27 5.5 h6 v3 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M47 4.5 h6 v5 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M67 3 h6 v8 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M87 1.5 h6 v11 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M107 3 h6 v8 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M127 4.5 h6 v5 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M147 5.5 h6 v3 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M167 6 h6 v2 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M187 5.5 h6 v3 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M207 4.5 h6 v5 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M227 3 h6 v8 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M247 1.5 h6 v11 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M267 3 h6 v8 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M287 4.5 h6 v5 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M307 5.5 h6 v3 h-6 z" />
+    <path
+        android:fillColor="#4D9D35FF"
+        android:pathData="M327 6 h6 v2 h-6 z" />
+</vector>

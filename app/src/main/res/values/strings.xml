@@ -121,4 +121,18 @@
     <string name="download_url_invalid">URL de YouTube inválida</string>
     <string name="drag_handle">Arrastrar para reordenar</string>
     <string name="media_playback_channel_name">Reproducción de música</string>
+
+    <!-- Sprint 5 UI/UX: Downloads con identidad -->
+    <string name="downloads_section_search">Buscar música</string>
+    <string name="downloads_section_url">Descargar por URL</string>
+    <string name="downloads_empty_equalizer">▂ ▅ ▇ ▅ ▂</string>
+    <string name="downloads_empty_hint">Busca tu música o pega un enlace de YouTube</string>
+    <string name="download_button_idle">↓ Descargar</string>
+    <string name="download_done">✓</string>
+
+    <!-- Sprint 8 UI/UX: Empty/Loading/Error states -->
+    <string name="empty_state_equalizer">▂ ▅ ▇ ▅ ▂</string>
+    <string name="library_empty_hint">Agrega carpetas en Biblioteca &gt; Carpetas</string>
+    <string name="error_no_internet">Conectate a internet para buscar</string>
+    <string name="error_download_generic">Error al descargar. Intenta de nuevo.</string>
 </resources>

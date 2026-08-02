@@ -2,10 +2,17 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/surface"
+    android:background="@drawable/bg_queue_sheet"
     android:orientation="vertical"
-    android:paddingTop="16dp"
+    android:paddingTop="8dp"
     android:paddingBottom="16dp">
+
+    <View
+        android:layout_width="48dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_sheet_handle" />
 
     <TextView
         android:id="@+id/tv_queue_header"
@@ -29,10 +36,11 @@
         android:id="@+id/rv_queue"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="420dp"
         android:clipToPadding="false"
+        android:maxHeight="420dp"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
+        android:paddingTop="4dp"
         android:scrollbars="none" />
 
 </LinearLayout>

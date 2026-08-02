@@ -52,17 +52,37 @@
             android:paddingBottom="16dp"
             android:scrollbars="none" />
 
-        <TextView
-            android:id="@+id/tv_empty"
+        <LinearLayout
+            android:id="@+id/ll_song_list_empty"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:drawablePadding="12dp"
             android:gravity="center"
-            android:text="No hay canciones descargadas"
-            android:textColor="@color/text_secondary"
-            android:textSize="16sp"
-            android:visibility="gone" />
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/empty_state_equalizer"
+                android:textColor="@color/secondary"
+                android:textSize="44sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_empty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:drawablePadding="12dp"
+                android:gravity="center"
+                android:text="@string/empty_songs"
+                android:textAlignment="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp" />
+
+        </LinearLayout>
 
     </FrameLayout>
 

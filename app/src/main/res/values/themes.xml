@@ -33,4 +33,12 @@
         <item name="android:elevation">0dp</item>
         <item name="titleTextColor">@color/on_surface</item>
     </style>
+
+    <!-- Sprint 7 UI/UX: indicador activo tipo cápsula (pill) en la bottom nav -->
+    <style name="BottomNav.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">#339D35FF</item>
+        <item name="android:width">48dp</item>
+        <item name="android:height">32dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+    </style>
 </resources>

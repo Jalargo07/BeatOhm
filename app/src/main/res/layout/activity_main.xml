@@ -12,7 +12,6 @@
         android:layout_width="0dp"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/background"
-        app:title="@string/app_name"
         app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -36,6 +35,15 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/view_nav_top_border"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <View
+        android:id="@+id/view_nav_top_border"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:background="@color/outline"
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -46,7 +54,7 @@
         android:layout_height="wrap_content"
         android:background="@color/surface"
         android:elevation="8dp"
-        app:itemActiveIndicatorStyle="@style/Widget.Material3.BottomNavigationView.ActiveIndicator"
+        app:itemActiveIndicatorStyle="@style/BottomNav.ActiveIndicator"
         app:itemIconTint="@color/color_nav_states"
         app:itemRippleColor="@color/primary_container"
         app:itemTextColor="@color/color_nav_states"
