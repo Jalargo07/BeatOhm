@@ -121,7 +121,7 @@ class AudioDownloader(private val context: Context) {
             tag.setField(FieldKey.TITLE, song.title)
             tag.setField(FieldKey.ARTIST, song.artist)
             tag.setField(FieldKey.ALBUM, song.album)
-            tag.setField(FieldKey.GENRE, song.genre)
+            tag.setField(FieldKey.GENRE, com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(song.genre))
             tag.setField(FieldKey.YEAR, song.year)
             if (song.trackNumber > 0) tag.setField(FieldKey.TRACK, song.trackNumber.toString())
             if (song.lyrics.isNotBlank()) tag.setField(FieldKey.LYRICS, song.lyrics)

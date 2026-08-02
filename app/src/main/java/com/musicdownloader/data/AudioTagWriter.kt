@@ -39,7 +39,7 @@ object AudioTagWriter {
             tag.setField(FieldKey.TITLE, title)
             tag.setField(FieldKey.ARTIST, artist)
             tag.setField(FieldKey.ALBUM, album)
-            tag.setField(FieldKey.GENRE, song.genre)
+            tag.setField(FieldKey.GENRE, com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(song.genre))
             tag.setField(FieldKey.YEAR, song.year)
             if (song.trackNumber > 0) tag.setField(FieldKey.TRACK, song.trackNumber.toString())
 

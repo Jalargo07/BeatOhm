@@ -67,6 +67,14 @@
     <string name="lyrics_found">Letra encontrada</string>
     <string name="lyrics_not_found">Letra no encontrada</string>
     <string name="enrich_progress_with_lyrics">Completando metadatos %1$d de %2$d (incluyendo letras)</string>
+    <string name="enrich_screen_title">Buscar metadata</string>
+    <string name="enrich_screen_subtitle">Elegí qué querés construir en las canciones seleccionadas</string>
+    <string name="enrich_option_name">Nombre correcto</string>
+    <string name="enrich_option_name_desc">Consultar iTunes para el nombre real y limpiar el título</string>
+    <string name="enrich_option_tags">Tags</string>
+    <string name="enrich_option_tags_desc">Escribir los tags en los archivos (artista, álbum, género…)</string>
+    <string name="enrich_option_lyrics">Letra</string>
+    <string name="enrich_option_lyrics_desc">Buscar letras (LRCLIB / Genius)</string>
     <string name="queue">Cola de reproducción</string>
     <string name="queue_count">Cola (%1$d canciones)</string>
     <string name="queue_header">Cola de reproducción (%1$d canciones)</string>

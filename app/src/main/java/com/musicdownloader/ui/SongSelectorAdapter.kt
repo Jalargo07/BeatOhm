@@ -10,13 +10,30 @@ import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 
 class SongSelectorAdapter(
-    private val songs: List<LocalSong>,
+    private val allSongs: List<LocalSong>,
     private val initiallySelected: Set<String>
 ) : RecyclerView.Adapter<SongSelectorAdapter.ViewHolder>() {
 
     var onSelectionChanged: (() -> Unit)? = null
 
     private val selectedIds = HashSet(initiallySelected)
+    private var filter = ""
+
+    private val filtered: List<LocalSong>
+        get() = if (filter.isBlank()) {
+            allSongs
+        } else {
+            allSongs.filter { song ->
+                song.title.contains(filter, ignoreCase = true) ||
+                    song.artist.contains(filter, ignoreCase = true)
+            }
+        }
+
+    fun setFilter(query: String) {
+        filter = query.trim()
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -25,7 +42,7 @@ class SongSelectorAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val song = songs[position]
+        val song = filtered[position]
         holder.tvTitle.text = song.title
         holder.tvArtist.text = song.artist.ifBlank { "Desconocido" }
         holder.cbSelect.isChecked = selectedIds.contains(song.id)
@@ -41,7 +58,7 @@ class SongSelectorAdapter(
         }
     }
 
-    override fun getItemCount() = songs.size
+    override fun getItemCount() = filtered.size
 
     private fun toggleSelection(id: String) {
         if (selectedIds.contains(id)) selectedIds.remove(id) else selectedIds.add(id)
@@ -49,7 +66,7 @@ class SongSelectorAdapter(
     }
 
     fun selectAll() {
-        selectedIds.addAll(songs.map { it.id })
+        selectedIds.addAll(allSongs.map { it.id })
         notifyDataSetChanged()
         onSelectionChanged?.invoke()
     }
@@ -60,12 +77,13 @@ class SongSelectorAdapter(
         onSelectionChanged?.invoke()
     }
 
-    fun getSelectedSongs(): List<LocalSong> = songs.filter { selectedIds.contains(it.id) }
+    fun getSelectedSongs(): List<LocalSong> = allSongs.filter { selectedIds.contains(it.id) }
 
     fun getSelectedCount(): Int = selectedIds.size
 
     private fun isIncomplete(song: LocalSong): Boolean {
-        return song.artist.isBlank() || song.album.isBlank() || song.genre.isBlank()
+        return song.artist.isBlank() || song.album.isBlank()
+            || com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(song.genre).isBlank()
             || song.thumbnailUrl.isBlank() || song.year.isBlank()
     }
 

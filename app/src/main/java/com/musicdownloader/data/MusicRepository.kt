@@ -19,7 +19,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -33,6 +35,13 @@ class MusicRepository(private val context: Context) {
     private val dao = AppDatabase.getInstance(context).songDao()
     private val metadataFetcher = MetadataFetcher()
     private val lyricsFetcher = LyricsFetcher()
+
+    /**
+     * Serializa el enriquecimiento manual (enrichSong) y el de fondo
+     * (enrichMetadataGradually) para evitar condiciones de carrera que
+     * dejaban canciones duplicadas cuando ambos corrían en paralelo.
+     */
+    private val enrichMutex = Mutex()
 
     suspend fun getAllSongsNow(): List<LocalSong> = dao.getAllSongsNow()
 
@@ -139,7 +148,8 @@ class MusicRepository(private val context: Context) {
 
         val allSongs = dao.getAllSongsNow()
         val incompleteSongs = allSongs.filter {
-            it.artist.isBlank() || it.album.isBlank() || it.genre.isBlank()
+            it.artist.isBlank() || it.album.isBlank()
+                || com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(it.genre).isBlank()
                 || it.thumbnailUrl.isBlank() || it.lyrics.isBlank() || it.year.isBlank()
         }
 
@@ -149,34 +159,36 @@ class MusicRepository(private val context: Context) {
     suspend fun enrichMetadataGradually(
         songs: List<LocalSong>,
         onProgress: ((done: Int, total: Int, title: String) -> Unit)? = null
-    ) = withContext(Dispatchers.IO) {
-        val artCacheDir = getAlbumArtCacheDir()
-        if (!artCacheDir.exists()) artCacheDir.mkdirs()
+    ) = enrichMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val artCacheDir = getAlbumArtCacheDir()
+            if (!artCacheDir.exists()) artCacheDir.mkdirs()
 
-        val songsNeedingMetadata = songs.filter {
-            it.artist.isBlank() || it.album.isBlank() || it.duration == 0L
-        }
-        val total = songsNeedingMetadata.size
-        var done = 0
+            val songsNeedingMetadata = songs.filter {
+                it.artist.isBlank() || it.album.isBlank() || it.duration == 0L
+            }
+            val total = songsNeedingMetadata.size
+            var done = 0
 
-        for (song in songsNeedingMetadata) {
-            try {
-                val file = File(song.filePath)
-                if (file.exists()) {
-                    val updated = extractSong(file, artCacheDir, song)
-                    if (updated.thumbnailUrl.isBlank()) {
-                        val artUrl = fetchArtFromITunes(updated, artCacheDir)
-                        dao.insertSong(
-                            if (artUrl.isNotBlank()) updated.copy(thumbnailUrl = artUrl) else updated
-                        )
-                    } else {
-                        dao.insertSong(updated)
+            for (song in songsNeedingMetadata) {
+                try {
+                    val file = File(song.filePath)
+                    if (file.exists()) {
+                        val updated = extractSong(file, artCacheDir, song)
+                        if (updated.thumbnailUrl.isBlank()) {
+                            val artUrl = fetchArtFromITunes(updated, artCacheDir)
+                            dao.insertSong(
+                                if (artUrl.isNotBlank()) updated.copy(thumbnailUrl = artUrl) else updated
+                            )
+                        } else {
+                            dao.insertSong(updated)
+                        }
                     }
-                }
-            } catch (_: Exception) {}
-            done++
-            onProgress?.invoke(done, total, song.title)
-            delay(100)
+                } catch (_: Exception) {}
+                done++
+                onProgress?.invoke(done, total, song.title)
+                delay(100)
+            }
         }
     }
 
@@ -245,7 +257,9 @@ class MusicRepository(private val context: Context) {
             val title = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension)
             val artist = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "")
             val album = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: "")
-            val genre = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: "")
+            val genre = com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(
+                fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: "")
+            )
             val year = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR) ?: ""
             val track = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)?.toIntOrNull() ?: 0
             val duration = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
@@ -279,7 +293,7 @@ class MusicRepository(private val context: Context) {
                 title = title,
                 artist = artist.ifBlank { existing?.artist.orEmpty() },
                 album = album.ifBlank { existing?.album.orEmpty() },
-                genre = genre.ifBlank { existing?.genre.orEmpty() },
+                genre = genre.ifBlank { com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(existing?.genre.orEmpty()) },
                 year = year.ifBlank { existing?.year.orEmpty() },
                 trackNumber = if (track > 0) track else (existing?.trackNumber ?: 0),
                 duration = duration,
@@ -346,12 +360,24 @@ class MusicRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Qué construir durante el enriquecimiento de una canción.
+     * - fetchMetadata: consulta iTunes/MusicBrainz para el nombre correcto (título/artista limpio)
+     * - writeTags: escribe los tags en el archivo
+     * - fetchLyrics: busca letras (LRCLIB/Genius/lyrics.ovh)
+     */
+    data class EnrichOptions(
+        val fetchMetadata: Boolean = true,
+        val writeTags: Boolean = true,
+        val fetchLyrics: Boolean = true
+    )
+
     suspend fun enrichSong(
         song: LocalSong,
-        skipTagWrite: Boolean = false,
-        fetchLyrics: Boolean = false
-    ): LocalSong {
-        Log.e("MusicRepository", "enrichSong INICIO: '${song.artist}' - '${song.title}' fetchLyrics=$fetchLyrics")
+        options: EnrichOptions = EnrichOptions(),
+        skipTagWrite: Boolean = false
+    ): LocalSong = enrichMutex.withLock {
+        Log.e("MusicRepository", "enrichSong INICIO: '${song.artist}' - '${song.title}' options=$options")
         val existing = dao.getSongById(song.id)?.let {
             it.copy(
                 title = fixMojibake(it.title),
@@ -359,7 +385,12 @@ class MusicRepository(private val context: Context) {
                 album = fixMojibake(it.album)
             )
         } ?: song
-        val enriched = metadataFetcher.fetchFullMetadata(song.toSong()).getOrNull() ?: song.toSong()
+
+        val enriched = if (options.fetchMetadata) {
+            metadataFetcher.fetchFullMetadata(song.toSong()).getOrNull() ?: song.toSong()
+        } else {
+            existing.toSong()
+        }
         Log.e("MusicRepository", "enrichSong metadata: '${enriched.artist}' - '${enriched.title}' [${enriched.album}]")
 
         var thumbnailUrl = enriched.thumbnailUrl
@@ -374,7 +405,10 @@ class MusicRepository(private val context: Context) {
             title = bestValue(existing.title, enriched.title),
             artist = bestValue(existing.artist, enriched.artist),
             album = bestValue(existing.album, enriched.album),
-            genre = bestValue(existing.genre, enriched.genre),
+            genre = bestValue(
+                com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(existing.genre),
+                com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(enriched.genre)
+            ),
             year = bestValue(existing.year, enriched.year),
             trackNumber = if (enriched.trackNumber > 0) enriched.trackNumber else song.trackNumber,
             duration = song.duration,
@@ -385,14 +419,25 @@ class MusicRepository(private val context: Context) {
             playCount = existing.playCount
         )
 
-        if (fetchLyrics && updated.lyrics.isBlank()) {
+        val existingLyrics = existing.lyrics
+        val shouldFetchLyrics = options.fetchLyrics &&
+            (existingLyrics.isBlank() || !com.musicdownloader.lrc.LrcParser.hasTimestamps(existingLyrics))
+
+        if (shouldFetchLyrics) {
             try {
                 val lyricsResult = lyricsFetcher.fetchLyrics(updated.artist, updated.title)
                 if (lyricsResult.isSuccess) {
                     val result = lyricsResult.getOrNull()
-                    val lyrics = (result?.syncedLrc ?: result?.plainText).orEmpty()
-                    if (lyrics.isNotBlank()) {
-                        updated = updated.copy(lyrics = lyrics)
+                    val synced = result?.syncedLrc?.takeIf { it.isNotBlank() }
+                    val plain = result?.plainText?.takeIf { it.isNotBlank() }
+                    val newLyrics = when {
+                        existingLyrics.isBlank() -> synced ?: plain ?: ""
+                        com.musicdownloader.lrc.LrcParser.hasTimestamps(existingLyrics) -> existingLyrics
+                        synced != null -> synced
+                        else -> existingLyrics
+                    }
+                    if (newLyrics.isNotBlank()) {
+                        updated = updated.copy(lyrics = newLyrics)
                     }
                 }
             } catch (_: Exception) {}
@@ -401,7 +446,7 @@ class MusicRepository(private val context: Context) {
         dao.insertSong(updated)
 
         // Renombrar archivo si cambió artista o título
-        if (!skipTagWrite) {
+        if (options.writeTags && !skipTagWrite) {
             val oldFile = File(song.filePath)
             if (oldFile.exists()) {
                 val newFileName = "${fixMojibake(updated.artist)} - ${fixMojibake(updated.title)}".replace(Regex("[/\\\\:*?\"<>|]"), "_")
@@ -420,7 +465,7 @@ class MusicRepository(private val context: Context) {
             }
             AudioTagWriter.writeTags(File(updated.filePath), updated)
         }
-        return updated
+        updated
     }
 
     private fun bestValue(existing: String, newValue: String): String =
@@ -429,7 +474,75 @@ class MusicRepository(private val context: Context) {
     private fun isUsableMetadata(value: String): Boolean {
         val trimmed = value.trim()
         if (trimmed.isBlank()) return false
-        return trimmed.lowercase() !in setOf("unknown", "various artists", "desconocido")
+        return trimmed.lowercase() !in setOf(
+            "unknown", "unknow", "various artists", "desconocido",
+            "music", "musica", "música", "other", "none", "n/a"
+        )
+    }
+
+    /**
+     * Unifica variantes del mismo artista en la DB ("Alexis y Fido" vs "Alexis & Fido",
+     * "Arcangel" vs "Arcángel", "Las Pastillas Del Abuelo" vs "del Abuelo", ...).
+     * Elige como canónico el nombre más usado y actualiza DB + tags del archivo.
+     * Devuelve cuántas canciones se consolidaron.
+     */
+    suspend fun consolidateArtists(skipPath: String? = null): Int = enrichMutex.withLock {
+        val allSongs = dao.getAllSongsNow()
+        val groups = allSongs
+            .filter { it.artist.isNotBlank() }
+            .groupBy { normalizeArtistKey(it.artist) }
+
+        var consolidated = 0
+        for ((_, songs) in groups) {
+            val distinct = songs.map { it.artist }.distinct()
+            if (distinct.size < 2) continue
+            val canonical = songs.groupingBy { it.artist }.eachCount()
+                .toList()
+                .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+                .first().first
+
+            for (song in songs) {
+                if (song.artist == canonical) continue
+                val updated = song.copy(artist = canonical)
+                dao.insertSong(updated)
+                consolidated++
+
+                val isPlaying = song.filePath == skipPath
+                if (isPlaying) continue
+                try {
+                    val file = File(updated.filePath)
+                    if (!file.exists()) continue
+                    val newFileName = "${fixMojibake(updated.artist)} - ${fixMojibake(updated.title)}"
+                        .replace(Regex("[/\\\\:*?\"<>|]"), "_")
+                    val newFile = File(file.parent, "${newFileName}.${file.extension}")
+                    if (newFile.absolutePath != file.absolutePath && !newFile.exists()) {
+                        if (file.renameTo(newFile)) {
+                            val oldId = updated.id
+                            val renamed = updated.copy(id = newFile.absolutePath, filePath = newFile.absolutePath)
+                            dao.insertSong(renamed)
+                            if (oldId != renamed.id) dao.deleteSongById(oldId)
+                            AudioTagWriter.writeTags(newFile, renamed)
+                        }
+                    } else {
+                        AudioTagWriter.writeTags(file, updated)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        if (consolidated > 0) {
+            Log.e("MusicRepository", "Artistas consolidados: $consolidated")
+        }
+        consolidated
+    }
+
+    private fun normalizeArtistKey(artist: String): String {
+        val lower = artist.lowercase()
+        val normalized = java.text.Normalizer.normalize(lower, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}"), "")
+            .replace("&", "y")
+            .replace(",", "")
+            .replace(".", "")
+        return normalized.trim()
     }
 
     private fun downloadArtwork(url: String, dest: File) {

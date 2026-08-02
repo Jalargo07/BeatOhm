@@ -72,7 +72,7 @@ object OpusTagWriter {
         setComment(tags, VorbisStyleComments.KEY_TITLE, title)
         setComment(tags, VorbisStyleComments.KEY_ARTIST, artist)
         setComment(tags, VorbisStyleComments.KEY_ALBUM, album)
-        setComment(tags, VorbisStyleComments.KEY_GENRE, song.genre)
+        setComment(tags, VorbisStyleComments.KEY_GENRE, com.musicdownloader.metadata.MetadataFetcher.sanitizeGenre(song.genre))
         setComment(tags, VorbisStyleComments.KEY_DATE, song.year)
         if (song.trackNumber > 0) {
             setComment(tags, KEY_TRACKNUMBER, song.trackNumber.toString())
@@ -81,8 +81,6 @@ object OpusTagWriter {
         }
         if (song.lyrics.isNotBlank()) {
             setComment(tags, KEY_LYRICS, song.lyrics)
-        } else {
-            tags.removeComments(KEY_LYRICS)
         }
         if (song.thumbnailUrl.isNotBlank()) {
             try {

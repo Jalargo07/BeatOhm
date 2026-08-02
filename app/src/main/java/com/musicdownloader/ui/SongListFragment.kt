@@ -37,6 +37,7 @@ class SongListFragment : Fragment() {
     private var collectJob: Job? = null
     private var folderPath: String = ""
     private var searchQuery: String = ""
+    private var transitionStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +57,8 @@ class SongListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         repository = MusicRepository(requireContext())
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
+
+        postponeEnterTransition()
 
         adapter = SongItemAdapter { song ->
             val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@SongItemAdapter
@@ -89,6 +92,13 @@ class SongListFragment : Fragment() {
         }
     }
 
+    private fun startEnterTransitionIfReady() {
+        if (!transitionStarted) {
+            transitionStarted = true
+            startPostponedEnterTransition()
+        }
+    }
+
     private fun collectSearchResults() {
         collectJob?.cancel()
         collectJob = lifecycleScope.launch {
@@ -100,6 +110,7 @@ class SongListFragment : Fragment() {
                         song.album.lowercase().contains(query)
                 }
                 adapter.submitList(filtered)
+                startEnterTransitionIfReady()
                 if (filtered.isEmpty()) {
                     recyclerView?.visibility = View.GONE
                     emptyView?.visibility = View.VISIBLE
@@ -116,6 +127,7 @@ class SongListFragment : Fragment() {
         collectJob = lifecycleScope.launch {
             repository.getSongsInFolder(folderPath).collectLatest { songs ->
                 adapter.submitList(songs)
+                startEnterTransitionIfReady()
                 if (songs.isEmpty()) {
                     recyclerView?.visibility = View.GONE
                     emptyView?.visibility = View.VISIBLE
@@ -163,6 +175,7 @@ class SongListFragment : Fragment() {
             }
             flow.collectLatest { songs ->
                 adapter.submitList(songs)
+                startEnterTransitionIfReady()
                 if (songs.isEmpty()) {
                     recyclerView?.visibility = View.GONE
                     emptyView?.visibility = View.VISIBLE

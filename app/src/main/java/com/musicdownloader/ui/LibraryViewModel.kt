@@ -67,7 +67,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 val pending = result.incompleteSongs.filter { it.id !in offered }
                 pendingIncomplete = pending
                 _incompleteCount.postValue(result.incompleteSongs.size)
-                if (pending.isNotEmpty()) {
+                if (enrichmentJob?.isActive != true && pending.isNotEmpty()) {
                     _offerEnrichment.postValue(pending.size)
                 }
             } catch (e: Exception) {
@@ -99,37 +99,56 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun startEnrichment(selectedSongs: List<LocalSong>, fetchLyrics: Boolean = false) {
+    fun startEnrichment(selectedSongs: List<LocalSong>, options: com.musicdownloader.data.MusicRepository.EnrichOptions) {
         if (selectedSongs.isEmpty() || enrichmentJob?.isActive == true) return
+        _offerEnrichment.postValue(null)
         val playingPath = PlayerViewModel.getInstance(getApplication()).currentSong.value?.filePath.orEmpty()
         enrichmentJob = viewModelScope.launch(Dispatchers.IO) {
             var done = 0
             val total = selectedSongs.size
             for (song in selectedSongs) {
                 try {
-                    repo.enrichSong(song, skipTagWrite = song.filePath == playingPath, fetchLyrics = fetchLyrics)
+                    val updated = repo.enrichSong(
+                        song,
+                        options,
+                        skipTagWrite = song.filePath == playingPath
+                    )
+                    if (!isIncomplete(updated)) {
+                        addOfferedId(song.id)
+                    }
                 } catch (_: Exception) {}
                 done++
-                _enrichmentProgress.postValue(EnrichmentProgress(done, total, song.title, fetchLyrics))
-                addOfferedId(song.id)
+                _enrichmentProgress.postValue(
+                    EnrichmentProgress(done, total, song.title, options.fetchLyrics)
+                )
             }
             _enrichmentProgress.postValue(null)
             _offerEnrichment.postValue(null)
             pendingIncomplete = emptyList()
+            try {
+                repo.consolidateArtists(skipPath = playingPath)
+            } catch (_: Exception) {}
             val freshSongs = repo.getAllSongsNow()
             _incompleteCount.postValue(freshSongs.count { isIncomplete(it) })
             _allSongs.postValue(freshSongs)
         }
     }
 
-    fun startEnrichment(fetchLyrics: Boolean = false) {
+    fun startEnrichment(options: com.musicdownloader.data.MusicRepository.EnrichOptions = com.musicdownloader.data.MusicRepository.EnrichOptions()) {
         if (pendingIncomplete.isEmpty() || enrichmentJob?.isActive == true) return
-        startEnrichment(pendingIncomplete, fetchLyrics)
+        startEnrichment(pendingIncomplete, options)
     }
 
     fun isIncomplete(song: LocalSong): Boolean {
-        return song.artist.isBlank() || song.album.isBlank() || song.genre.isBlank()
+        return song.artist.isBlank() || song.album.isBlank() || isGenericGenre(song.genre)
             || song.thumbnailUrl.isBlank() || song.year.isBlank()
+    }
+
+    private fun isGenericGenre(genre: String): Boolean {
+        if (genre.isBlank()) return true
+        return genre.lowercase().trim() in setOf(
+            "music", "musica", "música", "unknown", "unknow", "other", "none", "n/a", "audio"
+        )
     }
 
     fun dismissEnrichmentOffer() {
@@ -160,6 +179,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     companion object {
         private const val TAG = "LibraryViewModel"
         private const val ENRICHMENT_PREFS = "enrichment_prefs"
-        private const val KEY_ENRICHED_IDS = "enriched_ids"
+        private const val KEY_ENRICHED_IDS = "enriched_ids_v2"
     }
 }

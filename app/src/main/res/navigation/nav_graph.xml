@@ -76,4 +76,10 @@
         android:id="@+id/foldersFragment"
         android:name="com.musicdownloader.ui.FoldersFragment"
         android:label="@string/folders" />
+
+    <fragment
+        android:id="@+id/enrichFragment"
+        android:name="com.musicdownloader.ui.EnrichFragment"
+        android:label="@string/enrich_screen_title"
+        tools:layout="@layout/fragment_enrich" />
 </navigation>

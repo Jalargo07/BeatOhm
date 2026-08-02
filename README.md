@@ -6,7 +6,7 @@
 
 **Descargá, organizá y escuchá tu música favorita directo desde YouTube — con metadata impecable, letras multi-fuente y un reproductor premium con visualizador de onda de audio real.**
 
-[![Version](https://img.shields.io/badge/version-2.4-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.5-blue.svg)]()
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-35-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
@@ -145,6 +145,21 @@ app/src/main/java/com/musicdownloader/
 ---
 
 ## Changelog
+
+### v2.5 Stable
+- **Pantalla de enriquecimiento rediseñada** — pantalla completa (no modal) con 3 toggles independientes: Nombre correcto (iTunes/Deezer/MusicBrainz), Tags y Letra. Cada toggle controla su API por separado.
+- **Buscador + orden alfabético** — la lista de canciones a enriquecer se busca y ordena fácilmente.
+- **Deezer como fallback de metadata** — cuando iTunes bloquea (HTTP 403) o no matchea, Deezer encuentra artista/álbum reales.
+- **Búsqueda sin artista como última instancia** — recupera canciones con el artista mal cargado (ej. "Boy Boy" → "Big Boy").
+- **Limpieza de títulos con artista repetido** — "Soda Stereo - Soda Stereo - Entre Caníbales" → "Entre Caníbales".
+- **Artistas-canal de YouTube** — "elvecindariocalle13" → "Calle 13", "velapuercavideos" → "La Vela Puerca", etc.
+- **Consolidación automática de artistas** — unifica variantes ("Alexis y Fido"/"Alexis & Fido", "Arcangel"/"Arcángel") en un solo artista.
+- **Fix géneros genéricos** — "Music", "Unknown", etc. ya no se escriben; iTunes les pone el real.
+- **Fix letras** — el tag writer ya no borra las letras de los archivos al enriquecer.
+- **Fix duplicados** — Mutex que serializa el enriquecimiento manual y el de fondo.
+- **Fix notificación duplicada** — no se re-ofrece el enriquecimiento mientras corre.
+- **Fix animaciones de drill-down** — sin música incorrecta al volver de artista/álbum.
+- **Política de versionado** — ver `VERSIONING.md` (stable + nightly).
 
 ### v2.4 Stable
 - **Fast Scan + Enriquecimiento async** — biblioteca aparece al instante; metadata (artista, álbum, carátula, duración, onda) se completa en background de a una canción por vez

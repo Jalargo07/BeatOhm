@@ -89,7 +89,7 @@ class LibraryFragment : Fragment() {
         setupSearch()
 
         binding.tvSeeAllFavorites.setOnClickListener {
-            findNavController().navigate(R.id.favoritesFragment)
+            navigateWithMotion(R.id.favoritesFragment)
         }
 
         if (!hasScanned) {
@@ -171,7 +171,7 @@ class LibraryFragment : Fragment() {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 val query = binding.etLibrarySearch.text?.toString()?.trim().orEmpty()
                 if (query.isNotBlank()) {
-                    findNavController().navigate(R.id.songListFragment, bundleOf("searchQuery" to query))
+                    navigateWithMotion(R.id.songListFragment, bundleOf("searchQuery" to query))
                 }
                 true
             } else {
@@ -200,81 +200,43 @@ class LibraryFragment : Fragment() {
     }
 
     private fun navigateToFolder(path: String) {
-        findNavController().navigate(R.id.songListFragment, bundleOf("folderPath" to path))
+        navigateWithMotion(R.id.songListFragment, bundleOf("folderPath" to path))
     }
 
     private fun navigateToCategory(category: LibraryCategory) {
-        val navController = findNavController()
         when (category.id) {
-            "songs" -> navController.navigate(R.id.songListFragment)
-            "artists" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "artist"))
-            "genres" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "genre"))
-            "albums" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "album"))
-            "years" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "year"))
-            "playlists" -> navController.navigate(R.id.playlistsFragment)
-            "favorites" -> navController.navigate(R.id.favoritesFragment)
-            "most_played" -> navController.navigate(R.id.mostPlayedFragment)
-            "folders" -> navController.navigate(R.id.foldersFragment)
+            "songs" -> navigateWithMotion(R.id.songListFragment)
+            "artists" -> navigateWithMotion(R.id.categoryListFragment, bundleOf("category" to "artist"))
+            "genres" -> navigateWithMotion(R.id.categoryListFragment, bundleOf("category" to "genre"))
+            "albums" -> navigateWithMotion(R.id.categoryListFragment, bundleOf("category" to "album"))
+            "years" -> navigateWithMotion(R.id.categoryListFragment, bundleOf("category" to "year"))
+            "playlists" -> navigateWithMotion(R.id.playlistsFragment)
+            "favorites" -> navigateWithMotion(R.id.favoritesFragment)
+            "most_played" -> navigateWithMotion(R.id.mostPlayedFragment)
+            "folders" -> navigateWithMotion(R.id.foldersFragment)
         }
+    }
+
+    private fun navigateWithMotion(destinationId: Int, args: Bundle? = null) {
+        val options = androidx.navigation.NavOptions.Builder()
+            .setEnterAnim(R.anim.slide_in_right)
+            .setExitAnim(R.anim.slide_out_left)
+            .setPopEnterAnim(R.anim.slide_in_left)
+            .setPopExitAnim(R.anim.slide_out_right)
+            .build()
+        findNavController().navigate(destinationId, args, options)
     }
 
     private fun observeIncompleteCount() {
         binding.btnEnrichManual.visibility = View.VISIBLE
         binding.btnEnrichManual.text = getString(R.string.enrich_manual)
         binding.btnEnrichManual.setOnClickListener {
-            showSongSelectorDialog()
-        }
-    }
-
-    private fun showSongSelectorDialog() {
-        val allSongs = libraryViewModel.allSongs.value.orEmpty()
-        if (allSongs.isEmpty()) {
-            Toast.makeText(requireContext(), R.string.no_songs_available, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val incompleteIds = allSongs.filter { libraryViewModel.isIncomplete(it) }.map { it.id }.toSet()
-        val adapter = SongSelectorAdapter(allSongs, incompleteIds)
-
-        val dialogView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dialog_song_selector, null)
-
-        val rvSelector = dialogView.findViewById<RecyclerView>(R.id.rv_song_selector)
-        rvSelector.layoutManager = LinearLayoutManager(requireContext())
-        rvSelector.adapter = adapter
-
-        val tvCount = dialogView.findViewById<TextView>(R.id.tv_selection_count)
-        val btnSelectAll = dialogView.findViewById<TextView>(R.id.btn_select_all)
-        val cbLyrics = dialogView.findViewById<MaterialCheckBox>(R.id.cb_fetch_lyrics)
-
-        val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.select_songs_title)
-            .setView(dialogView)
-            .setPositiveButton(R.string.enrich_selected) { _, _ ->
-                val selected = adapter.getSelectedSongs()
-                if (selected.isNotEmpty()) {
-                    libraryViewModel.startEnrichment(selected, cbLyrics.isChecked)
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-
-        fun updateCount() {
-            val count = adapter.getSelectedCount()
-            tvCount.text = getString(R.string.select_songs_selected_count, count, allSongs.size)
-            btnSelectAll.text = getString(if (count == allSongs.size) R.string.deselect_all else R.string.select_all)
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).isEnabled = count > 0
-        }
-
-        adapter.onSelectionChanged = { updateCount() }
-        btnSelectAll.setOnClickListener {
-            if (adapter.getSelectedCount() == allSongs.size) {
-                adapter.deselectAll()
+            if (libraryViewModel.allSongs.value.orEmpty().isEmpty()) {
+                Toast.makeText(requireContext(), R.string.no_songs_available, Toast.LENGTH_SHORT).show()
             } else {
-                adapter.selectAll()
+                navigateWithMotion(R.id.enrichFragment)
             }
         }
-        updateCount()
     }
 
     private fun observeEnrichment() {
@@ -289,7 +251,11 @@ class LibraryFragment : Fragment() {
                     .setTitle(R.string.enrich_dialog_title)
                     .setView(dialogView)
                     .setPositiveButton(R.string.enrich_accept) { _, _ ->
-                        libraryViewModel.startEnrichment(cbOfferLyrics.isChecked)
+                        libraryViewModel.startEnrichment(
+                            com.musicdownloader.data.MusicRepository.EnrichOptions(
+                                fetchLyrics = cbOfferLyrics.isChecked
+                            )
+                        )
                     }
                     .setNegativeButton(R.string.enrich_decline) { _, _ ->
                         libraryViewModel.dismissEnrichmentOffer()
