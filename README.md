@@ -10,7 +10,7 @@
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-35-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-orange.svg)](LICENSE)
 [![API](https://img.shields.io/badge/API-Android%207.0%2B-brightgreen.svg)]()
 
 ---
@@ -184,8 +184,11 @@ app/src/main/java/com/musicdownloader/
 ## Licencia
 
 ```
-MIT License
-Copyright (c) 2026 Music Downloader
+Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+Copyright (c) 2026 Jorge Largo (Jalargo07)
+
+Libre de compartir y adaptar con atribución. NO comercial.
+Texto completo: https://creativecommons.org/licenses/by-nc/4.0/legalcode
 ```
 
 ---
