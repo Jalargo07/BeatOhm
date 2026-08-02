@@ -10,7 +10,7 @@
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-35-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
-[![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-orange.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg)](LICENSE)
 [![API](https://img.shields.io/badge/API-Android%207.0%2B-brightgreen.svg)]()
 
 ---
@@ -184,11 +184,12 @@ app/src/main/java/com/musicdownloader/
 ## Licencia
 
 ```
-Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+PolyForm Noncommercial License 1.0.0
 Copyright (c) 2026 Jorge Largo (Jalargo07)
 
-Libre de compartir y adaptar con atribución. NO comercial.
-Texto completo: https://creativecommons.org/licenses/by-nc/4.0/legalcode
+Permiso de ejecutar, modificar y distribuir SOLO para fines no comerciales.
+Prohibido el uso comercial: vender, alquilar, licenciar u ofrecer servicios pagos.
+Texto completo: https://polyformproject.org/licenses/noncommercial/1.0.0/
 ```
 
 ---
