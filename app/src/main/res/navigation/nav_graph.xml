@@ -14,7 +14,7 @@
     <fragment
         android:id="@+id/libraryFragment"
         android:name="com.musicdownloader.ui.LibraryFragment"
-        android:label="@string/library_title"
+        android:label=""
         tools:layout="@layout/fragment_library" />
 
     <fragment
@@ -39,6 +39,10 @@
         android:label="@string/songs">
         <argument
             android:name="folderPath"
+            android:defaultValue=""
+            app:argType="string" />
+        <argument
+            android:name="searchQuery"
             android:defaultValue=""
             app:argType="string" />
     </fragment>

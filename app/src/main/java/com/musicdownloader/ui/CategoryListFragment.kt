@@ -5,8 +5,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
@@ -25,7 +25,6 @@ class CategoryListFragment : Fragment() {
     private var recyclerView: RecyclerView? = null
     private var emptyView: TextView? = null
     private var headerBar: View? = null
-    private var backButton: ImageView? = null
     private var categoryTitle: TextView? = null
     private lateinit var adapter: CategoryAdapter
     private lateinit var songsAdapter: FilteredSongAdapter
@@ -35,10 +34,24 @@ class CategoryListFragment : Fragment() {
 
     private var showingSongs = false
     private var selectedCategoryValue = ""
+    private var scrollPosition = 0
+    private var scrollOffset = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         categoryType = arguments?.getString("category", "album") ?: "album"
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val lm = recyclerView?.layoutManager as? LinearLayoutManager
+        if (lm != null) {
+            val pos = lm.findFirstVisibleItemPosition()
+            val view = lm.findViewByPosition(pos)
+            val offset = view?.top ?: 0
+            outState.putInt("scroll_position", pos)
+            outState.putInt("scroll_offset", offset)
+        }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -46,7 +59,6 @@ class CategoryListFragment : Fragment() {
         recyclerView = view.findViewById(R.id.rv_categories)
         emptyView = view.findViewById(R.id.tv_empty)
         headerBar = view.findViewById(R.id.header_bar)
-        backButton = view.findViewById(R.id.btn_back)
         categoryTitle = view.findViewById(R.id.tv_category_title)
         return view
     }
@@ -71,6 +83,12 @@ class CategoryListFragment : Fragment() {
         })
 
         adapter = CategoryAdapter { name ->
+            val lm = recyclerView?.layoutManager as? LinearLayoutManager
+            if (lm != null) {
+                scrollPosition = lm.findFirstVisibleItemPosition()
+                val view = lm.findViewByPosition(scrollPosition)
+                scrollOffset = view?.top ?: 0
+            }
             selectedCategoryValue = name
             showingSongs = true
             headerBar?.visibility = View.VISIBLE
@@ -80,14 +98,37 @@ class CategoryListFragment : Fragment() {
 
         recyclerView?.layoutManager = LinearLayoutManager(requireContext())
 
-        backButton?.setOnClickListener {
-            showingSongs = false
-            headerBar?.visibility = View.GONE
-            recyclerView?.adapter = adapter
-            loadCategories()
-        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (showingSongs) {
+                    showingSongs = false
+                    headerBar?.visibility = View.GONE
+                    recyclerView?.adapter = adapter
+                    loadCategories()
+                    restoreScrollPosition()
+                } else {
+                    isEnabled = false
+                    requireActivity().onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
 
         loadCategories()
+
+        if (savedInstanceState != null) {
+            scrollPosition = savedInstanceState.getInt("scroll_position", 0)
+            scrollOffset = savedInstanceState.getInt("scroll_offset", 0)
+            restoreScrollPosition()
+        }
+    }
+
+    private fun restoreScrollPosition() {
+        recyclerView?.post {
+            val lm = recyclerView?.layoutManager as? LinearLayoutManager ?: return@post
+            if (scrollPosition > 0) {
+                lm.scrollToPositionWithOffset(scrollPosition, scrollOffset)
+            }
+        }
     }
 
     private fun loadCategories() {
@@ -143,7 +184,6 @@ class CategoryListFragment : Fragment() {
         recyclerView = null
         emptyView = null
         headerBar = null
-        backButton = null
         categoryTitle = null
         super.onDestroyView()
     }

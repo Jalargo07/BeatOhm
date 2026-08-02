@@ -5,14 +5,29 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_gradient_player">
 
+    <ImageView
+        android:id="@+id/iv_glow"
+        android:layout_width="340dp"
+        android:layout_height="340dp"
+        android:alpha="0.8"
+        android:background="@drawable/bg_glow_soft"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toBottomOf="@id/cover_container"
+        app:layout_constraintEnd_toEndOf="@id/cover_container"
+        app:layout_constraintStart_toStartOf="@id/cover_container"
+        app:layout_constraintTop_toTopOf="@id/cover_container" />
+
     <FrameLayout
         android:id="@+id/cover_container"
-        android:layout_width="280dp"
-        android:layout_height="280dp"
-        android:layout_marginTop="24dp"
-        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_glow_cover"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toTopOf="parent">
 
         <ImageView
             android:id="@+id/iv_cover"
@@ -37,14 +52,14 @@
         android:id="@+id/title_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="20dp"
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"
-        android:orientation="horizontal"
         android:gravity="center_vertical"
-        app:layout_constraintTop_toBottomOf="@id/cover_container"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/cover_container">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -87,86 +102,17 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/controls_container"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:gravity="center"
-        android:orientation="horizontal"
-        app:layout_constraintTop_toBottomOf="@id/title_container"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <ImageButton
-            android:id="@+id/btn_shuffle"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/shuffle"
-            android:src="@drawable/ic_shuffle"
-            app:tint="@color/text_secondary" />
-
-        <ImageButton
-            android:id="@+id/btn_rewind"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/rewind"
-            android:src="@drawable/ic_rewind"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_prev"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/previous"
-            android:src="@drawable/ic_prev"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_play_pause"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_circle_primary"
-            android:contentDescription="@string/play"
-            android:src="@drawable/ic_play"
-            android:elevation="4dp" />
-
-        <ImageButton
-            android:id="@+id/btn_next"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/next"
-            android:src="@drawable/ic_next"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_forward"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/forward"
-            android:src="@drawable/ic_forward"
-            app:tint="@color/on_surface" />
-
-    </LinearLayout>
-
-    <LinearLayout
         android:id="@+id/seek_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"
-        android:orientation="horizontal"
         android:gravity="center_vertical"
-        app:layout_constraintTop_toBottomOf="@id/controls_container"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/title_container">
 
         <TextView
             android:id="@+id/tv_current_time"
@@ -207,6 +153,84 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/controls_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/seek_container">
+
+        <ImageButton
+            android:id="@+id/btn_shuffle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/shuffle"
+            android:src="@drawable/ic_shuffle"
+            app:tint="@color/text_secondary" />
+
+        <ImageButton
+            android:id="@+id/btn_rewind"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/rewind"
+            android:src="@drawable/ic_rewind"
+            app:tint="@color/on_surface" />
+
+        <ImageButton
+            android:id="@+id/btn_prev"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/previous"
+            android:src="@drawable/ic_prev"
+            app:tint="@color/on_surface" />
+
+        <ImageButton
+            android:id="@+id/btn_play_pause"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_circle_primary"
+            android:contentDescription="@string/play"
+            android:elevation="4dp"
+            android:src="@drawable/ic_play" />
+
+        <ImageButton
+            android:id="@+id/btn_next"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/next"
+            android:src="@drawable/ic_next"
+            app:tint="@color/on_surface" />
+
+        <ImageButton
+            android:id="@+id/btn_forward"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/forward"
+            android:src="@drawable/ic_forward"
+            app:tint="@color/on_surface" />
+
+        <ImageButton
+            android:id="@+id/btn_repeat"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/repeat"
+            android:src="@drawable/ic_repeat"
+            app:tint="@color/on_surface" />
+
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/bottom_actions"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -215,9 +239,9 @@
         android:layout_marginEnd="32dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        app:layout_constraintTop_toBottomOf="@id/seek_container"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/controls_container">
 
         <ImageView
             android:layout_width="24dp"
@@ -257,15 +281,6 @@
             app:tint="@color/on_surface" />
 
         <ImageButton
-            android:id="@+id/btn_repeat"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/repeat"
-            android:src="@drawable/ic_repeat"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
             android:id="@+id/btn_queue"
             android:layout_width="44dp"
             android:layout_height="44dp"
@@ -289,13 +304,13 @@
         android:id="@+id/tv_no_song"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="No hay canción reproduciendo"
+        android:text="@string/no_song"
         android:textColor="@color/on_surface"
         android:textSize="16sp"
         android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

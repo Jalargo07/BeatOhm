@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="12dp"
+    android:layout_height="116dp"
+    android:layout_margin="6dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardBackgroundColor="@color/surface_high"
+    app:cardBackgroundColor="@color/cards"
     app:cardCornerRadius="16dp"
     app:cardElevation="0dp"
     app:rippleColor="@color/primary_container"
@@ -15,13 +16,13 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="16dp">
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="8dp">
 
         <ImageView
-            android:id="@+id/iv_cat_icon"
+            android:id="@+id/iv_grid_icon"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:background="@drawable/bg_circle_primary"
@@ -31,24 +32,29 @@
             app:tint="@color/on_primary" />
 
         <TextView
-            android:id="@+id/tv_cat_name"
-            android:layout_width="0dp"
+            android:id="@+id/tv_grid_name"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_weight="1"
+            android:layout_marginTop="8dp"
             android:ellipsize="end"
+            android:gravity="center"
             android:maxLines="1"
             android:textColor="@color/on_surface"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:text="Canciones" />
 
-        <ImageView
-            android:id="@+id/iv_cat_chevron"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:contentDescription="@string/back"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="@color/text_secondary" />
+        <TextView
+            android:id="@+id/tv_grid_count"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            tools:text="1,284" />
 
     </LinearLayout>
 

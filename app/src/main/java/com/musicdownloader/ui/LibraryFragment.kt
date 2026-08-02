@@ -1,28 +1,41 @@
 package com.musicdownloader.ui
 
+import android.app.Application
 import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.musicdownloader.R
+import com.musicdownloader.data.LocalSong
+import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.toSong
 import com.musicdownloader.databinding.FragmentLibraryBinding
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class LibraryFragment : Fragment() {
 
     private var _binding: FragmentLibraryBinding? = null
     private val binding get() = _binding!!
     private lateinit var libraryViewModel: LibraryViewModel
+    private lateinit var repository: MusicRepository
+    private lateinit var adapter: LibraryMenuAdapter
+    private lateinit var favoriteAdapter: FavoriteSongAdapter
+    private val categoryCounts = mutableMapOf<String, Int>()
     private var enrichmentTotal = 0
     private var wasEnriching = false
     private var hasScanned = false
@@ -35,28 +48,42 @@ class LibraryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         libraryViewModel = ViewModelProvider(requireActivity())[LibraryViewModel::class.java]
+        repository = MusicRepository(requireContext())
 
-        val adapter = LibraryMenuAdapter(
+        adapter = LibraryMenuAdapter(
             onCategoryClick = { category -> navigateToCategory(category) },
             onFolderClick = { path -> navigateToFolder(path) }
         )
-        binding.rvLibraryCategories.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvLibraryCategories.adapter = adapter
 
-        libraryViewModel.folders.observe(viewLifecycleOwner) { folders ->
-            val items = buildList {
-                addAll(categories.map { LibraryMenuItem.Category(it) })
-                val current = folders ?: emptyList()
-                if (current.isNotEmpty()) {
-                    add(LibraryMenuItem.Section(R.string.my_folders))
-                    current.forEach { add(LibraryMenuItem.Folder(it)) }
+        val gridLayoutManager = GridLayoutManager(requireContext(), GRID_COLUMNS).apply {
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int {
+                    return if (adapter.currentList[position] is LibraryMenuItem.Category) 1 else GRID_COLUMNS
                 }
             }
-            adapter.submitList(items)
         }
+        binding.rvLibraryCategories.layoutManager = gridLayoutManager
+        binding.rvLibraryCategories.adapter = adapter
 
+        favoriteAdapter = FavoriteSongAdapter(
+            onPlay = { song -> playSong(song) },
+            onToggleFavorite = { song, isFavorite -> toggleFavorite(song, isFavorite) }
+        )
+        binding.rvLibraryFavorites.layoutManager =
+            LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+        binding.rvLibraryFavorites.adapter = favoriteAdapter
+
+        libraryViewModel.folders.observe(viewLifecycleOwner) { submitLibraryItems() }
+
+        observeFavorites()
+        observeCategoryCounts()
         observeEnrichment()
         observeIncompleteCount()
+        setupSearch()
+
+        binding.tvSeeAllFavorites.setOnClickListener {
+            findNavController().navigate(R.id.favoritesFragment)
+        }
 
         if (!hasScanned) {
             libraryViewModel.refreshLibrary()
@@ -67,6 +94,93 @@ class LibraryFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         libraryViewModel.refreshFolders()
+    }
+
+    private fun submitLibraryItems() {
+        val items = buildList {
+            add(LibraryMenuItem.Section(R.string.your_library))
+            categories.forEach { category ->
+                add(LibraryMenuItem.Category(category.copy(count = categoryCounts[category.id] ?: 0)))
+            }
+            val current = libraryViewModel.folders.value ?: emptyList()
+            if (current.isNotEmpty()) {
+                add(LibraryMenuItem.Section(R.string.my_folders))
+                current.forEach { add(LibraryMenuItem.Folder(it)) }
+            }
+        }
+        adapter.submitList(items)
+    }
+
+    private fun observeFavorites() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repository.getFavoriteSongs().collectLatest { songs ->
+                val shown = songs.take(MAX_FAVORITES)
+                favoriteAdapter.submitList(shown)
+                binding.rvLibraryFavorites.visibility = if (shown.isEmpty()) View.GONE else View.VISIBLE
+            }
+        }
+    }
+
+    private fun observeCategoryCounts() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            launch {
+                repository.getSongCount().collectLatest {
+                    categoryCounts["songs"] = it
+                    submitLibraryItems()
+                }
+            }
+            launch {
+                repository.getAllAlbums().collectLatest {
+                    categoryCounts["albums"] = it.size
+                    submitLibraryItems()
+                }
+            }
+            launch {
+                repository.getAllArtists().collectLatest {
+                    categoryCounts["artists"] = it.size
+                    submitLibraryItems()
+                }
+            }
+            launch {
+                repository.getAllGenres().collectLatest {
+                    categoryCounts["genres"] = it.size
+                    submitLibraryItems()
+                }
+            }
+        }
+    }
+
+    private fun setupSearch() {
+        binding.etLibrarySearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                val query = binding.etLibrarySearch.text?.toString()?.trim().orEmpty()
+                if (query.isNotBlank()) {
+                    findNavController().navigate(R.id.songListFragment, bundleOf("searchQuery" to query))
+                }
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun playSong(song: LocalSong) {
+        val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return
+        val service = activity.playbackService ?: return
+        val vm = PlayerViewModel.getInstance(requireActivity().application as Application)
+        val songs = favoriteAdapter.currentList
+        val index = songs.indexOf(song)
+        vm.setPlaylist(
+            songs.map { it.toSong() },
+            if (index >= 0) index else 0
+        )
+        service.playFile(song.filePath)
+    }
+
+    private fun toggleFavorite(song: LocalSong, isFavorite: Boolean) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repository.setFavorite(song.id, isFavorite)
+        }
     }
 
     private fun navigateToFolder(path: String) {
@@ -203,6 +317,9 @@ class LibraryFragment : Fragment() {
     }
 
     companion object {
+        private const val GRID_COLUMNS = 2
+        private const val MAX_FAVORITES = 5
+
         private val categories = listOf(
             LibraryCategory("songs", R.string.songs, R.drawable.ic_music_note),
             LibraryCategory("artists", R.string.by_artist, R.drawable.ic_mic),

@@ -1,5 +1,6 @@
 package com.musicdownloader.ui
 
+import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.app.Application
 import android.content.BroadcastReceiver
@@ -11,6 +12,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.BounceInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -38,6 +42,7 @@ class PlayerFragment : Fragment() {
     private var isLyricsVisible = false
     private var updateRunnable: Runnable? = null
     private var currentSongFilePath: String? = null
+    private var coverBreatheAnimator: ValueAnimator? = null
 
     private var audioManager: AudioManager? = null
     private var isVolumeDragging = false
@@ -98,6 +103,9 @@ class PlayerFragment : Fragment() {
                 binding.tvTitle.text = song.title
                 binding.tvArtist.text = song.artist.ifBlank { "Desconocido" }
                 binding.tvNoSong.visibility = View.GONE
+                binding.ivGlow.alpha = 0f
+                binding.ivGlow.visibility = View.VISIBLE
+                binding.ivGlow.animate().alpha(1f).setDuration(300).start()
                 if (song.thumbnailUrl.isNotBlank()) {
                     binding.ivCover.load(song.thumbnailUrl) {
                         placeholder(R.drawable.ic_player)
@@ -117,6 +125,10 @@ class PlayerFragment : Fragment() {
                 binding.tvArtist.text = ""
                 binding.ivCover.setImageResource(R.drawable.ic_music_note)
                 binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
+                    if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
+                }.start()
+                stopCoverBreathe()
             }
         }
 
@@ -125,6 +137,11 @@ class PlayerFragment : Fragment() {
                 if (playing) R.drawable.ic_pause
                 else R.drawable.ic_play
             )
+            if (playing) {
+                animateCoverPlaying()
+            } else {
+                stopCoverBreathe()
+            }
         }
 
         viewModel.isShuffle.observe(viewLifecycleOwner) { shuffle ->
@@ -167,12 +184,64 @@ class PlayerFragment : Fragment() {
         }
     }
 
+    private fun animateCoverPlaying() {
+        stopCoverBreathe()
+        binding.coverContainer.scaleX = 0.95f
+        binding.coverContainer.scaleY = 0.95f
+        binding.coverContainer.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(400)
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                if (_binding != null) startCoverBreathe()
+            }
+            .start()
+    }
+
+    private fun startCoverBreathe() {
+        val animator = ValueAnimator.ofFloat(0.98f, 1.0f).apply {
+            duration = 1600L
+            interpolator = AccelerateDecelerateInterpolator()
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            addUpdateListener { anim ->
+                val value = anim.animatedValue as Float
+                binding.coverContainer.scaleX = value
+                binding.coverContainer.scaleY = value
+            }
+            start()
+        }
+        coverBreatheAnimator = animator
+    }
+
+    private fun stopCoverBreathe() {
+        coverBreatheAnimator?.cancel()
+        coverBreatheAnimator = null
+        binding.coverContainer.animate().cancel()
+        binding.coverContainer.scaleX = 1f
+        binding.coverContainer.scaleY = 1f
+    }
+
+    private fun animatePlayPausePress() {
+        binding.btnPlayPause.scaleX = 0.9f
+        binding.btnPlayPause.scaleY = 0.9f
+        binding.btnPlayPause.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(200)
+            .setInterpolator(BounceInterpolator())
+            .start()
+    }
+
     private fun setupControls() {
         binding.btnPlayPause.setOnClickListener {
             val song = viewModel.currentSong.value ?: return@setOnClickListener
             val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
             val service = activity.playbackService
             if (service == null) return@setOnClickListener
+
+            animatePlayPausePress()
 
             if (service.isPlaying()) service.pause() else service.play()
         }
@@ -368,6 +437,7 @@ class PlayerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        stopCoverBreathe()
         updateRunnable?.let { binding.root.removeCallbacks(it) }
         _binding = null
         super.onDestroyView()

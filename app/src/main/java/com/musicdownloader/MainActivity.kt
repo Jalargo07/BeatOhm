@@ -12,6 +12,11 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings
+import android.view.View
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -20,11 +25,15 @@ import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupWithNavController
+import coil.load
+import com.google.android.material.imageview.ShapeableImageView
 import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.databinding.ActivityMainBinding
+import com.musicdownloader.model.Song
 import com.musicdownloader.ui.ArtworkLoader
 import com.musicdownloader.ui.MainViewModel
 import com.musicdownloader.ui.PlayerViewModel
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
@@ -32,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     var playbackService: MusicPlaybackService? = null
         private set
     private lateinit var navController: NavController
+    private lateinit var playerViewModel: PlayerViewModel
+    private var miniPlayerVisible = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -60,6 +71,8 @@ class MainActivity : AppCompatActivity() {
 
         ViewModelProvider(this)[MainViewModel::class.java]
 
+        playerViewModel = PlayerViewModel.getInstance(application)
+
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(true)
 
@@ -72,12 +85,106 @@ class MainActivity : AppCompatActivity() {
         )
         binding.toolbar.setupWithNavController(navController, appBarConfiguration)
 
+        setupMiniPlayer()
+
         checkPermissions()
         bindPlaybackService()
     }
 
     override fun onSupportNavigateUp(): Boolean =
         navController.navigateUp() || super.onSupportNavigateUp()
+
+    private fun setupMiniPlayer() {
+        findViewById<View>(R.id.mini_player_container).setOnClickListener {
+            navController.navigate(R.id.playerFragment)
+        }
+
+        findViewById<ImageButton>(R.id.btn_mini_play_pause).setOnClickListener {
+            val service = playbackService ?: return@setOnClickListener
+            if (service.isPlaying()) service.pause() else service.play()
+        }
+
+        playerViewModel.currentSong.observe(this) { song ->
+            if (song == null) {
+                hideMiniPlayer()
+            } else {
+                updateMiniPlayer(song)
+                if (navController.currentDestination?.id != R.id.playerFragment) {
+                    showMiniPlayer()
+                }
+            }
+        }
+
+        playerViewModel.isPlaying.observe(this) { playing ->
+            findViewById<ImageButton>(R.id.btn_mini_play_pause).setImageResource(
+                if (playing) R.drawable.ic_pause else R.drawable.ic_play
+            )
+        }
+
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            if (destination.id == R.id.playerFragment) {
+                hideMiniPlayer()
+            } else if (playerViewModel.currentSong.value != null) {
+                showMiniPlayer()
+            }
+        }
+    }
+
+    private fun showMiniPlayer() {
+        if (miniPlayerVisible) return
+        miniPlayerVisible = true
+        val container = findViewById<View>(R.id.mini_player_container)
+        container.visibility = View.VISIBLE
+        container.alpha = 0f
+        val offset = 48 * resources.displayMetrics.density
+        container.translationY = offset
+        container.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(250)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+    }
+
+    private fun hideMiniPlayer() {
+        if (!miniPlayerVisible) return
+        miniPlayerVisible = false
+        val offset = 48 * resources.displayMetrics.density
+        val container = findViewById<View>(R.id.mini_player_container)
+        container.animate()
+            .alpha(0f)
+            .translationY(offset)
+            .setDuration(200)
+            .setInterpolator(AccelerateInterpolator())
+            .withEndAction {
+                if (!miniPlayerVisible) container.visibility = View.GONE
+            }
+            .start()
+    }
+
+    private fun updateMiniPlayer(song: Song) {
+        findViewById<TextView>(R.id.tv_mini_title).text = song.title
+        findViewById<TextView>(R.id.tv_mini_artist).text = song.artist.ifBlank { "Desconocido" }
+
+        val cover = findViewById<ShapeableImageView>(R.id.iv_mini_cover)
+        cover.alpha = 0.4f
+        val path = song.filePath.ifBlank { song.youtubeUrl }
+        if (song.thumbnailUrl.isNotBlank()) {
+            cover.tag = null
+            cover.load(song.thumbnailUrl) {
+                crossfade(true)
+                placeholder(R.drawable.ic_player)
+                error(R.drawable.ic_player)
+            }
+        } else if (path.isNotBlank() && File(path).exists()) {
+            cover.tag = path
+            ArtworkLoader.loadArtFromAudioFile(cover, path)
+        } else {
+            cover.tag = null
+            cover.setImageResource(R.drawable.ic_player)
+        }
+        cover.animate().alpha(1f).setDuration(200).start()
+    }
 
     private fun bindPlaybackService() {
         val intent = Intent(this, MusicPlaybackService::class.java)

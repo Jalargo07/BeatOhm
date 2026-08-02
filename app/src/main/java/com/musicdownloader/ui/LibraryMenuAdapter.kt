@@ -5,12 +5,12 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.musicdownloader.databinding.ItemLibraryCategoryBinding
 import com.musicdownloader.databinding.ItemLibraryFolderBinding
+import com.musicdownloader.databinding.ItemLibraryGridBinding
 import com.musicdownloader.databinding.ItemLibrarySectionBinding
 import java.io.File
 
-data class LibraryCategory(val id: String, val labelRes: Int, val iconRes: Int)
+data class LibraryCategory(val id: String, val labelRes: Int, val iconRes: Int, val count: Int = 0)
 
 sealed interface LibraryMenuItem {
     val id: String
@@ -42,7 +42,7 @@ class LibraryMenuAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
-            TYPE_CATEGORY -> CategoryViewHolder(ItemLibraryCategoryBinding.inflate(inflater, parent, false))
+            TYPE_CATEGORY -> CategoryViewHolder(ItemLibraryGridBinding.inflate(inflater, parent, false))
             TYPE_FOLDER -> FolderViewHolder(ItemLibraryFolderBinding.inflate(inflater, parent, false))
             else -> SectionViewHolder(ItemLibrarySectionBinding.inflate(inflater, parent, false))
         }
@@ -53,8 +53,14 @@ class LibraryMenuAdapter(
             is LibraryMenuItem.Category -> {
                 val vh = holder as CategoryViewHolder
                 val category = item.category
-                vh.binding.tvCatName.text = vh.binding.root.context.getString(category.labelRes)
-                vh.binding.ivCatIcon.setImageResource(category.iconRes)
+                vh.binding.tvGridName.text = vh.binding.root.context.getString(category.labelRes)
+                vh.binding.ivGridIcon.setImageResource(category.iconRes)
+                if (category.count > 0) {
+                    vh.binding.tvGridCount.visibility = android.view.View.VISIBLE
+                    vh.binding.tvGridCount.text = formatCount(category.count)
+                } else {
+                    vh.binding.tvGridCount.visibility = android.view.View.INVISIBLE
+                }
                 vh.binding.root.setOnClickListener { onCategoryClick(category) }
             }
             is LibraryMenuItem.Folder -> {
@@ -70,7 +76,15 @@ class LibraryMenuAdapter(
         }
     }
 
-    class CategoryViewHolder(val binding: ItemLibraryCategoryBinding) : RecyclerView.ViewHolder(binding.root)
+    private fun formatCount(count: Int): String {
+        return if (count >= 1000) {
+            "%,d".format(count)
+        } else {
+            count.toString()
+        }
+    }
+
+    class CategoryViewHolder(val binding: ItemLibraryGridBinding) : RecyclerView.ViewHolder(binding.root)
     class FolderViewHolder(val binding: ItemLibraryFolderBinding) : RecyclerView.ViewHolder(binding.root)
     class SectionViewHolder(val binding: ItemLibrarySectionBinding) : RecyclerView.ViewHolder(binding.root)
 

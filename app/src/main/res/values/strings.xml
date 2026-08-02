@@ -80,6 +80,10 @@
     <string name="playlists_menu">Listas de reproducción</string>
     <string name="library_title">Biblioteca</string>
     <string name="categories">Categorías</string>
+    <string name="search_library_hint">Buscar en tu música...</string>
+    <string name="your_library">Tu biblioteca</string>
+    <string name="see_all">Ver todos</string>
+    <string name="library_search">Resultados de búsqueda</string>
     <string name="player_title">Reproductor</string>
     <string name="downloads_title">Descargas</string>
     <string-array name="sort_options">

@@ -36,10 +36,12 @@ class SongListFragment : Fragment() {
     private lateinit var playerViewModel: PlayerViewModel
     private var collectJob: Job? = null
     private var folderPath: String = ""
+    private var searchQuery: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         folderPath = arguments?.getString(ARG_FOLDER_PATH, "").orEmpty()
+        searchQuery = arguments?.getString(ARG_SEARCH_QUERY, "").orEmpty()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -77,8 +79,35 @@ class SongListFragment : Fragment() {
             view.findViewById<TextView>(R.id.tv_list_title)?.text =
                 folderPath.substringAfterLast(File.separator).ifBlank { folderPath }
             collectFolderSongs()
+        } else if (searchQuery.isNotBlank()) {
+            sortSpinner?.visibility = View.GONE
+            view.findViewById<TextView>(R.id.tv_list_title)?.text =
+                getString(R.string.library_search)
+            collectSearchResults()
         } else {
             setupSortSpinner()
+        }
+    }
+
+    private fun collectSearchResults() {
+        collectJob?.cancel()
+        collectJob = lifecycleScope.launch {
+            repository.getAllSongs().collectLatest { songs ->
+                val query = searchQuery.trim().lowercase()
+                val filtered = songs.filter { song ->
+                    song.title.lowercase().contains(query) ||
+                        song.artist.lowercase().contains(query) ||
+                        song.album.lowercase().contains(query)
+                }
+                adapter.submitList(filtered)
+                if (filtered.isEmpty()) {
+                    recyclerView?.visibility = View.GONE
+                    emptyView?.visibility = View.VISIBLE
+                } else {
+                    recyclerView?.visibility = View.VISIBLE
+                    emptyView?.visibility = View.GONE
+                }
+            }
         }
     }
 
@@ -155,6 +184,7 @@ class SongListFragment : Fragment() {
 
     companion object {
         private const val ARG_FOLDER_PATH = "folderPath"
+        private const val ARG_SEARCH_QUERY = "searchQuery"
         private const val PREFS_NAME = "player_prefs"
         private const val PREFS_SORT_ORDER = "sort_order"
         private const val SORT_TITLE = "title"
