@@ -6,6 +6,7 @@
 .gradle/
 /build
 /app/build
+/app/release
 
 # Kotlin
 .kotlin/
@@ -14,33 +15,36 @@
 local.properties
 secrets.properties
 
-# OpenCode (herramienta de desarrollo local, no forma parte de la app)
+# OpenCode / AI agents
 opencode.json
 .opencode/
+AGENTS.md
+PROJECT_INDEX.json
 
-# Documentación de trabajo (planes y notas del proceso, no del producto)
+# Development plans (not part of the app)
 PLAN*.md
 REVIEW*.md
 MANUAL_*.md
+PLAYER_REDESIGN_PLAN.md
+UI_UX_SPRINT_PLAN.md
 docs/
-PROJECT_INDEX.json
 
 # OS
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# Logs y dumps de memoria
+# Logs and dumps
 *.log
 *.err
 *.hprof
 
-# Capturas y build nativo
+# Native build
 /captures
 .externalNativeBuild
 .cxx
 
-# APKs / paquetes / firmas
+# APKs / keystores
 *.apk
 *.aab
 *.keystore
