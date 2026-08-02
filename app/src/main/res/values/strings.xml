@@ -17,6 +17,7 @@
     <string name="no_lyrics">Sin letras disponibles</string>
     <string name="sort_order">Ordenar por</string>
     <string name="favorite">Favorito</string>
+    <string name="bookmark">Bookmark</string>
     <string name="previous">Anterior</string>
     <string name="next">Siguiente</string>
     <string name="rewind">Retroceder 10s</string>

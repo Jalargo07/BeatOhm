@@ -109,138 +109,119 @@
 
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/seek_container"
+    <FrameLayout
+        android:id="@+id/waveform_controls_container"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="96dp"
         android:layout_marginTop="16dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/title_container">
 
-        <TextView
-            android:id="@+id/tv_current_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:gravity="center"
-            android:maxWidth="64dp"
-            android:minWidth="38dp"
-            android:text="0:00"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
-
         <com.musicdownloader.ui.WaveformSeekBar
             android:id="@+id/waveform_seekbar"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_weight="1" />
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
 
-        <TextView
-            android:id="@+id/tv_total_time"
+        <LinearLayout
+            android:id="@+id/controls_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            android:layout_gravity="center"
             android:gravity="center"
-            android:maxWidth="64dp"
-            android:minWidth="38dp"
-            android:text="0:00"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:orientation="horizontal">
 
-    </LinearLayout>
+            <ImageButton
+                android:id="@+id/btn_shuffle"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="20dp"
+                android:background="@drawable/bg_control_button"
+                android:contentDescription="@string/shuffle"
+                android:src="@drawable/ic_shuffle"
+                app:tint="@color/text_secondary" />
+
+            <ImageButton
+                android:id="@+id/btn_prev"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/previous"
+                android:src="@drawable/ic_prev"
+                app:tint="@color/on_surface" />
+
+            <ImageButton
+                android:id="@+id/btn_play_pause"
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_play_pause_premium"
+                android:contentDescription="@string/play"
+                android:elevation="6dp"
+                android:src="@drawable/ic_play" />
+
+            <ImageButton
+                android:id="@+id/btn_next"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/next"
+                android:src="@drawable/ic_next"
+                app:tint="@color/on_surface" />
+
+            <ImageButton
+                android:id="@+id/btn_repeat"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="20dp"
+                android:background="@drawable/bg_control_button"
+                android:contentDescription="@string/repeat"
+                android:src="@drawable/ic_repeat"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 
     <LinearLayout
-        android:id="@+id/controls_container"
-        android:layout_width="wrap_content"
+        android:id="@+id/time_row"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:gravity="center"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/seek_container">
+        app:layout_constraintTop_toBottomOf="@id/waveform_controls_container">
 
-        <ImageButton
-            android:id="@+id/btn_shuffle"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/bg_control_button"
-            android:contentDescription="@string/shuffle"
-            android:src="@drawable/ic_shuffle"
-            app:tint="@color/text_secondary" />
+        <TextView
+            android:id="@+id/tv_current_time"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="monospace"
+            android:gravity="start"
+            android:text="0:00"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
 
-        <ImageButton
-            android:id="@+id/btn_rewind"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/rewind"
-            android:src="@drawable/ic_rewind"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_prev"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/previous"
-            android:src="@drawable/ic_prev"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_play_pause"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_play_pause_premium"
-            android:contentDescription="@string/play"
-            android:elevation="6dp"
-            android:src="@drawable/ic_play" />
-
-        <ImageButton
-            android:id="@+id/btn_next"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/next"
-            android:src="@drawable/ic_next"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_forward"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/forward"
-            android:src="@drawable/ic_forward"
-            app:tint="@color/on_surface" />
-
-        <ImageButton
-            android:id="@+id/btn_repeat"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_marginStart="16dp"
-            android:background="@drawable/bg_control_button"
-            android:contentDescription="@string/repeat"
-            android:src="@drawable/ic_repeat"
-            app:tint="@color/text_secondary" />
+        <TextView
+            android:id="@+id/tv_total_time"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="monospace"
+            android:gravity="end"
+            android:text="0:00"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
 
     </LinearLayout>
 
@@ -248,13 +229,13 @@
         android:id="@+id/btn_favorite"
         android:layout_width="44dp"
         android:layout_height="44dp"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="4dp"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/favorite"
-        android:src="@drawable/ic_favorite_border"
+        android:contentDescription="@string/bookmark"
+        android:src="@drawable/ic_bookmark_border"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/controls_container" />
+        app:layout_constraintTop_toBottomOf="@id/time_row" />
 
     <LinearLayout
         android:id="@+id/bottom_actions"
@@ -382,7 +363,6 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@drawable/bg_lyrics_glass"
-        android:clickable="true"
         android:focusable="true"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -390,27 +370,24 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <ImageButton
-            android:id="@+id/btn_lyrics_close"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="top|end"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/bg_circle_lyrics"
-            android:contentDescription="@string/close"
-            android:elevation="6dp"
-            android:src="@drawable/ic_close"
-            app:tint="@android:color/white" />
-
         <com.musicdownloader.ui.SyncedLyricsView
             android:id="@+id/synced_lyrics_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:paddingStart="24dp"
             android:paddingEnd="24dp"
-            android:paddingTop="76dp"
+            android:paddingTop="28dp"
             android:paddingBottom="32dp" />
+
+        <View
+            android:id="@+id/lyrics_drag_handle"
+            android:layout_width="48dp"
+            android:layout_height="12dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_lyrics_handle"
+            android:clickable="true"
+            android:focusable="true" />
 
     </FrameLayout>
 

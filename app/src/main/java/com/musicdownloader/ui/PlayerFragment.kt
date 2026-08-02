@@ -152,7 +152,7 @@ class PlayerFragment : Fragment() {
             binding.coverContainer.visibility = View.VISIBLE
             binding.ivGlow.visibility = View.VISIBLE
             binding.titleContainer.visibility = View.VISIBLE
-            binding.seekContainer.visibility = View.VISIBLE
+            binding.waveformControlsContainer.visibility = View.VISIBLE
             binding.controlsContainer.visibility = View.VISIBLE
             binding.bottomActions.visibility = View.VISIBLE
             binding.ivCover.visibility = View.VISIBLE
@@ -170,7 +170,7 @@ class PlayerFragment : Fragment() {
                 binding.tvArtist.text = ""
                 binding.ivCover.setImageResource(R.drawable.ic_music_note)
                 binding.pbCover.visibility = View.GONE
-                binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                binding.btnFavorite.setImageResource(R.drawable.ic_bookmark_border)
                 binding.btnFavorite.colorFilter = null
                 binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
                     if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
@@ -226,8 +226,8 @@ class PlayerFragment : Fragment() {
             val song = repository.getSongById(filePath)
             val isFav = song?.isFavorite ?: false
             binding.btnFavorite.setImageResource(
-                if (isFav) R.drawable.ic_favorite
-                else R.drawable.ic_favorite_border
+                if (isFav) R.drawable.ic_bookmark
+                else R.drawable.ic_bookmark_border
             )
             binding.btnFavorite.colorFilter = if (isFav) {
                 PorterDuffColorFilter(
@@ -542,10 +542,6 @@ class PlayerFragment : Fragment() {
             toggleLyrics()
         }
 
-        binding.btnLyricsClose.setOnClickListener {
-            if (isLyricsVisible) toggleLyrics()
-        }
-
         binding.btnFavorite.setOnClickListener {
             val path = currentSongFilePath ?: return@setOnClickListener
             lifecycleScope.launch {
@@ -557,20 +553,6 @@ class PlayerFragment : Fragment() {
                     if (newFav) animateFavoriteHeart()
                 }
             }
-        }
-
-        binding.btnRewind.setOnClickListener {
-            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
-            val service = activity.playbackService ?: return@setOnClickListener
-            val newPos = maxOf(0L, service.getCurrentPosition() - 10_000L)
-            service.seekTo(newPos)
-        }
-
-        binding.btnForward.setOnClickListener {
-            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
-            val service = activity.playbackService ?: return@setOnClickListener
-            val newPos = service.getCurrentPosition() + 10_000L
-            service.seekTo(newPos)
         }
 
         binding.btnAddPlaylist.setOnClickListener {
@@ -662,19 +644,46 @@ class PlayerFragment : Fragment() {
     private fun coverWidthPx(): Float = binding.coverContainer.width.toFloat().coerceAtLeast(1f)
 
     private fun setupLyricsSwipe() {
-        val swipeCloseThreshold = 100 * resources.displayMetrics.density
-        binding.lyricsPanel.setOnTouchListener { _, event ->
+        val density = resources.displayMetrics.density
+        val closeThreshold = 120 * density
+        binding.lyricsDragHandle.setOnTouchListener { _, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> downY = event.y
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val deltaY = event.y - downY
-                    if (isLyricsVisible && deltaY > swipeCloseThreshold) {
-                        closeLyrics()
-                    }
+                MotionEvent.ACTION_DOWN -> {
+                    downY = event.rawY
+                    isDragging = true
+                    binding.lyricsPanel.parent?.requestDisallowInterceptTouchEvent(true)
+                    true
                 }
-                else -> {}
+                MotionEvent.ACTION_MOVE -> {
+                    if (isDragging) {
+                        val deltaY = event.rawY - downY
+                        if (deltaY > 0) {
+                            binding.lyricsPanel.translationY = deltaY
+                            val progress = (deltaY / closeThreshold).coerceIn(0f, 1f)
+                            binding.lyricsPanel.alpha = 1f - progress * 0.4f
+                        }
+                        true
+                    } else false
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (isDragging) {
+                        isDragging = false
+                        val deltaY = event.rawY - downY
+                        if (deltaY > closeThreshold) {
+                            closeLyrics()
+                        } else {
+                            binding.lyricsPanel.animate()
+                                .translationY(0f)
+                                .alpha(1f)
+                                .setDuration(200)
+                                .setInterpolator(DecelerateInterpolator())
+                                .start()
+                        }
+                        true
+                    } else false
+                }
+                else -> false
             }
-            false
         }
     }
 
@@ -771,9 +780,6 @@ class PlayerFragment : Fragment() {
             binding.syncedLyricsView.onLineClicked = { positionMs ->
                 (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.seekTo(positionMs)
             }
-            binding.syncedLyricsView.onSwipeDown = {
-                closeLyrics()
-            }
             loadLyricsBackground(song)
             binding.ivLyricsBackground.visibility = View.VISIBLE
             binding.lyricsPanel.visibility = View.VISIBLE
@@ -781,7 +787,7 @@ class PlayerFragment : Fragment() {
             binding.ivCover.visibility = View.INVISIBLE
             binding.ivGlow.visibility = View.INVISIBLE
             binding.titleContainer.visibility = View.INVISIBLE
-            binding.seekContainer.visibility = View.INVISIBLE
+            binding.waveformControlsContainer.visibility = View.INVISIBLE
             binding.controlsContainer.visibility = View.INVISIBLE
             binding.bottomActions.visibility = View.INVISIBLE
 
@@ -862,7 +868,7 @@ class PlayerFragment : Fragment() {
                     binding.ivGlow.visibility = View.VISIBLE
                     binding.ivCover.visibility = View.VISIBLE
                     binding.titleContainer.visibility = View.VISIBLE
-                    binding.seekContainer.visibility = View.VISIBLE
+                    binding.waveformControlsContainer.visibility = View.VISIBLE
                     binding.controlsContainer.visibility = View.VISIBLE
                     binding.bottomActions.visibility = View.VISIBLE
                 }

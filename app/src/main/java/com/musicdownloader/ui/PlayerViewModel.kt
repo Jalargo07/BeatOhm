@@ -56,7 +56,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setSong(song: Song) {
         _currentSong.value = song
-        _isPlaying.value = false
         _currentPosition.value = 0L
         _duration.value = 0L
     }

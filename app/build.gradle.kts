@@ -19,8 +19,8 @@ android {
         applicationId = "com.musicdownloader"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "2.2-night"
+        versionCode = 8
+        versionName = "2.4"
 
         buildConfigField("String", "GENIUS_ACCESS_TOKEN", "\"${secrets.getProperty("GENIUS_ACCESS_TOKEN", "")}\"")
     }

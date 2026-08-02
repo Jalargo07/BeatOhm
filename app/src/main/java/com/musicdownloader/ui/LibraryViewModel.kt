@@ -51,18 +51,24 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             _isScanning.postValue(true)
             try {
                 _allSongs.postValue(repo.getAllSongsNow())
-                val result = repo.scanLibrary()
+                val result = repo.fastScan()
                 _allSongs.postValue(result.songs)
+
+                launch(Dispatchers.IO) {
+                    repo.enrichMetadataGradually(result.songs) { done, total, title ->
+                        Log.d(TAG, "Enriching: $done/$total - $title")
+                    }
+                    repo.extractMissingWaveforms(repo.getAllSongsNow()) { done, total ->
+                        Log.d(TAG, "Waveform: $done/$total")
+                    }
+                }
+
                 val offered = offeredIds()
                 val pending = result.incompleteSongs.filter { it.id !in offered }
                 pendingIncomplete = pending
                 _incompleteCount.postValue(result.incompleteSongs.size)
                 if (pending.isNotEmpty()) {
                     _offerEnrichment.postValue(pending.size)
-                }
-                // Extract waveforms in background (non-blocking, limited concurrency)
-                repo.extractMissingWaveforms(result.songs) { done, total ->
-                    Log.d(TAG, "Waveform extraction: $done/$total")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error scanning library", e)

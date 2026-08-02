@@ -16,6 +16,7 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Semaphore
@@ -98,20 +99,19 @@ class MusicRepository(private val context: Context) {
     suspend fun scanMusicFolder(): List<LocalSong> = scanLibrary().songs
 
     suspend fun scanLibrary(): ScanResult {
-        // One-time: clear old waveform data so new density formula is applied
         val prefs = context.getSharedPreferences("waveform_migration", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("v2_cleared", false)) {
             dao.clearAllWaveforms()
             prefs.edit().putBoolean("v2_cleared", true).apply()
         }
+        return fastScan()
+    }
 
+    suspend fun fastScan(): ScanResult = withContext(Dispatchers.IO) {
         cleanupDuplicates()
         val existing = dao.getAllSongsNow().associate { it.id to it }
-        val artCacheDir = getAlbumArtCacheDir()
-        if (!artCacheDir.exists()) artCacheDir.mkdirs()
-
+        val newSongs = mutableListOf<LocalSong>()
         val processed = mutableSetOf<String>()
-        val songs = mutableListOf<LocalSong>()
 
         for (folderPath in getLibraryFolders()) {
             val dir = File(folderPath)
@@ -119,35 +119,65 @@ class MusicRepository(private val context: Context) {
             try {
                 for (file in audioFilesIn(dir, MAX_SCAN_DEPTH)) {
                     val path = file.absolutePath
-                    if (processed.add(path)) {
-                        songs.add(extractSong(file, artCacheDir, existing[path]))
+                    if (processed.add(path) && existing[path] == null) {
+                        newSongs.add(
+                            LocalSong(
+                                id = path,
+                                title = file.nameWithoutExtension,
+                                duration = 0L,
+                                filePath = path
+                            )
+                        )
                     }
                 }
             } catch (_: Exception) {}
         }
 
-        if (songs.isNotEmpty()) {
-            dao.insertSongs(songs)
+        if (newSongs.isNotEmpty()) {
+            dao.insertSongs(newSongs)
         }
 
-        val songsNeedingArt = songs.filter { it.thumbnailUrl.isBlank() }.take(20)
-        for (song in songsNeedingArt) {
-            val artUrl = fetchArtFromITunes(song, artCacheDir)
-            if (artUrl.isNotBlank()) {
-                dao.insertSong(song.copy(thumbnailUrl = artUrl))
-                val songIndex = songs.indexOfFirst { it.id == song.id }
-                if (songIndex >= 0) {
-                    songs[songIndex] = songs[songIndex].copy(thumbnailUrl = artUrl)
-                }
-            }
-        }
-
-        val incompleteSongs = songs.filter {
+        val allSongs = dao.getAllSongsNow()
+        val incompleteSongs = allSongs.filter {
             it.artist.isBlank() || it.album.isBlank() || it.genre.isBlank()
                 || it.thumbnailUrl.isBlank() || it.lyrics.isBlank() || it.year.isBlank()
         }
 
-        return ScanResult(songs, incompleteSongs)
+        ScanResult(allSongs, incompleteSongs)
+    }
+
+    suspend fun enrichMetadataGradually(
+        songs: List<LocalSong>,
+        onProgress: ((done: Int, total: Int, title: String) -> Unit)? = null
+    ) = withContext(Dispatchers.IO) {
+        val artCacheDir = getAlbumArtCacheDir()
+        if (!artCacheDir.exists()) artCacheDir.mkdirs()
+
+        val songsNeedingMetadata = songs.filter {
+            it.artist.isBlank() || it.album.isBlank() || it.duration == 0L
+        }
+        val total = songsNeedingMetadata.size
+        var done = 0
+
+        for (song in songsNeedingMetadata) {
+            try {
+                val file = File(song.filePath)
+                if (file.exists()) {
+                    val updated = extractSong(file, artCacheDir, song)
+                    if (updated.thumbnailUrl.isBlank()) {
+                        val artUrl = fetchArtFromITunes(updated, artCacheDir)
+                        dao.insertSong(
+                            if (artUrl.isNotBlank()) updated.copy(thumbnailUrl = artUrl) else updated
+                        )
+                    } else {
+                        dao.insertSong(updated)
+                    }
+                }
+            } catch (_: Exception) {}
+            done++
+            onProgress?.invoke(done, total, song.title)
+            delay(100)
+        }
     }
 
     /**
@@ -222,19 +252,21 @@ class MusicRepository(private val context: Context) {
 
             var thumbnailUrl = ""
             try {
-                val art = meta.embeddedPicture
-                if (art != null) {
-                    val artFile = File(artCacheDir, "${file.nameWithoutExtension}.jpg")
-                    if (!artFile.exists()) {
-                        val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                        if (bitmap != null) {
-                            FileOutputStream(artFile).use { out ->
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                if (file.extension.lowercase() != "opus") {
+                    val art = meta.embeddedPicture
+                    if (art != null) {
+                        val artFile = File(artCacheDir, "${file.nameWithoutExtension}.jpg")
+                        if (!artFile.exists()) {
+                            val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                            if (bitmap != null) {
+                                FileOutputStream(artFile).use { out ->
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                                }
                             }
                         }
-                    }
-                    if (artFile.exists()) {
-                        thumbnailUrl = artFile.absolutePath
+                        if (artFile.exists()) {
+                            thumbnailUrl = artFile.absolutePath
+                        }
                     }
                 }
             } catch (e: Exception) {

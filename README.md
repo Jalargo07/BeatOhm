@@ -6,7 +6,7 @@
 
 **Descargá, organizá y escuchá tu música favorita directo desde YouTube — con metadata impecable, letras multi-fuente y un reproductor premium con visualizador de onda de audio real.**
 
-[![Version](https://img.shields.io/badge/version-2.3-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.4-blue.svg)]()
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-35-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
@@ -31,17 +31,19 @@
 
 ### 🎧 Reproductor Premium
 
-- **Visualizador de onda de audio real** — extrae amplitud real del archivo de audio via MediaExtractor + MediaCodec. Cada barra representa ~3 segundos de audio. Datos cacheados en Room para carga instantánea.
+- **Visualizador de onda de audio real** — extrae amplitud real del archivo de audio via MediaExtractor + MediaCodec. Cada barra representa ~3 segundos de audio. Datos cacheados en Room para carga instantánea. Barras 1/3 más grandes para mejor legibilidad.
+- **Controles sobre la onda** — los controles de reproducción se superponen a la onda como fondo; barra de tiempo propia debajo con tiempo actual y total.
 - **Scroll continuo tipo Poweramp** — cursor fijo al 30%, la onda se desplaza suavemente. Fling con inercia (OverScroller, fricción 0.008) para deslizamiento fluido.
 - **Gesto invertido** — deslizar a la izquierda adelanta, a la derecha retrocede (empujar línea de tiempo).
 - **Dynamic Gradient** — colores extraídos del Palette de la carátula (6 swatches), gradientes animados.
 - **Album Art Glow** — efecto de brillo dual-layer en la carátula.
-- **Letras glassmorphism** — panel translúcido con tap-to-seek y swipe-to-close. Letras sincronizadas con resaltado de línea actual.
+- **Letras glassmorphism** — panel translúcido con drag-handle para cerrar. Letras sincronizadas con resaltado de línea actual.
+- **Letras estilo Spotify** — toda la letra visible desde el inicio, scroll manual libre, y auto-scroll que sigue la línea cantada. Auto-scroll se pausa al tocar/deslizar y se reanuda al tocar la línea resaltada o al acercarla al centro.
 - **Cola glassmorphism** — bottom sheet con DiffUtil, animaciones escalonadas, stroke en canción actual.
 - **Mini Player** — barra de progreso gradient integrada en el mini player.
 - **Media3 ExoPlayer** — motor de reproducción nativo con controles en notificación.
 - **Shuffle & Repeat** — aleatorio y repetición (una canción / toda la lista).
-- **Favoritos** — marcá cualquier canción como favorita con un toque.
+- **Favoritos con bookmark** — marcá cualquier canción como favorita con un toque.
 
 ### 📚 Biblioteca
 
@@ -49,6 +51,7 @@
 - **Álbumes / Artistas / Géneros / Años** — explorá por diferentes criterios.
 - **Favoritos / Más escuchadas** — ranking por contador de reproducciones.
 - **Playlists** — creá, editá y eliminá playlists personalizadas.
+- **Fast Scan** — las canciones aparecen al instante al abrir la app (scan rápido de archivos sin bloquear la UI), y la metadata (artista, álbum, carátula, duración) se enriquece en background de a una por vez.
 
 ### 📁 Carpetas personalizadas
 
@@ -118,7 +121,7 @@ app/src/main/java/com/musicdownloader/
 │   ├── WaveformSeekBar.kt         # Waveform real con scroll, fling, Path batch
 │   ├── DynamicGradientDrawable.kt # Gradient animado desde Palette
 │   ├── GlowDrawable.kt            # Efecto de brillo dual-layer
-│   ├── SyncedLyricsView.kt        # Letras sincronizadas con tap-to-seek
+│   ├── SyncedLyricsView.kt        # Letras con auto-scroll, scroll manual y tap-to-seek
 │   ├── QueueBottomSheetDialogFragment.kt  # Cola glassmorphism
 │   └── ArtworkLoader.kt           # Carga de carátulas desde archivos
 │
@@ -142,6 +145,17 @@ app/src/main/java/com/musicdownloader/
 ---
 
 ## Changelog
+
+### v2.4 Stable
+- **Fast Scan + Enriquecimiento async** — biblioteca aparece al instante; metadata (artista, álbum, carátula, duración, onda) se completa en background de a una canción por vez
+- **Fix play/pause** — `onIsPlayingChanged()` es la única fuente de verdad del estado; elimina el reset espurio en `setSong()`
+- **Reproductor rediseñado** — controles superpuestos a la onda como fondo, barra de tiempo propia, botones ±10s eliminados
+- **Favoritos con bookmark** — ícono bookmark en vez de corazón
+- **Onda 1/3 más grande** — mejor legibilidad
+- **Letras estilo Spotify** — toda la letra visible desde el inicio, scroll manual libre, auto-scroll que se pausa con el dedo y se reanuda al tocar la línea resaltada o acercarla al centro
+- **Fix overlap de letras** — posiciones cacheadas con altura máxima, sin superposición al resaltar
+- **Fix fling de letras** — eje correcto del OverScroller (el scroll ya no vuela a la primera línea)
+- **Drag-handle para cerrar letras** — arrastrá el panel hacia abajo para cerrarlo
 
 ### v2.3 Stable
 - **Real Audio Waveform** — MediaExtractor + MediaCodec decodifica audio a PCM, calcula RMS por segmento
