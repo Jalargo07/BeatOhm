@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindPlaybackService() {
         val intent = Intent(this, MusicPlaybackService::class.java)
+        ContextCompat.startForegroundService(this, intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 

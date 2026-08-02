@@ -88,8 +88,14 @@ class LyricsFetcher {
                 val synced = json.get("syncedLyrics")?.asString?.takeIf { it.isNotBlank() }
                 val plain = json.get("plainLyrics")?.asString?.takeIf { it.isNotBlank() }
                 when {
-                    synced != null -> Result.success(LyricsResult(plainText = synced, syncedLrc = synced))
-                    plain != null -> Result.success(LyricsResult(plainText = plain, syncedLrc = null))
+                    synced != null -> {
+                        Log.e(TAG, "LRCLIB SYNCED LRC (${synced.length} chars): '${synced.take(120)}...'")
+                        Result.success(LyricsResult(plainText = synced, syncedLrc = synced))
+                    }
+                    plain != null -> {
+                        Log.e(TAG, "LRCLIB PLAIN TEXT (${plain.length} chars): '${plain.take(120)}...'")
+                        Result.success(LyricsResult(plainText = plain, syncedLrc = null))
+                    }
                     else -> Result.failure(Exception("LRCLIB sin letras"))
                 }
             }

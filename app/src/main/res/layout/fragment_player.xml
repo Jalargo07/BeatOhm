@@ -24,25 +24,13 @@
             android:scaleType="centerCrop"
             android:src="@drawable/ic_music_note" />
 
-        <ScrollView
-            android:id="@+id/sv_lyrics"
+        <com.musicdownloader.ui.SyncedLyricsView
+            android:id="@+id/synced_lyrics_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/bg_cover_rounded"
             android:padding="16dp"
-            android:scrollbarStyle="insideInset"
-            android:fadeScrollbars="true"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/tv_lyrics"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-light"
-                android:lineSpacingExtra="4dp"
-                android:textColor="@color/on_surface"
-                android:textSize="14sp" />
-        </ScrollView>
+            android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout

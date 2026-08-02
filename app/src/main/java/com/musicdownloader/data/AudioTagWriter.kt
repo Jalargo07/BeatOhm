@@ -10,15 +10,21 @@ import com.musicdownloader.data.MusicRepository
 
 object AudioTagWriter {
     private const val TAG = "AudioTagWriter"
-    private val SUPPORTED = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav")
+    private val SUPPORTED = setOf("mp3", "m4a", "flac", "ogg", "opus")
 
     fun writeTags(file: File, song: LocalSong) {
+        Log.e(TAG, "writeTags INICIO: ext=${file.extension} name=${file.name}")
         if (file.extension.lowercase() !in SUPPORTED) {
             Log.e(TAG, "Formato no soportado: ${file.extension} (${file.name})")
             return
         }
         if (!file.exists() || file.length() == 0L) {
             Log.e(TAG, "Archivo no existe o vacío: ${file.name}")
+            return
+        }
+        if (file.extension.lowercase() == "opus") {
+            Log.e(TAG, "Delegando a OpusTagWriter: ${file.name}")
+            OpusTagWriter.writeTags(file, song)
             return
         }
         try {

@@ -1,5 +1,10 @@
 package com.musicdownloader
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -16,7 +21,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.musicdownloader.data.MusicRepository
@@ -46,6 +50,7 @@ class MusicPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel()
         val audioManager = getSystemService(AudioManager::class.java)
         val sessionId = audioManager.generateAudioSessionId()
         player = ExoPlayer.Builder(this).build()
@@ -57,12 +62,6 @@ class MusicPlaybackService : MediaSessionService() {
                 .build(),
             true
         )
-        val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
-            .setChannelId(CHANNEL_ID)
-            .setChannelName(R.string.media_playback_channel_name)
-            .build()
-        notificationProvider.setSmallIcon(R.drawable.ic_player)
-        setMediaNotificationProvider(notificationProvider)
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(object : MediaSession.Callback {
                 override fun onMediaButtonEvent(
@@ -91,7 +90,80 @@ class MusicPlaybackService : MediaSessionService() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_PLAY_PAUSE -> if (player.isPlaying) player.pause() else player.play()
+            ACTION_NEXT -> advanceSong(true)
+            ACTION_PREV -> advanceSong(false)
+        }
+        startForeground(NOTIFICATION_ID, buildNotification())
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun buildNotification(): Notification {
+        val metadata = player.currentMediaItem?.mediaMetadata
+        val title = metadata?.title?.toString()
+            ?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.app_name)
+        val artist = metadata?.artist?.toString()?.takeIf { it.isNotBlank() }
+
+        val playPauseIcon = if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+
+        val builder = Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_player)
+            .setContentTitle(title)
+            .setContentText(artist)
+            .setOngoing(true)
+            .setStyle(
+                Notification.MediaStyle()
+                    .setShowActionsInCompactView(0, 1, 2)
+            )
+
+        builder.addAction(Notification.Action.Builder(
+            android.R.drawable.ic_media_previous,
+            getString(R.string.previous),
+            pendingIntentFor(ACTION_PREV)
+        ).build())
+
+        builder.addAction(Notification.Action.Builder(
+            playPauseIcon,
+            if (player.isPlaying) getString(R.string.pause) else getString(R.string.play),
+            pendingIntentFor(ACTION_PLAY_PAUSE)
+        ).build())
+
+        builder.addAction(Notification.Action.Builder(
+            android.R.drawable.ic_media_next,
+            getString(R.string.next),
+            pendingIntentFor(ACTION_NEXT)
+        ).build())
+
+        return builder.build()
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.media_playback_channel_name),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply { description = "Reproducción de música" }
+        getSystemService(NotificationManager::class.java)
+            .createNotificationChannel(channel)
+    }
+
+    private fun pendingIntentFor(action: String): PendingIntent {
+        val intent = Intent(this, MusicPlaybackService::class.java).apply {
+            this.action = action
+        }
+        return PendingIntent.getService(
+            this,
+            action.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun updateNotification() {
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, buildNotification())
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -257,6 +329,7 @@ class MusicPlaybackService : MediaSessionService() {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playerViewModel?.setPlaying(isPlaying)
+                updateNotification()
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
@@ -275,6 +348,7 @@ class MusicPlaybackService : MediaSessionService() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 playerViewModel?.setDuration(0L)
                 checkAndSetDuration()
+                updateNotification()
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                     syncViewModelToExoPlayer()
                 }
@@ -284,6 +358,10 @@ class MusicPlaybackService : MediaSessionService() {
 
     companion object {
         private const val CHANNEL_ID = "music_playback_channel"
+        private const val NOTIFICATION_ID = 1001
         private const val MAX_ARTWORK_ITEMS = 50
+        const val ACTION_PLAY_PAUSE = "com.musicdownloader.action.PLAY_PAUSE"
+        const val ACTION_NEXT = "com.musicdownloader.action.NEXT"
+        const val ACTION_PREV = "com.musicdownloader.action.PREV"
     }
 }

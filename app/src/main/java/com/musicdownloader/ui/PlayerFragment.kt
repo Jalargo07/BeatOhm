@@ -90,7 +90,7 @@ class PlayerFragment : Fragment() {
     private fun setupObservers() {
         viewModel.currentSong.observe(viewLifecycleOwner) { song ->
             isLyricsVisible = false
-            binding.svLyrics.visibility = View.GONE
+            binding.syncedLyricsView.visibility = View.GONE
             binding.ivCover.visibility = View.VISIBLE
             if (song != null) {
                 val path = song.filePath.ifBlank { song.youtubeUrl }
@@ -288,31 +288,19 @@ class PlayerFragment : Fragment() {
         isLyricsVisible = !isLyricsVisible
         if (isLyricsVisible) {
             val song = viewModel.currentSong.value
-            binding.tvLyrics.text = stripLrcTimestamps(song?.lyrics ?: "")
-            binding.svLyrics.visibility = View.VISIBLE
+            binding.syncedLyricsView.setLyrics(song?.lyrics ?: "")
+            binding.syncedLyricsView.visibility = View.VISIBLE
             binding.ivCover.visibility = View.INVISIBLE
-            binding.svLyrics.alpha = 0f
-            binding.svLyrics.animate().alpha(1f).setDuration(200).start()
+            binding.syncedLyricsView.alpha = 0f
+            binding.syncedLyricsView.animate().alpha(1f).setDuration(200).start()
+            val pos = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.getCurrentPosition() ?: 0L
+            binding.syncedLyricsView.updatePosition(pos)
         } else {
-            binding.svLyrics.animate().alpha(0f).setDuration(200).withEndAction {
-                binding.svLyrics.visibility = View.GONE
+            binding.syncedLyricsView.animate().alpha(0f).setDuration(200).withEndAction {
+                binding.syncedLyricsView.visibility = View.GONE
                 binding.ivCover.visibility = View.VISIBLE
             }.start()
         }
-    }
-
-    private fun stripLrcTimestamps(text: String): String {
-        val timestampRegex = Regex("\\[\\d{1,2}:\\d{2}(\\.\\d+)?\\]")
-        if (!text.contains(timestampRegex)) return text
-        return text.lines()
-            .map { line ->
-                val trimmed = line.trimStart()
-                if (trimmed.contains(Regex("^\\[\\d{1,2}:\\d{2}(\\.\\d+)?\\]"))) {
-                    trimmed.replace(timestampRegex, "").trim()
-                } else line
-            }
-            .joinToString("\n")
-            .trim()
     }
 
     private fun showAddToPlaylistDialog(songFilePath: String) {
@@ -363,6 +351,9 @@ class PlayerFragment : Fragment() {
                     b.seekBar.progress = progress.coerceIn(0, MAX_SEEK)
                     b.tvCurrentTime.text = formatTime(pos)
                     viewModel.setPosition(pos)
+                    if (isLyricsVisible) {
+                        b.syncedLyricsView.updatePosition(pos)
+                    }
                 }
                 b.root.postDelayed(this, 500)
             }
