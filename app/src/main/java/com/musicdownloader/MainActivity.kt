@@ -14,11 +14,14 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.view.Menu
+import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageButton
-import android.widget.ProgressBar
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -106,11 +109,49 @@ class MainActivity : AppCompatActivity() {
         bindPlaybackService()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                navController.navigate(R.id.settingsFragment)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
     override fun onSupportNavigateUp(): Boolean =
         navController.navigateUp() || super.onSupportNavigateUp()
 
     private fun setupMiniPlayer() {
-        findViewById<View>(R.id.mini_player_container).setOnClickListener {
+        val miniPlayerContainer = findViewById<View>(R.id.mini_player_container)
+        val swipeThreshold = 100 * resources.displayMetrics.density
+        var miniTouchStartY = 0f
+
+        miniPlayerContainer.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    miniTouchStartY = event.y
+                    false
+                }
+                MotionEvent.ACTION_UP -> {
+                    val deltaY = miniTouchStartY - event.y
+                    if (deltaY > swipeThreshold) {
+                        navController.navigate(R.id.playerFragment)
+                        true
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+
+        miniPlayerContainer.setOnClickListener {
             navController.navigate(R.id.playerFragment)
         }
 
@@ -212,7 +253,7 @@ class MainActivity : AppCompatActivity() {
         val pos = service.getCurrentPosition()
         val dur = service.getDuration()
         if (dur > 0) {
-            findViewById<ProgressBar>(R.id.mini_progress_bar).progress = (pos * 1000 / dur).toInt()
+            findViewById<LinearProgressIndicator>(R.id.mini_progress_bar).progress = (pos * 100 / dur).toInt()
         }
     }
 
