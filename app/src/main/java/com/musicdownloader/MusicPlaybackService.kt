@@ -108,13 +108,28 @@ class MusicPlaybackService : MediaSessionService() {
 
         val playPauseIcon = if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
 
+        val largeIcon: Bitmap? = metadata?.artworkData?.let { data ->
+            try { BitmapFactory.decodeByteArray(data, 0, data.size) } catch (_: Exception) { null }
+        }
+
+        val contentIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_player)
             .setContentTitle(title)
             .setContentText(artist)
             .setOngoing(true)
+            .setLargeIcon(largeIcon)
+            .setContentIntent(contentIntent)
             .setStyle(
                 Notification.MediaStyle()
+                    .setMediaSession(mediaSession?.sessionCompatToken?.token as? android.media.session.MediaSession.Token)
                     .setShowActionsInCompactView(0, 1, 2)
             )
 
