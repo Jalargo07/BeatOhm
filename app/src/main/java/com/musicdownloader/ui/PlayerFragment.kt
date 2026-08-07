@@ -152,7 +152,8 @@ class PlayerFragment : Fragment() {
             binding.coverContainer.visibility = View.VISIBLE
             binding.ivGlow.visibility = View.VISIBLE
             binding.titleContainer.visibility = View.VISIBLE
-            binding.waveformRow.visibility = View.VISIBLE
+            binding.waveformSeekbar.visibility = View.VISIBLE
+            binding.timeRow.visibility = View.VISIBLE
             binding.controlsContainer.visibility = View.VISIBLE
             binding.bottomActions.visibility = View.VISIBLE
             binding.ivCover.visibility = View.VISIBLE
@@ -570,6 +571,8 @@ class PlayerFragment : Fragment() {
             isSeeking = true
             val dur = currentDurationMs()
             binding.tvCurrentTime.text = formatTime(if (dur > 0) progress.toLong() * dur / MAX_SEEK else 0L)
+            binding.controlsContainer.animate().cancel()
+            binding.controlsContainer.alpha = 0.1f
         }
         binding.waveformSeekbar.onProgressStop = { progress ->
             isSeeking = false
@@ -577,6 +580,18 @@ class PlayerFragment : Fragment() {
             val dur = currentDurationMs()
             val target = if (dur > 0) progress.toLong() * dur / MAX_SEEK else 0L
             activity?.playbackService?.seekTo(target)
+            binding.controlsContainer.animate().cancel()
+            binding.controlsContainer.animate().alpha(1f).setDuration(120).start()
+        }
+
+        binding.waveformSeekbar.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    binding.controlsContainer.animate().cancel()
+                    binding.controlsContainer.animate().alpha(1f).setDuration(120).start()
+                }
+            }
+            false
         }
 
         binding.volumeSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -768,7 +783,8 @@ class PlayerFragment : Fragment() {
             binding.ivCover.visibility = View.INVISIBLE
             binding.ivGlow.visibility = View.INVISIBLE
             binding.titleContainer.visibility = View.INVISIBLE
-            binding.waveformRow.visibility = View.INVISIBLE
+            binding.waveformSeekbar.visibility = View.INVISIBLE
+            binding.timeRow.visibility = View.INVISIBLE
             binding.controlsContainer.visibility = View.INVISIBLE
             binding.bottomActions.visibility = View.INVISIBLE
 
@@ -849,7 +865,8 @@ class PlayerFragment : Fragment() {
                     binding.ivGlow.visibility = View.VISIBLE
                     binding.ivCover.visibility = View.VISIBLE
                     binding.titleContainer.visibility = View.VISIBLE
-                    binding.waveformRow.visibility = View.VISIBLE
+                    binding.waveformSeekbar.visibility = View.VISIBLE
+                    binding.timeRow.visibility = View.VISIBLE
                     binding.controlsContainer.visibility = View.VISIBLE
                     binding.bottomActions.visibility = View.VISIBLE
                 }
