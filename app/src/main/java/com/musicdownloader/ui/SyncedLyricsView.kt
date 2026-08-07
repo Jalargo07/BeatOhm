@@ -39,9 +39,14 @@ class SyncedLyricsView @JvmOverloads constructor(
     private var targetScrollOffset = 0f
     private var scrollAnimator: ValueAnimator? = null
 
+    private var isUserScrolling = false
+    private var dragStartOffset = 0f
+    private var lastMoveY = 0f
+
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val lineSpacing = 28f * scaledDensity
     private val maxTextWidthMargin = 16f * scaledDensity
+    private val scrollTouchSlop = 8f * resources.displayMetrics.density
 
     private val normalPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.on_surface)
@@ -77,9 +82,13 @@ class SyncedLyricsView @JvmOverloads constructor(
         val newIndex = findCurrentLine(positionMs)
         if (newIndex != currentIndex) {
             currentIndex = newIndex
-            targetScrollOffset = currentIndex * lineSpacing
-            animateScroll()
-            invalidate()
+            if (!isUserScrolling) {
+                targetScrollOffset = currentIndex * lineSpacing
+                animateScroll()
+                invalidate()
+            } else {
+                targetScrollOffset = currentIndex * lineSpacing
+            }
         }
     }
 
@@ -125,7 +134,11 @@ class SyncedLyricsView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                lastMoveY = event.y
                 isSwiping = false
+                isUserScrolling = false
+                dragStartOffset = scrollOffset
+                scrollAnimator?.cancel()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -133,7 +146,13 @@ class SyncedLyricsView @JvmOverloads constructor(
                 val deltaX = event.x - downX
                 if (Math.abs(deltaY) > swipeThreshold && Math.abs(deltaY) > Math.abs(deltaX)) {
                     isSwiping = true
+                    isUserScrolling = false
+                } else if (Math.abs(deltaY) > scrollTouchSlop && Math.abs(deltaY) > Math.abs(deltaX)) {
+                    isUserScrolling = true
+                    scrollOffset = dragStartOffset - deltaY
+                    invalidate()
                 }
+                lastMoveY = event.y
                 return true
             }
             MotionEvent.ACTION_UP -> {
@@ -141,6 +160,16 @@ class SyncedLyricsView @JvmOverloads constructor(
                     val deltaY = event.y - downY
                     if (deltaY > swipeThreshold) {
                         onSwipeDown?.invoke()
+                    }
+                } else if (isUserScrolling) {
+                    val releaseY = event.y
+                    val centerY = height / 2f
+                    val centerThreshold = height * 0.2f
+                    if (Math.abs(releaseY - centerY) < centerThreshold) {
+                        isUserScrolling = false
+                        targetScrollOffset = currentIndex * lineSpacing
+                        animateScroll()
+                        invalidate()
                     }
                 } else {
                     val index = getLineAtY(event.y)
@@ -150,7 +179,11 @@ class SyncedLyricsView @JvmOverloads constructor(
                 }
                 return true
             }
-            MotionEvent.ACTION_CANCEL -> return true
+            MotionEvent.ACTION_CANCEL -> {
+                isSwiping = false
+                isUserScrolling = false
+                return true
+            }
         }
         return super.onTouchEvent(event)
     }
