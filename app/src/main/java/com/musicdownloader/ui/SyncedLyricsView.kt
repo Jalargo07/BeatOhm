@@ -5,6 +5,9 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -40,14 +43,14 @@ class SyncedLyricsView @JvmOverloads constructor(
     private val lineSpacing = 28f * scaledDensity
     private val maxTextWidthMargin = 16f * scaledDensity
 
-    private val normalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val normalPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.on_surface)
         textSize = 18f * scaledDensity
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
     }
 
-    private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val highlightPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         textSize = 18f * scaledDensity
         textAlign = Paint.Align.CENTER
@@ -195,16 +198,23 @@ class SyncedLyricsView @JvmOverloads constructor(
         }
     }
 
-    private fun drawCenteredText(canvas: Canvas, text: String, cx: Float, y: Float, paint: Paint, maxWidth: Float) {
+    private fun drawCenteredText(canvas: Canvas, text: String, cx: Float, y: Float, paint: TextPaint, maxWidth: Float) {
         val measured = paint.measureText(text)
         if (measured <= maxWidth || measured <= 0f) {
             canvas.drawText(text, cx, y, paint)
             return
         }
-        val originalSize = paint.textSize
-        paint.textSize = originalSize * (maxWidth / measured)
-        canvas.drawText(text, cx, y, paint)
-        paint.textSize = originalSize
+        val staticLayout = StaticLayout.Builder.obtain(
+            text, 0, text.length, paint, maxWidth.toInt()
+        )
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setLineSpacing(0f, 1f)
+            .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+            .build()
+        canvas.save()
+        canvas.translate(cx - maxWidth / 2f, y - staticLayout.getLineBaseline(0))
+        staticLayout.draw(canvas)
+        canvas.restore()
     }
 
     override fun onDetachedFromWindow() {
