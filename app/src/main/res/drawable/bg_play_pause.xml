@@ -10,8 +10,8 @@
         <shape android:shape="oval">
             <gradient
                 android:angle="45"
-                android:endColor="@color/accent_gradient_end"
-                android:startColor="@color/accent_gradient_start" />
+                android:endColor="@color/secondary"
+                android:startColor="@color/primary" />
         </shape>
     </item>
 </ripple>

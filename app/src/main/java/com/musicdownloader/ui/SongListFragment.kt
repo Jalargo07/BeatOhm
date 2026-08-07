@@ -21,6 +21,7 @@ import coil.load
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.databinding.FragmentSongListBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -28,9 +29,8 @@ import java.io.File
 
 class SongListFragment : Fragment() {
 
-    private var recyclerView: RecyclerView? = null
-    private var emptyView: View? = null
-    private var sortSpinner: Spinner? = null
+    private var _binding: FragmentSongListBinding? = null
+    private val binding get() = _binding!!
     private lateinit var adapter: SongItemAdapter
     private lateinit var repository: MusicRepository
     private lateinit var playerViewModel: PlayerViewModel
@@ -45,11 +45,8 @@ class SongListFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val view = inflater.inflate(R.layout.fragment_song_list, container, false)
-        recyclerView = view.findViewById(R.id.rv_songs)
-        emptyView = view.findViewById(R.id.ll_song_list_empty)
-        sortSpinner = view.findViewById(R.id.spinner_sort)
-        return view
+        _binding = FragmentSongListBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -71,17 +68,17 @@ class SongListFragment : Fragment() {
             }
         }
 
-        recyclerView?.layoutManager = LinearLayoutManager(requireContext())
-        recyclerView?.adapter = adapter
+        binding.rvSongs.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvSongs.adapter = adapter
 
         if (folderPath.isNotBlank()) {
-            sortSpinner?.visibility = View.GONE
-            view.findViewById<TextView>(R.id.tv_list_title)?.text =
+            binding.spinnerSort.visibility = View.GONE
+            binding.tvListTitle.text =
                 folderPath.substringAfterLast(File.separator).ifBlank { folderPath }
             collectFolderSongs()
         } else if (searchQuery.isNotBlank()) {
-            sortSpinner?.visibility = View.GONE
-            view.findViewById<TextView>(R.id.tv_list_title)?.text =
+            binding.spinnerSort.visibility = View.GONE
+            binding.tvListTitle.text =
                 getString(R.string.library_search)
             collectSearchResults()
         } else {
@@ -101,11 +98,11 @@ class SongListFragment : Fragment() {
                 }
                 adapter.submitList(filtered)
                 if (filtered.isEmpty()) {
-                    recyclerView?.visibility = View.GONE
-                    emptyView?.visibility = View.VISIBLE
+                    binding.rvSongs.visibility = View.GONE
+                    binding.llSongListEmpty.visibility = View.VISIBLE
                 } else {
-                    recyclerView?.visibility = View.VISIBLE
-                    emptyView?.visibility = View.GONE
+                    binding.rvSongs.visibility = View.VISIBLE
+                    binding.llSongListEmpty.visibility = View.GONE
                 }
             }
         }
@@ -117,18 +114,18 @@ class SongListFragment : Fragment() {
             repository.getSongsInFolder(folderPath).collectLatest { songs ->
                 adapter.submitList(songs)
                 if (songs.isEmpty()) {
-                    recyclerView?.visibility = View.GONE
-                    emptyView?.visibility = View.VISIBLE
+                    binding.rvSongs.visibility = View.GONE
+                    binding.llSongListEmpty.visibility = View.VISIBLE
                 } else {
-                    recyclerView?.visibility = View.VISIBLE
-                    emptyView?.visibility = View.GONE
+                    binding.rvSongs.visibility = View.VISIBLE
+                    binding.llSongListEmpty.visibility = View.GONE
                 }
             }
         }
     }
 
     private fun setupSortSpinner() {
-        val spinner = sortSpinner ?: return
+        val spinner = binding.spinnerSort
         spinner.visibility = View.VISIBLE
         val options = resources.getStringArray(R.array.sort_options)
         spinner.adapter = ArrayAdapter(
@@ -164,11 +161,11 @@ class SongListFragment : Fragment() {
             flow.collectLatest { songs ->
                 adapter.submitList(songs)
                 if (songs.isEmpty()) {
-                    recyclerView?.visibility = View.GONE
-                    emptyView?.visibility = View.VISIBLE
+                    binding.rvSongs.visibility = View.GONE
+                    binding.llSongListEmpty.visibility = View.VISIBLE
                 } else {
-                    recyclerView?.visibility = View.VISIBLE
-                    emptyView?.visibility = View.GONE
+                    binding.rvSongs.visibility = View.VISIBLE
+                    binding.llSongListEmpty.visibility = View.GONE
                 }
             }
         }
@@ -176,9 +173,7 @@ class SongListFragment : Fragment() {
 
     override fun onDestroyView() {
         collectJob?.cancel()
-        recyclerView = null
-        emptyView = null
-        sortSpinner = null
+        _binding = null
         super.onDestroyView()
     }
 

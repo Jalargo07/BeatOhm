@@ -17,15 +17,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.databinding.FragmentCategoryListBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class CategoryListFragment : Fragment() {
 
-    private var recyclerView: RecyclerView? = null
-    private var emptyView: TextView? = null
-    private var headerBar: View? = null
-    private var categoryTitle: TextView? = null
+    private var _binding: FragmentCategoryListBinding? = null
+    private val binding get() = _binding!!
     private lateinit var adapter: CategoryAdapter
     private lateinit var songsAdapter: FilteredSongAdapter
     private lateinit var repository: MusicRepository
@@ -44,7 +43,7 @@ class CategoryListFragment : Fragment() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        val lm = recyclerView?.layoutManager as? LinearLayoutManager
+        val lm = binding.rvCategories.layoutManager as? LinearLayoutManager
         if (lm != null) {
             val pos = lm.findFirstVisibleItemPosition()
             val view = lm.findViewByPosition(pos)
@@ -55,12 +54,8 @@ class CategoryListFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val view = inflater.inflate(R.layout.fragment_category_list, container, false)
-        recyclerView = view.findViewById(R.id.rv_categories)
-        emptyView = view.findViewById(R.id.tv_empty)
-        headerBar = view.findViewById(R.id.header_bar)
-        categoryTitle = view.findViewById(R.id.tv_category_title)
-        return view
+        _binding = FragmentCategoryListBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -83,27 +78,27 @@ class CategoryListFragment : Fragment() {
         })
 
         adapter = CategoryAdapter { name ->
-            val lm = recyclerView?.layoutManager as? LinearLayoutManager
+            val lm = binding.rvCategories.layoutManager as? LinearLayoutManager
             if (lm != null) {
                 scrollPosition = lm.findFirstVisibleItemPosition()
-                val view = lm.findViewByPosition(scrollPosition)
-                scrollOffset = view?.top ?: 0
+                val v = lm.findViewByPosition(scrollPosition)
+                scrollOffset = v?.top ?: 0
             }
             selectedCategoryValue = name
             showingSongs = true
-            headerBar?.visibility = View.VISIBLE
-            categoryTitle?.text = name
+            binding.headerBar.visibility = View.VISIBLE
+            binding.tvCategoryTitle.text = name
             loadSongsForCategory(name)
         }
 
-        recyclerView?.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvCategories.layoutManager = LinearLayoutManager(requireContext())
 
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (showingSongs) {
                     showingSongs = false
-                    headerBar?.visibility = View.GONE
-                    recyclerView?.adapter = adapter
+                    binding.headerBar.visibility = View.GONE
+                    binding.rvCategories.adapter = adapter
                     loadCategories()
                     restoreScrollPosition()
                 } else {
@@ -123,8 +118,8 @@ class CategoryListFragment : Fragment() {
     }
 
     private fun restoreScrollPosition() {
-        recyclerView?.post {
-            val lm = recyclerView?.layoutManager as? LinearLayoutManager ?: return@post
+        binding.rvCategories.post {
+            val lm = binding.rvCategories.layoutManager as? LinearLayoutManager ?: return@post
             if (scrollPosition > 0) {
                 lm.scrollToPositionWithOffset(scrollPosition, scrollOffset)
             }
@@ -132,7 +127,7 @@ class CategoryListFragment : Fragment() {
     }
 
     private fun loadCategories() {
-        recyclerView?.adapter = adapter
+        binding.rvCategories.adapter = adapter
         lifecycleScope.launch {
             val flow = when (categoryType) {
                 "album" -> repository.getAllAlbums()
@@ -147,18 +142,18 @@ class CategoryListFragment : Fragment() {
                 } else items
                 adapter.submitList(data)
                 if (data.isEmpty()) {
-                    recyclerView?.visibility = View.GONE
-                    emptyView?.visibility = View.VISIBLE
+                    binding.rvCategories.visibility = View.GONE
+                    binding.tvEmpty.visibility = View.VISIBLE
                 } else {
-                    recyclerView?.visibility = View.VISIBLE
-                    emptyView?.visibility = View.GONE
+                    binding.rvCategories.visibility = View.VISIBLE
+                    binding.tvEmpty.visibility = View.GONE
                 }
             }
         }
     }
 
     private fun loadSongsForCategory(name: String) {
-        recyclerView?.adapter = songsAdapter
+        binding.rvCategories.adapter = songsAdapter
         lifecycleScope.launch {
             val flow = when (categoryType) {
                 "album" -> repository.getSongsByAlbum(name)
@@ -170,21 +165,18 @@ class CategoryListFragment : Fragment() {
             flow.collectLatest { songs ->
                 songsAdapter.submitList(songs)
                 if (songs.isEmpty()) {
-                    recyclerView?.visibility = View.GONE
-                    emptyView?.visibility = View.VISIBLE
+                    binding.rvCategories.visibility = View.GONE
+                    binding.tvEmpty.visibility = View.VISIBLE
                 } else {
-                    recyclerView?.visibility = View.VISIBLE
-                    emptyView?.visibility = View.GONE
+                    binding.rvCategories.visibility = View.VISIBLE
+                    binding.tvEmpty.visibility = View.GONE
                 }
             }
         }
     }
 
     override fun onDestroyView() {
-        recyclerView = null
-        emptyView = null
-        headerBar = null
-        categoryTitle = null
+        _binding = null
         super.onDestroyView()
     }
 }

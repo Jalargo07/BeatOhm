@@ -76,4 +76,18 @@
         android:id="@+id/foldersFragment"
         android:name="com.musicdownloader.ui.FoldersFragment"
         android:label="@string/folders" />
+
+    <fragment
+        android:id="@+id/playlistDetailFragment"
+        android:name="com.musicdownloader.ui.PlaylistDetailFragment"
+        android:label="@string/playlists_menu">
+        <argument
+            android:name="playlist_id"
+            android:defaultValue="0L"
+            app:argType="long" />
+        <argument
+            android:name="playlist_name"
+            android:defaultValue=""
+            app:argType="string" />
+    </fragment>
 </navigation>

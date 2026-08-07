@@ -73,14 +73,13 @@
 
     </LinearLayout>
 
-    <ProgressBar
+    <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/mini_progress_bar"
-        style="@android:style/Widget.ProgressBar.Horizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:max="1000"
-        android:progress="0"
-        android:progressDrawable="@drawable/mini_progress_drawable" />
+        app:indicatorColor="@color/primary"
+        app:trackColor="@color/surface_variant"
+        app:trackThickness="3dp" />
 
 </FrameLayout>

@@ -6,34 +6,30 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.musicdownloader.R
-import com.musicdownloader.PlaylistDetailActivity
 import com.musicdownloader.data.AppDatabase
 import com.musicdownloader.data.Playlist
+import com.musicdownloader.databinding.FragmentPlaylistsBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class PlaylistsFragment : Fragment() {
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var emptyView: TextView
-    private lateinit var fab: FloatingActionButton
+    private var _binding: FragmentPlaylistsBinding? = null
+    private val binding get() = _binding!!
     private lateinit var adapter: PlaylistAdapter
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val view = inflater.inflate(R.layout.fragment_playlists, container, false)
-        recyclerView = view.findViewById(R.id.rv_playlists)
-        emptyView = view.findViewById(R.id.tv_empty)
-        fab = view.findViewById(R.id.fab_add_playlist)
-        return view
+        _binding = FragmentPlaylistsBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -42,14 +38,18 @@ class PlaylistsFragment : Fragment() {
         val playlistDao = db.playlistDao()
 
         adapter = PlaylistAdapter { playlist ->
-            PlaylistDetailActivity.playlistId = playlist.id
-            PlaylistDetailActivity.playlistName = playlist.name
-            startActivity(android.content.Intent(requireContext(), PlaylistDetailActivity::class.java))
+            findNavController().navigate(
+                R.id.playlistDetailFragment,
+                bundleOf(
+                    PlaylistDetailFragment.ARG_PLAYLIST_ID to playlist.id,
+                    PlaylistDetailFragment.ARG_PLAYLIST_NAME to playlist.name
+                )
+            )
         }
-        recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        recyclerView.adapter = adapter
+        binding.rvPlaylists.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvPlaylists.adapter = adapter
 
-        fab.setOnClickListener {
+        binding.fabAddPlaylist.setOnClickListener {
             val input = EditText(requireContext())
             AlertDialog.Builder(requireContext())
                 .setTitle("Nueva Playlist")
@@ -69,9 +69,14 @@ class PlaylistsFragment : Fragment() {
         lifecycleScope.launch {
             playlistDao.getAllPlaylists().collectLatest { playlists ->
                 adapter.submitList(playlists)
-                emptyView.visibility = if (playlists.isEmpty()) View.VISIBLE else View.GONE
+                binding.tvEmpty.visibility = if (playlists.isEmpty()) View.VISIBLE else View.GONE
             }
         }
+    }
+
+    override fun onDestroyView() {
+        _binding = null
+        super.onDestroyView()
     }
 }
 

@@ -62,7 +62,7 @@ class WaveformSeekBar @JvmOverloads constructor(
 
     // Gradient (cached, screen-relative)
     private val primaryColor = ContextCompat.getColor(context, R.color.primary)
-    private val accentEnd = ContextCompat.getColor(context, R.color.accent_gradient_end)
+    private val accentEnd = ContextCompat.getColor(context, R.color.secondary)
     private var playedGradient: LinearGradient? = null
 
     private var bars: FloatArray = floatArrayOf()

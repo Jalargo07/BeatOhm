@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.card.MaterialCardView
 import com.musicdownloader.MainActivity
@@ -40,6 +41,8 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
+
+        setupBottomSheetBehavior()
 
         lateinit var itemTouchHelper: ItemTouchHelper
         val adapter = QueueSongAdapter(
@@ -122,6 +125,22 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
         if (index >= 0) {
             binding.rvQueue.scrollToPosition(index)
         }
+    }
+
+    private fun setupBottomSheetBehavior() {
+        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            ?: return
+        val behavior = BottomSheetBehavior.from(bottomSheet)
+
+        behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
+        behavior.halfExpandedRatio = 0.5f
+        behavior.peekHeight = 0
+        behavior.isHideable = true
+        behavior.skipCollapsed = true
+        behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {}
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+        })
     }
 
     override fun onDestroyView() {
