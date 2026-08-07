@@ -23,4 +23,22 @@
     <color name="splash_background">#0B0910</color>
     <color name="queue_current_bg">#339D35FF</color>
     <color name="success">#4CAF50</color>
+
+    <!-- Player specific -->
+    <color name="player_gradient_start">#1A0B2E</color>
+    <color name="player_gradient_end">#0F0F14</color>
+    <color name="glow_purple">#1F9D35FF</color>
+    <color name="glow_purple_zero">#009D35FF</color>
+    <color name="glow_purple_mid">#4D9D35FF</color>
+    <color name="mini_player_bg">#4D9D35FF</color>
+    <color name="play_button_bg">#33FFFFFF</color>
+    <color name="play_button_pressed">#FFFFFF</color>
+    <color name="lyrics_scrim">#CC0B0910</color>
+    <color name="lyrics_glass_border">#22000000</color>
+    <color name="queue_sheet_bg">#E60B0910</color>
+    <color name="button_overlay">#22FFFFFF</color>
+    <color name="button_overlay_light">#1AFFFFFF</color>
+    <color name="shuffle_overlay">#22FFFFFF</color>
+    <color name="download_button_pressed">#FF6B7E</color>
+    <color name="bottom_nav_active_indicator">#339D35FF</color>
 </resources>

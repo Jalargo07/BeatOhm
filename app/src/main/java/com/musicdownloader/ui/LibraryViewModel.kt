@@ -50,19 +50,32 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             _isScanning.postValue(true)
             try {
+                // Phase 1: Show existing DB songs immediately
                 _allSongs.postValue(repo.getAllSongsNow())
-                val result = repo.scanLibrary()
+
+                // Phase 2: Fast scan — find new files, insert to DB with minimal metadata
+                val result = repo.fastScan()
                 _allSongs.postValue(result.songs)
+
+                // Phase 3: Background enrichment (gradual, non-blocking)
+                // This runs AFTER songs are already visible in UI
+                launch(Dispatchers.IO) {
+                    repo.enrichMetadataGradually(result.songs) { done, total, title ->
+                        Log.d(TAG, "Enriching: $done/$total - $title")
+                    }
+                    // After metadata enrichment, extract waveforms
+                    repo.extractMissingWaveforms(repo.getAllSongsNow()) { done, total ->
+                        Log.d(TAG, "Waveform: $done/$total")
+                    }
+                }
+
+                // Offer enrichment for incomplete songs
                 val offered = offeredIds()
                 val pending = result.incompleteSongs.filter { it.id !in offered }
                 pendingIncomplete = pending
                 _incompleteCount.postValue(result.incompleteSongs.size)
                 if (pending.isNotEmpty()) {
                     _offerEnrichment.postValue(pending.size)
-                }
-                // Extract waveforms in background (non-blocking, limited concurrency)
-                repo.extractMissingWaveforms(result.songs) { done, total ->
-                    Log.d(TAG, "Waveform extraction: $done/$total")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error scanning library", e)

@@ -20,8 +20,8 @@
 
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/iv_thumbnail"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="@dimen/thumbnail_song"
+            android:layout_height="@dimen/thumbnail_song"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_music_note"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />

@@ -152,7 +152,7 @@ class PlayerFragment : Fragment() {
             binding.coverContainer.visibility = View.VISIBLE
             binding.ivGlow.visibility = View.VISIBLE
             binding.titleContainer.visibility = View.VISIBLE
-            binding.seekContainer.visibility = View.VISIBLE
+            binding.waveformRow.visibility = View.VISIBLE
             binding.controlsContainer.visibility = View.VISIBLE
             binding.bottomActions.visibility = View.VISIBLE
             binding.ivCover.visibility = View.VISIBLE
@@ -170,7 +170,7 @@ class PlayerFragment : Fragment() {
                 binding.tvArtist.text = ""
                 binding.ivCover.setImageResource(R.drawable.ic_music_note)
                 binding.pbCover.visibility = View.GONE
-                binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                binding.btnFavorite.setImageResource(R.drawable.ic_bookmark_border)
                 binding.btnFavorite.colorFilter = null
                 binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
                     if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
@@ -226,8 +226,8 @@ class PlayerFragment : Fragment() {
             val song = repository.getSongById(filePath)
             val isFav = song?.isFavorite ?: false
             binding.btnFavorite.setImageResource(
-                if (isFav) R.drawable.ic_favorite
-                else R.drawable.ic_favorite_border
+                if (isFav) R.drawable.ic_bookmark
+                else R.drawable.ic_bookmark_border
             )
             binding.btnFavorite.colorFilter = if (isFav) {
                 PorterDuffColorFilter(
@@ -317,7 +317,8 @@ class PlayerFragment : Fragment() {
                 binding.ivCoverPreview.translationX = 0f
                 binding.ivCoverPreview.setImageDrawable(null)
                 binding.tvTitle.text = song.title
-                binding.tvArtist.text = song.artist.ifBlank { "Desconocido" }
+                binding.tvArtist.text = song.artist.ifBlank { getString(R.string.unknown_artist) }
+                binding.ivCover.contentDescription = "${song.title} - ${song.artist}"
                 loadCover(song, path)
                 binding.titleTextContainer.translationY = 20 * density
                 binding.titleTextContainer.alpha = 0f
@@ -559,20 +560,6 @@ class PlayerFragment : Fragment() {
             }
         }
 
-        binding.btnRewind.setOnClickListener {
-            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
-            val service = activity.playbackService ?: return@setOnClickListener
-            val newPos = maxOf(0L, service.getCurrentPosition() - 10_000L)
-            service.seekTo(newPos)
-        }
-
-        binding.btnForward.setOnClickListener {
-            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
-            val service = activity.playbackService ?: return@setOnClickListener
-            val newPos = service.getCurrentPosition() + 10_000L
-            service.seekTo(newPos)
-        }
-
         binding.btnAddPlaylist.setOnClickListener {
             val path = currentSongFilePath ?: return@setOnClickListener
             showAddToPlaylistDialog(path)
@@ -781,7 +768,7 @@ class PlayerFragment : Fragment() {
             binding.ivCover.visibility = View.INVISIBLE
             binding.ivGlow.visibility = View.INVISIBLE
             binding.titleContainer.visibility = View.INVISIBLE
-            binding.seekContainer.visibility = View.INVISIBLE
+            binding.waveformRow.visibility = View.INVISIBLE
             binding.controlsContainer.visibility = View.INVISIBLE
             binding.bottomActions.visibility = View.INVISIBLE
 
@@ -862,7 +849,7 @@ class PlayerFragment : Fragment() {
                     binding.ivGlow.visibility = View.VISIBLE
                     binding.ivCover.visibility = View.VISIBLE
                     binding.titleContainer.visibility = View.VISIBLE
-                    binding.seekContainer.visibility = View.VISIBLE
+                    binding.waveformRow.visibility = View.VISIBLE
                     binding.controlsContainer.visibility = View.VISIBLE
                     binding.bottomActions.visibility = View.VISIBLE
                 }

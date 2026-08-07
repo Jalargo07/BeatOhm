@@ -27,7 +27,7 @@ class SongSelectorAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val song = songs[position]
         holder.tvTitle.text = song.title
-        holder.tvArtist.text = song.artist.ifBlank { "Desconocido" }
+        holder.tvArtist.text = song.artist.ifBlank { holder.itemView.context.getString(R.string.unknown_artist) }
         holder.cbSelect.isChecked = selectedIds.contains(song.id)
         holder.tvIncomplete.visibility = if (isIncomplete(song)) View.VISIBLE else View.GONE
 

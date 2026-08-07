@@ -200,7 +200,7 @@ class CategoryAdapter(private val onItemClick: (String) -> Unit) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        holder.name.text = if (item.isBlank()) "Desconocido" else item
+        holder.name.text = if (item.isBlank()) holder.itemView.context.getString(R.string.unknown_artist) else item
         holder.itemView.setOnClickListener { onItemClick(item) }
     }
 

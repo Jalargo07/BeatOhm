@@ -42,9 +42,9 @@ class WaveformSeekBar @JvmOverloads constructor(
     private var flingVelocity = 0f
 
     private val density = resources.displayMetrics.density
-    private val barWidth = 2.5f * density
-    private val barSpacing = 1.5f * density
-    private val minBarHeight = 3f * density
+    private val barWidth = 4f * density
+    private val barSpacing = 2f * density
+    private val minBarHeight = 4f * density
     private val cornerRadius = 1.2f * density
 
     // Cursor position: fixed at 30% from left edge

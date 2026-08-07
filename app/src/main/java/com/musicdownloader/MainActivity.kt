@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateMiniPlayer(song: Song) {
         findViewById<TextView>(R.id.tv_mini_title).text = song.title
-        findViewById<TextView>(R.id.tv_mini_artist).text = song.artist.ifBlank { "Desconocido" }
+        findViewById<TextView>(R.id.tv_mini_artist).text = song.artist.ifBlank { getString(R.string.unknown_artist) }
 
         val cover = findViewById<ShapeableImageView>(R.id.iv_mini_cover)
         cover.alpha = 0.4f

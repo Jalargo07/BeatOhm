@@ -17,6 +17,7 @@
     <string name="no_lyrics">Sin letras disponibles</string>
     <string name="sort_order">Ordenar por</string>
     <string name="favorite">Favorito</string>
+    <string name="bookmark">Bookmark</string>
     <string name="previous">Anterior</string>
     <string name="next">Siguiente</string>
     <string name="rewind">Retroceder 10s</string>
@@ -24,6 +25,7 @@
     <string name="play">Reproducir</string>
     <string name="pause">Pausar</string>
     <string name="volume">Volumen</string>
+    <string name="seek_position">Posición de reproducción</string>
     <string name="add_playlist">Agregar a playlist</string>
     <string name="back">Volver</string>
     <string name="no_song">No hay canción reproduciendo</string>
@@ -131,6 +133,13 @@
     <string name="download_done">✓</string>
 
     <!-- Sprint 8 UI/UX: Empty/Loading/Error states -->
+    <string name="unknown_artist">Desconocido</string>
+    <string name="placeholder_title">T</string>
+    <string name="placeholder_artist">Artista</string>
+    <string name="placeholder_time">0:00</string>
+    <string name="empty_folders">No hay carpetas configuradas</string>
+    <string name="empty_playlists">No hay playlists. Toca + para crear una.</string>
+    <string name="empty_category">Vacío</string>
     <string name="empty_state_equalizer">▂ ▅ ▇ ▅ ▂</string>
     <string name="library_empty_hint">Agrega carpetas en Biblioteca &gt; Carpetas</string>
     <string name="error_no_internet">Conectate a internet para buscar</string>

@@ -12,7 +12,7 @@
         <shape android:shape="rectangle">
             <stroke
                 android:width="2dp"
-                android:color="#4D9D35FF" />
+                android:color="@color/mini_player_bg" />
         </shape>
     </item>
 </layer-list>

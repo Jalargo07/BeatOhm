@@ -206,7 +206,7 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 holder.title.typeface,
                 if (isCurrent) Typeface.BOLD else Typeface.NORMAL
             )
-            holder.artist.text = song.artist.ifBlank { "Desconocido" }
+            holder.artist.text = song.artist.ifBlank { holder.itemView.context.getString(R.string.unknown_artist) }
             holder.card.setCardBackgroundColor(
                 ContextCompat.getColorStateList(
                     holder.root.context,

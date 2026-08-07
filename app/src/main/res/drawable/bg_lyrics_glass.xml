@@ -2,7 +2,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#CC0B0910" />
+            <solid android:color="@color/lyrics_scrim" />
             <corners android:radius="0dp" />
         </shape>
     </item>
@@ -11,8 +11,8 @@
             <gradient
                 android:angle="270"
                 android:startColor="#00000000"
-                android:centerColor="#22000000"
-                android:endColor="#CC0B0910" />
+                android:centerColor="@color/lyrics_glass_border"
+                android:endColor="@color/lyrics_scrim" />
         </shape>
     </item>
 </layer-list>

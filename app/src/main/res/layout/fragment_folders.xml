@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center"
-            android:text="No hay carpetas configuradas"
+            android:text="@string/empty_folders"
             android:textColor="@color/text_secondary"
             android:textSize="16sp"
             android:visibility="gone" />

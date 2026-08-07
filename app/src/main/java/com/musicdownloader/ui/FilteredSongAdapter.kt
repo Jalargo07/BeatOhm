@@ -27,7 +27,7 @@ class FilteredSongAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val song = getItem(position)
         holder.title.text = song.title
-        holder.artist.text = song.artist.ifBlank { "Desconocido" }
+        holder.artist.text = song.artist.ifBlank { holder.itemView.context.getString(R.string.unknown_artist) }
 
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
             holder.thumbnail.tag = null

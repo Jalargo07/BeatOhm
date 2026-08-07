@@ -27,7 +27,7 @@ class FavoriteSongAdapter(
         val song = getItem(position)
         val b = holder.binding
         b.tvFavTitle.text = song.title
-        b.tvFavArtist.text = song.artist.ifBlank { "Desconocido" }
+        b.tvFavArtist.text = song.artist.ifBlank { b.root.context.getString(R.string.unknown_artist) }
 
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
             b.ivFavCover.tag = null
