@@ -375,26 +375,13 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <ImageButton
-            android:id="@+id/btn_lyrics_close"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="top|end"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/bg_circle_lyrics"
-            android:contentDescription="@string/close"
-            android:elevation="6dp"
-            android:src="@drawable/ic_close"
-            app:tint="@android:color/white" />
-
         <com.musicdownloader.ui.SyncedLyricsView
             android:id="@+id/synced_lyrics_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:paddingStart="24dp"
             android:paddingEnd="24dp"
-            android:paddingTop="76dp"
+            android:paddingTop="32dp"
             android:paddingBottom="32dp" />
 
     </FrameLayout>

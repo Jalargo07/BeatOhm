@@ -544,10 +544,6 @@ class PlayerFragment : Fragment() {
             toggleLyrics()
         }
 
-        binding.btnLyricsClose.setOnClickListener {
-            if (isLyricsVisible) toggleLyrics()
-        }
-
         binding.btnFavorite.setOnClickListener {
             val path = currentSongFilePath ?: return@setOnClickListener
             lifecycleScope.launch {
