@@ -49,7 +49,7 @@ class SyncedLyricsView @JvmOverloads constructor(
 
     private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
-        textSize = 32f * scaledDensity
+        textSize = 18f * scaledDensity
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
         setShadowLayer(32f, 0f, 0f, 0xCCFFFFFF.toInt())
