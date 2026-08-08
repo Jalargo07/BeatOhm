@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.snackbar.Snackbar
 import com.musicdownloader.R
@@ -54,10 +53,6 @@ class DownloadsFragment : Fragment() {
         }
 
         binding.btnSearch.setOnClickListener { startSearch() }
-
-        binding.btnSettings.setOnClickListener {
-            findNavController().navigate(R.id.action_downloadsFragment_to_settingsFragment)
-        }
 
         viewModel.downloads.observe(viewLifecycleOwner) { list ->
             adapter.submitList(list)

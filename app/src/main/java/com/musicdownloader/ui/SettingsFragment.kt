@@ -15,6 +15,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.musicdownloader.BuildConfig
 import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentSettingsBinding
@@ -321,6 +322,9 @@ class SettingsFragment : Fragment() {
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 ThemeManager.updateTheme(updated)
                 ThemeManager.setActiveThemeBlocking(updated)
+                withContext(Dispatchers.Main) {
+                    if (isAdded) requireActivity().recreate()
+                }
             }
         }
     }

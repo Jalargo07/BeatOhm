@@ -232,7 +232,11 @@ class LibraryFragment : Fragment() {
             return
         }
 
-        val incompleteIds = allSongs.filter { libraryViewModel.isIncomplete(it) }.map { it.id }.toSet()
+        val incompleteIds = if (libraryViewModel.pendingIncompleteSongs.isNotEmpty()) {
+            libraryViewModel.pendingIncompleteSongs.map { it.id }.toSet()
+        } else {
+            allSongs.filter { libraryViewModel.isIncomplete(it) }.map { it.id }.toSet()
+        }
         val adapter = SongSelectorAdapter(allSongs, incompleteIds)
 
         val dialogView = LayoutInflater.from(requireContext())

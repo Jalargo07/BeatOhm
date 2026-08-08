@@ -156,7 +156,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val file = fileResult.getOrThrow()
                         Log.e(TAG, "Archivo: ${file.name} (${file.length()} bytes)")
 
-                        musicRepository.insertSong(LocalSong(
+                        val inserted = LocalSong(
                             id = file.absolutePath,
                             title = finalSong.title,
                             artist = finalSong.artist,
@@ -164,10 +164,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             genre = finalSong.genre,
                             year = finalSong.year,
                             trackNumber = finalSong.trackNumber,
-                            duration = finalSong.duration,
+                            duration = finalSong.duration * 1000,
                             filePath = file.absolutePath,
                             lyrics = finalSong.lyrics
-                        ))
+                        )
+
+                        musicRepository.insertSong(inserted)
+
+                        viewModelScope.launch(Dispatchers.IO) {
+                            try {
+                                musicRepository.enrichSong(inserted, skipTagWrite = true, fetchLyrics = true)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Background enrich failed for '${inserted.title}': ${e.message}")
+                            }
+                        }
 
                         updateState(downloadId, DownloadStatus.TAGGING, 100,
                             "OK ${file.name} (${file.length() / 1024} KB)", file.absolutePath)

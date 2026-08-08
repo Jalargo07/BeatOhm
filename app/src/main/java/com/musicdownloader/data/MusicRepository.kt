@@ -57,12 +57,33 @@ class MusicRepository(private val context: Context) {
     suspend fun setFavorite(songId: String, isFavorite: Boolean) = dao.setFavorite(songId, isFavorite)
     suspend fun getSongById(id: String): LocalSong? = dao.getSongById(id)
 
+    fun isIncomplete(song: LocalSong): Boolean {
+        return song.artist.isBlank() || song.album.isBlank() || song.genre.isBlank()
+            || song.thumbnailUrl.isBlank() || song.lyrics.isBlank() || song.year.isBlank()
+    }
+
     suspend fun insertSong(song: LocalSong) = dao.insertSong(song)
     suspend fun deleteSong(song: LocalSong) = dao.deleteSong(song)
     suspend fun incrementPlayCount(songId: String) = dao.incrementPlayCount(songId)
 
     suspend fun updateWaveform(songId: String, json: String) {
         dao.updateWaveform(songId, json)
+    }
+
+    suspend fun resetWaveform(song: LocalSong) {
+        val meta = android.media.MediaMetadataRetriever()
+        val realDurationMs = try {
+            meta.setDataSource(song.filePath)
+            meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: song.duration
+        } catch (_: Exception) { song.duration } finally { meta.release() }
+        Log.d("MusicRepository", "resetWaveform: '${song.title}' dbDuration=${song.duration} realDurationMs=$realDurationMs filePath='${song.filePath.substringAfterLast("/")}'")
+        dao.clearWaveform(song.id)
+        val numBars = WaveformExtractor.barsForDuration(realDurationMs)
+        Log.d("MusicRepository", "resetWaveform: extracting $numBars bars for ${realDurationMs}ms")
+        val data = WaveformExtractor.extract(song.filePath, numBars)
+        val json = Gson().toJson(data.toList())
+        dao.updateWaveform(song.id, json)
+        Log.d("MusicRepository", "resetWaveform: saved ${data.size} bars to DB")
     }
 
     fun getLibraryFolders(): List<String> {
@@ -146,10 +167,7 @@ class MusicRepository(private val context: Context) {
         }
 
         val allSongs = dao.getAllSongsNow()
-        val incompleteSongs = allSongs.filter {
-            it.artist.isBlank() || it.album.isBlank() || it.genre.isBlank()
-                || it.thumbnailUrl.isBlank() || it.lyrics.isBlank() || it.year.isBlank()
-        }
+        val incompleteSongs = allSongs.filter { isIncomplete(it) }
 
         ScanResult(allSongs, incompleteSongs)
     }
@@ -212,7 +230,12 @@ class MusicRepository(private val context: Context) {
             async {
                 semaphore.withPermit {
                     try {
-                        val numBars = WaveformExtractor.barsForDuration(song.duration)
+                        val meta = android.media.MediaMetadataRetriever()
+                        val realDurationMs = try {
+                            meta.setDataSource(song.filePath)
+                            meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: song.duration
+                        } catch (_: Exception) { song.duration } finally { meta.release() }
+                        val numBars = WaveformExtractor.barsForDuration(realDurationMs)
                         val data = WaveformExtractor.extract(song.filePath, numBars)
                         val json = Gson().toJson(data.toList())
                         dao.updateWaveform(song.id, json)

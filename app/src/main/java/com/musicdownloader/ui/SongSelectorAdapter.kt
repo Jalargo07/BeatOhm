@@ -66,7 +66,7 @@ class SongSelectorAdapter(
 
     private fun isIncomplete(song: LocalSong): Boolean {
         return song.artist.isBlank() || song.album.isBlank() || song.genre.isBlank()
-            || song.thumbnailUrl.isBlank() || song.year.isBlank()
+            || song.thumbnailUrl.isBlank() || song.lyrics.isBlank() || song.year.isBlank()
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {

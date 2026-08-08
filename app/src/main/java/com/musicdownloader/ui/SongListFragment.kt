@@ -25,6 +25,8 @@ import com.musicdownloader.databinding.FragmentSongListBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import java.io.File
 
 class SongListFragment : Fragment() {
@@ -54,19 +56,36 @@ class SongListFragment : Fragment() {
         repository = MusicRepository(requireContext())
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
 
-        adapter = SongItemAdapter { song ->
-            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@SongItemAdapter
-            val service = activity.playbackService
-            if (service != null) {
-                val songs = adapter.currentList
-                val index = songs.indexOf(song)
-                playerViewModel.setPlaylist(
-                    songs.map { it.toSong() },
-                    if (index >= 0) index else 0
-                )
-                service.playFile(song.filePath)
+        adapter = SongItemAdapter(
+            onItemClick = { song ->
+                val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@SongItemAdapter
+                val service = activity.playbackService
+                if (service != null) {
+                    val songs = adapter.currentList
+                    val index = songs.indexOf(song)
+                    playerViewModel.setPlaylist(
+                        songs.map { it.toSong() },
+                        if (index >= 0) index else 0
+                    )
+                    service.playFile(song.filePath)
+                }
+            },
+                    onLongClick = { song ->
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Reset Waveform")
+                    .setMessage("Regenerar waveform de '${song.title}'?")
+                    .setPositiveButton("Reset") { _, _ ->
+                        lifecycleScope.launch {
+                            withContext(Dispatchers.IO) {
+                                repository.resetWaveform(song)
+                            }
+                            android.widget.Toast.makeText(requireContext(), "Waveform regenerado", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
             }
-        }
+        )
 
         binding.rvSongs.layoutManager = LinearLayoutManager(requireContext())
         binding.rvSongs.adapter = adapter
@@ -190,8 +209,10 @@ class SongListFragment : Fragment() {
     }
 }
 
-class SongItemAdapter(private val onItemClick: (LocalSong) -> Unit) :
-    ListAdapter<LocalSong, SongItemAdapter.ViewHolder>(SongDiffCallback()) {
+class SongItemAdapter(
+    private val onItemClick: (LocalSong) -> Unit,
+    private val onLongClick: ((LocalSong) -> Unit)? = null
+) : ListAdapter<LocalSong, SongItemAdapter.ViewHolder>(SongDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -221,6 +242,10 @@ class SongItemAdapter(private val onItemClick: (LocalSong) -> Unit) :
         }
 
         holder.itemView.setOnClickListener { onItemClick(song) }
+        holder.itemView.setOnLongClickListener {
+            onLongClick?.invoke(song)
+            true
+        }
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {

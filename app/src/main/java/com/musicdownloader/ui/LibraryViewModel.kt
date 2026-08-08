@@ -42,6 +42,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val incompleteCount: LiveData<Int> = _incompleteCount
 
     private var pendingIncomplete: List<LocalSong> = emptyList()
+    val pendingIncompleteSongs: List<LocalSong> get() = pendingIncomplete
     private var enrichmentJob: Job? = null
 
     fun refreshLibrary() {
@@ -135,8 +136,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun isIncomplete(song: LocalSong): Boolean {
-        return song.artist.isBlank() || song.album.isBlank() || song.genre.isBlank()
-            || song.thumbnailUrl.isBlank() || song.year.isBlank()
+        return repo.isIncomplete(song)
     }
 
     fun dismissEnrichmentOffer() {

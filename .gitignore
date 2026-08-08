@@ -26,7 +26,6 @@ PROJECT_INDEX.json
 .agents/
 .agents
 skills-lock.json
-$null
 
 # Development plans & docs (not part of the app)
 PLAN*.md
@@ -57,5 +56,7 @@ Desktop.ini
 # APKs / keystores
 *.apk
 *.aab
+*.apks
 *.keystore
 *.jks
+keystore.properties

@@ -167,8 +167,9 @@ class SyncedLyricsView @JvmOverloads constructor(
             invalidate()
             // Auto-scroll only if enabled
             if (autoScrollEnabled) {
-                targetScrollOffset = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
-                Log.d("LyricsScroll", "  → AUTO-SCROLL to target=$targetScrollOffset")
+                val heights = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
+                targetScrollOffset = heights + height / 2f - height / 3f
+                Log.d("LyricsScroll", "  → AUTO-SCROLL to target=$targetScrollOffset (1/3 rest)")
                 animateScroll()
             } else {
                 Log.d("LyricsScroll", "  → NO SCROLL (auto-scroll disabled, but highlight updated)")
@@ -228,10 +229,10 @@ class SyncedLyricsView @JvmOverloads constructor(
 
     // ── Fling ──────────────────────────────────────────────────────────
 
-    private fun startFling(velY: Float) {
+    private fun startFling(velY: Float): Boolean {
         if (Math.abs(velY) < 50f) {
             Log.d("LyricsScroll", "FLING ignored: velocity too low ($velY)")
-            return
+            return false
         }
         isFlinging = true
         val start = scrollOffset.toInt()
@@ -245,6 +246,7 @@ class SyncedLyricsView @JvmOverloads constructor(
         )
         removeCallbacks(flingRunnable)
         postOnAnimation(flingRunnable)
+        return true
     }
 
     private fun computeFling() {
@@ -272,17 +274,17 @@ class SyncedLyricsView @JvmOverloads constructor(
 
     private fun checkAutoScrollReactivation() {
         if (currentIndex < 0) return
-        val currentLineScreenPos = height / 2f
-        val zoneTop = height / 2f - autoScrollZone / 2f
-        val zoneBottom = height / 2f + autoScrollZone / 2f
+        val currentLineHeights = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
+        val currentLineScreenPos = height / 2f - scrollOffset + currentLineHeights
+        val restPoint = height / 3f
+        val zoneTop = restPoint - autoScrollZone / 2f
+        val zoneBottom = restPoint + autoScrollZone / 2f
         val inZone = currentLineScreenPos in zoneTop..zoneBottom
-        val target = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
-        Log.d("LyricsScroll", "CHECK AUTO-SCROLL: currentIndex=$currentIndex, scrollOffset=$scrollOffset, target=$target, inZone=$inZone")
+        Log.d("LyricsScroll", "CHECK AUTO-SCROLL: currentIndex=$currentIndex, scrollOffset=$scrollOffset, screenPos=$currentLineScreenPos, inZone=$inZone")
         if (inZone) {
-            // Re-enable auto-scroll and snap to current line
             autoScrollEnabled = true
-            targetScrollOffset = target
-            Log.d("LyricsScroll", "  → REACTIVATING auto-scroll to target=$targetScrollOffset")
+            targetScrollOffset = currentLineHeights + height / 2f - height / 3f
+            Log.d("LyricsScroll", "  → REACTIVATING auto-scroll to target=$targetScrollOffset (1/3 rest)")
             animateScroll()
         } else {
             Log.d("LyricsScroll", "  → NOT in zone, staying at scrollOffset=$scrollOffset, autoScroll stays disabled")
@@ -374,14 +376,21 @@ class SyncedLyricsView @JvmOverloads constructor(
                     isUserScrolling = false
                     // Invert velocity: swipe up = negative velocity = should scroll DOWN (positive fling)
                     Log.d("LyricsScroll", "  → FLING with velocity=${-velocity} (inverted from $velocity)")
-                    startFling(-velocity)
+                    val flung = startFling(-velocity)
+                    if (!flung) {
+                        checkAutoScrollReactivation()
+                    }
                 } else if (!hasMoved) {
-                    // Tap → seek to line and re-enable auto-scroll
+                    // Tap → seek to line; re-enable auto-scroll ONLY if tapping the current line
                     val index = getLineAtY(event.y)
-                    Log.d("LyricsScroll", "  → TAP on line=$index")
+                    Log.d("LyricsScroll", "  → TAP on line=$index (current=$currentIndex)")
                     if (index >= 0) {
-                        autoScrollEnabled = true
-                        Log.d("LyricsScroll", "  → AUTO-SCROLL RE-ENABLED (tap)")
+                        if (index == currentIndex) {
+                            autoScrollEnabled = true
+                            Log.d("LyricsScroll", "  → AUTO-SCROLL RE-ENABLED (tap on current line)")
+                        } else {
+                            Log.d("LyricsScroll", "  → Tap on non-current line, seeking without re-enabling auto-scroll")
+                        }
                         onLineClicked?.invoke(lines[index].timeMs)
                     }
                 }

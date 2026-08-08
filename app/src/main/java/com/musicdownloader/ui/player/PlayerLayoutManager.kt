@@ -1,5 +1,6 @@
 package com.musicdownloader.ui.player
 
+import android.graphics.Bitmap
 import android.graphics.Outline
 import android.view.View
 import android.view.ViewGroup
@@ -34,6 +35,7 @@ object PlayerLayoutManager {
         private set
 
     private var vinylRecordView: VinylRecordView? = null
+    private var lastVinylArtwork: Bitmap? = null
 
     /**
      * Apply the current theme's player style to the player layout.
@@ -154,6 +156,11 @@ object PlayerLayoutManager {
                 }
                 cover.addView(vinyl)
                 vinylRecordView = vinyl
+                lastVinylArtwork?.let { vinyl.setArtwork(it) }
+                if (lastVinylArtwork == null) {
+                    val bmp = (root.findViewById<android.widget.ImageView>(R.id.iv_cover)?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    vinyl.setArtwork(bmp)
+                }
             }
         }
 
@@ -241,7 +248,8 @@ object PlayerLayoutManager {
             .start()
     }
 
-    fun updateVinylArtwork(bitmap: android.graphics.Bitmap?) {
+    fun updateVinylArtwork(bitmap: Bitmap?) {
+        lastVinylArtwork = bitmap
         vinylRecordView?.setArtwork(bitmap)
     }
 

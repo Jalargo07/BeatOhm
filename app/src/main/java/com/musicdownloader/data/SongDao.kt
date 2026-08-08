@@ -103,6 +103,9 @@ interface SongDao {
     @Query("UPDATE songs SET waveformData = :data WHERE id = :songId")
     suspend fun updateWaveform(songId: String, data: String)
 
+    @Query("UPDATE songs SET waveformData = '' WHERE id = :songId")
+    suspend fun clearWaveform(songId: String)
+
     @Query("UPDATE songs SET waveformData = ''")
     suspend fun clearAllWaveforms()
 }

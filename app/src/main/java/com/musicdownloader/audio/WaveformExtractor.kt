@@ -3,6 +3,7 @@ package com.musicdownloader.audio
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
@@ -11,27 +12,38 @@ import kotlin.math.sqrt
 
 object WaveformExtractor {
 
+    private const val TAG = "WaveformExtractor"
+
     /**
-     * Extracts real audio waveform data from a file.
-     * Returns a FloatArray of [numBars] values normalized 0.0-1.0.
-     * Must be called from a background thread (Dispatchers.IO).
-     */
-    /**
-     * Calculates optimal number of bars: 1 bar per 1.5 seconds of audio.
+     * Calculates optimal number of bars: 1 bar per 3 seconds of audio.
      */
     fun barsForDuration(durationMs: Long): Int {
         val durationSec = durationMs / 1000.0
-        return (durationSec / 3.0).toInt().coerceIn(20, 200)
+        val bars = (durationSec / 1.2).toInt().coerceIn(20, 300)
+        Log.d(TAG, "barsForDuration: durationMs=$durationMs → durationSec=${"%.1f".format(durationSec)} → bars=$bars")
+        return bars
     }
 
     suspend fun extract(
         filePath: String,
         numBars: Int = 300
     ): FloatArray = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        Log.d(TAG, "extract START: file='${filePath.substringAfterLast("/")}' numBars=$numBars")
         try {
-            extractInternal(filePath, numBars)
+            val result = extractInternal(filePath, numBars)
+            val elapsed = System.currentTimeMillis() - startTime
+            val avg = result.average()
+            val min = result.minOrNull() ?: 0f
+            val max = result.maxOrNull() ?: 0f
+            val nonZero = result.count { it > 0.11f }
+            Log.d(TAG, "extract DONE: ${elapsed}ms bars=${result.size} min=${"%.3f".format(min)} max=${"%.3f".format(max)} avg=${"%.3f".format(avg)} nonZero=$nonZero/${result.size}")
+            Log.d(TAG, "extract first10: [${result.take(10).joinToString { "%.3f".format(it) }}]")
+            result
         } catch (e: Exception) {
-            FloatArray(numBars) { 0.3f } // fallback: flat bars
+            val elapsed = System.currentTimeMillis() - startTime
+            Log.e(TAG, "extract FAILED: ${elapsed}ms ${e.message}")
+            FloatArray(numBars) { 0.3f }
         }
     }
 
@@ -52,6 +64,7 @@ object WaveformExtractor {
             }
         }
         if (audioTrackIndex < 0 || format == null) {
+            Log.e(TAG, "No audio track found")
             extractor.release()
             return FloatArray(numBars) { 0.3f }
         }
@@ -60,13 +73,16 @@ object WaveformExtractor {
         val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
         val channelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
         val durationUs = format.getLong(MediaFormat.KEY_DURATION)
+        val mime = format.getString(MediaFormat.KEY_MIME)!!
 
-        // Calculate samples per bar
         val totalSamples = (durationUs / 1_000_000.0 * sampleRate).toLong()
         val samplesPerBar = (totalSamples / numBars).coerceAtLeast(1)
+        val durationSec = durationUs / 1_000_000.0
+
+        Log.d(TAG, "Audio: mime=$mime sampleRate=$sampleRate channels=$channelCount durationUs=$durationUs (${"%.1f".format(durationSec)}s)")
+        Log.d(TAG, "Calc: totalSamples=$totalSamples numBars=$numBars samplesPerBar=$samplesPerBar")
 
         // Configure decoder
-        val mime = format.getString(MediaFormat.KEY_MIME)!!
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
@@ -78,6 +94,10 @@ object WaveformExtractor {
         var samplesInCurrentBar = 0
         var sumSquares = 0.0
         var isEOS = false
+        var totalSamplesProcessed = 0L
+        var outputCount = 0
+
+        val decodeStart = System.currentTimeMillis()
 
         while (currentBar < numBars) {
             // Feed input
@@ -89,6 +109,7 @@ object WaveformExtractor {
                     if (sampleSize < 0) {
                         codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                         isEOS = true
+                        Log.d(TAG, "EOS sent at bar=$currentBar/$numBars")
                     } else {
                         codec.queueInputBuffer(inputIndex, 0, sampleSize, extractor.sampleTime, 0)
                         extractor.advance()
@@ -104,12 +125,13 @@ object WaveformExtractor {
                 if (size > 0) {
                     outputBuffer.position(bufferInfo.offset)
                     outputBuffer.limit(bufferInfo.offset + size)
+                    outputCount++
 
-                    // Process PCM samples (16-bit = 2 bytes per sample)
                     while (outputBuffer.remaining() >= 2 && currentBar < numBars) {
                         val sample = outputBuffer.short.toFloat() / Short.MAX_VALUE
                         sumSquares += sample * sample
                         samplesInCurrentBar++
+                        totalSamplesProcessed++
 
                         if (samplesInCurrentBar >= samplesPerBar) {
                             val rms = sqrt(sumSquares / samplesInCurrentBar).toFloat()
@@ -117,17 +139,31 @@ object WaveformExtractor {
                             currentBar++
                             samplesInCurrentBar = 0
                             sumSquares = 0.0
+
+                            if (currentBar % 20 == 0 || currentBar == numBars) {
+                                Log.d(TAG, "Progress: bar=$currentBar/$numBars samples=$totalSamplesProcessed")
+                            }
                         }
                     }
                 }
                 codec.releaseOutputBuffer(outputIndex, false)
-                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                    Log.d(TAG, "EOS received at bar=$currentBar/$numBars outputBuffers=$outputCount")
+                    break
+                }
             }
         }
 
+        val decodeMs = System.currentTimeMillis() - decodeStart
+        Log.d(TAG, "Decode loop: ${decodeMs}ms barsFilled=$currentBar/$numBars totalSamples=$totalSamplesProcessed outputBuffers=$outputCount")
+
         // Fill remaining bars if any
-        for (i in currentBar until numBars) {
-            amplitudes[i] = if (i > 0) amplitudes[i - 1] else 0.3f
+        val remaining = numBars - currentBar
+        if (remaining > 0) {
+            Log.d(TAG, "Filling $remaining remaining bars (padded)")
+            for (i in currentBar until numBars) {
+                amplitudes[i] = if (i > 0) amplitudes[i - 1] else 0.3f
+            }
         }
 
         codec.stop()
@@ -136,11 +172,15 @@ object WaveformExtractor {
 
         // Normalize to 0.1 - 1.0 range
         val maxAmp = amplitudes.maxOrNull() ?: 1f
+        val minBefore = amplitudes.minOrNull() ?: 0f
         if (maxAmp > 0f) {
             for (i in amplitudes.indices) {
                 amplitudes[i] = (0.1f + 0.9f * (amplitudes[i] / maxAmp))
             }
         }
+        val minAfter = amplitudes.minOrNull() ?: 0f
+        val maxAfter = amplitudes.maxOrNull() ?: 0f
+        Log.d(TAG, "Normalize: raw min=${"%.4f".format(minBefore)} max=${"%.4f".format(maxAmp)} → normalized min=${"%.3f".format(minAfter)} max=${"%.3f".format(maxAfter)}")
 
         return amplitudes
     }

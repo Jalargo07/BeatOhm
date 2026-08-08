@@ -1,11 +1,13 @@
 package com.musicdownloader.data
 
 import android.content.Context
+import android.database.CursorWindow
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.lang.reflect.Field
 
 @Database(entities = [LocalSong::class, Playlist::class, PlaylistSong::class, UserTheme::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
@@ -57,7 +59,19 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "music_downloader_db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .fallbackToDestructiveMigration()
+                    .addCallback(object : Callback() {
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            super.onOpen(db)
+                            try {
+                                val field: Field = CursorWindow::class.java.getDeclaredField("sCursorWindowSize")
+                                field.isAccessible = true
+                                field.set(null, 10 * 1024 * 1024) // 10MB
+                            } catch (_: Exception) {}
+                        }
+                    })
+                    .build().also { INSTANCE = it }
             }
         }
     }

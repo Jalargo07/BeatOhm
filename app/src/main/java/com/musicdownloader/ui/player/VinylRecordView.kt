@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.SweepGradient
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.View
@@ -44,6 +45,22 @@ class VinylRecordView @JvmOverloads constructor(
 
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
+    private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val labelRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+        alpha = 120
+    }
+
+    private val spindlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(10, 10, 10)
+        style = Paint.Style.FILL
+    }
+
     private val clipPath = android.graphics.Path()
     private val labelClipPath = android.graphics.Path()
 
@@ -52,7 +69,7 @@ class VinylRecordView @JvmOverloads constructor(
 
     private var iconDrawable: Drawable? = null
 
-    private val grooveCount = 18
+    private val grooveCount = 22
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -73,12 +90,22 @@ class VinylRecordView @JvmOverloads constructor(
 
         val labelRadius = outerRadius / 3f
         val innerRadius = labelRadius + 4f
-        val grooveStart = innerRadius + 6f
-        val grooveEnd = outerRadius - 6f
-        val grooveSpacing = (grooveEnd - grooveStart) / grooveCount
 
-        for (i in 0 until grooveCount) {
-            val r = grooveStart + i * grooveSpacing
+        val grooveStart = innerRadius + 6f
+        val mainGrooveEnd = outerRadius * 0.88f
+        val leadOutEnd = outerRadius * 0.93f
+
+        val mainGrooveCount = 20
+        val mainSpacing = (mainGrooveEnd - grooveStart) / mainGrooveCount
+        for (i in 0 until mainGrooveCount) {
+            val r = grooveStart + i * mainSpacing
+            canvas.drawCircle(cx, cy, r, groovePaint)
+        }
+
+        val leadOutCount = 4
+        val leadOutSpacing = (leadOutEnd - mainGrooveEnd) / leadOutCount
+        for (i in 0 until leadOutCount) {
+            val r = mainGrooveEnd + i * leadOutSpacing
             canvas.drawCircle(cx, cy, r, groovePaint)
         }
 
@@ -105,6 +132,22 @@ class VinylRecordView @JvmOverloads constructor(
                 drawable.draw(canvas)
             }
         }
+
+        canvas.drawCircle(cx, cy, labelRadius, labelRingPaint)
+
+        val sheenColors = intArrayOf(
+            Color.TRANSPARENT,
+            Color.argb(10, 255, 255, 255),
+            Color.TRANSPARENT
+        )
+        val sheenPositions = floatArrayOf(0f, 0.5f, 1f)
+        val sheenShader = SweepGradient(cx, cy, sheenColors, sheenPositions)
+        sheenShader.setLocalMatrix(android.graphics.Matrix().apply { setRotate(rotation, cx, cy) })
+        sheenPaint.shader = sheenShader
+        canvas.drawCircle(cx, cy, outerRadius, sheenPaint)
+
+        val spindleRadius = (outerRadius * 0.03f).coerceAtLeast(2f)
+        canvas.drawCircle(cx, cy, spindleRadius, spindlePaint)
 
         canvas.restore()
     }

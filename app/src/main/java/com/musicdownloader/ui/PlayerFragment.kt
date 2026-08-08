@@ -17,6 +17,8 @@ import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.TransitionDrawable
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
@@ -39,7 +41,9 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.palette.graphics.Palette
+import coil.Coil
 import coil.load
+import coil.request.ImageRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.musicdownloader.R
@@ -118,11 +122,11 @@ class PlayerFragment : Fragment() {
             )
         }
 
+        PlayerLayoutManager.applyStyle(binding.root)
         setupObservers()
         setupControls()
         setupSwipeGesture()
         setupLyricsSwipe()
-        PlayerLayoutManager.applyStyle(binding.root)
         applyIconPack()
     }
 
@@ -268,7 +272,12 @@ class PlayerFragment : Fragment() {
                     ?: run {
                         // 4. Not in DB yet — extract now (background)
                         try {
-                            val numBars = com.musicdownloader.audio.WaveformExtractor.barsForDuration(durationMs)
+                            val meta = android.media.MediaMetadataRetriever()
+                            val realDurationMs = try {
+                                meta.setDataSource(path)
+                                meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: durationMs
+                            } catch (_: Exception) { durationMs } finally { meta.release() }
+                            val numBars = com.musicdownloader.audio.WaveformExtractor.barsForDuration(realDurationMs)
                             val data = com.musicdownloader.audio.WaveformExtractor.extract(path, numBars)
                             WaveformSeekBar.cacheWaveform(path, data)
                             // Store in DB for future
@@ -349,7 +358,26 @@ class PlayerFragment : Fragment() {
             .start()
     }
 
+    private fun extractBitmap(drawable: Drawable?): Bitmap? {
+        return when (drawable) {
+            is BitmapDrawable -> drawable.bitmap
+            is TransitionDrawable -> {
+                for (i in drawable.numberOfLayers - 1 downTo 0) {
+                    val layer = drawable.getDrawable(i)
+                    val bitmap = (layer as? BitmapDrawable)?.bitmap
+                    if (bitmap != null) return bitmap
+                }
+                null
+            }
+            else -> null
+        }
+    }
+
     private fun loadCover(song: Song, path: String) {
+        if (PlayerLayoutManager.currentStyle == "vinyl") {
+            loadCoverForVinyl(song, path)
+            return
+        }
         if (song.thumbnailUrl.isNotBlank()) {
             binding.pbCover.visibility = View.VISIBLE
             binding.ivCover.load(song.thumbnailUrl) {
@@ -359,19 +387,15 @@ class PlayerFragment : Fragment() {
                 listener(
                     onSuccess = { _, result ->
                         if (_binding != null) binding.pbCover.visibility = View.GONE
-                        val bmp = (result.drawable as? BitmapDrawable)?.bitmap
-                            ?: if (_binding != null) (binding.ivCover.drawable as? BitmapDrawable)?.bitmap else null
+                        val bmp = extractBitmap(result.drawable)
+                            ?: if (_binding != null) extractBitmap(binding.ivCover.drawable) else null
                         applyPalette(bmp)
-                        if (PlayerLayoutManager.currentStyle == "vinyl") {
-                            PlayerLayoutManager.updateVinylArtwork(bmp)
-                        }
+                        PlayerLayoutManager.updateVinylArtwork(bmp)
                     },
                     onError = { _, _ ->
                         if (_binding != null) binding.pbCover.visibility = View.GONE
                         applyPalette(null)
-                        if (PlayerLayoutManager.currentStyle == "vinyl") {
-                            PlayerLayoutManager.updateVinylArtwork(null)
-                        }
+                        PlayerLayoutManager.updateVinylArtwork(null)
                     }
                 )
             }
@@ -382,16 +406,37 @@ class PlayerFragment : Fragment() {
             lifecycleScope.launch {
                 val bitmap = ArtworkLoader.loadBitmapFor(path)
                 if (_binding != null) applyPalette(bitmap)
-                if (_binding != null && PlayerLayoutManager.currentStyle == "vinyl") {
-                    PlayerLayoutManager.updateVinylArtwork(bitmap)
-                }
+                if (_binding != null) PlayerLayoutManager.updateVinylArtwork(bitmap)
             }
         } else {
             binding.pbCover.visibility = View.GONE
             binding.ivCover.setImageResource(R.drawable.ic_player)
             applyPalette(null)
-            if (PlayerLayoutManager.currentStyle == "vinyl") {
-                PlayerLayoutManager.updateVinylArtwork(null)
+            PlayerLayoutManager.updateVinylArtwork(null)
+        }
+    }
+
+    private fun loadCoverForVinyl(song: Song, path: String) {
+        binding.pbCover.visibility = View.GONE
+        lifecycleScope.launch {
+            var bitmap: Bitmap? = null
+            if (song.thumbnailUrl.isNotBlank()) {
+                try {
+                    val request = ImageRequest.Builder(requireContext().applicationContext)
+                        .data(song.thumbnailUrl)
+                        .build()
+                    val result = Coil.imageLoader(requireContext().applicationContext).execute(request)
+                    bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                } catch (e: Exception) {
+                    bitmap = null
+                }
+            }
+            if (bitmap == null) {
+                bitmap = ArtworkLoader.loadBitmapFor(path)
+            }
+            if (_binding != null) {
+                PlayerLayoutManager.updateVinylArtwork(bitmap)
+                applyPalette(bitmap)
             }
         }
     }
@@ -524,6 +569,7 @@ class PlayerFragment : Fragment() {
         coverBreatheAnimator?.cancel()
         coverBreatheAnimator = null
         binding.coverContainer.animate().cancel()
+        binding.coverContainer.alpha = 1f
         binding.coverContainer.scaleX = PlayerLayoutManager.currentScaleFactor
         binding.coverContainer.scaleY = PlayerLayoutManager.currentScaleFactor
     }
