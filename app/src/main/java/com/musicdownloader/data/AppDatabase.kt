@@ -7,10 +7,11 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [LocalSong::class, Playlist::class, PlaylistSong::class], version = 4, exportSchema = false)
+@Database(entities = [LocalSong::class, Playlist::class, PlaylistSong::class, UserTheme::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
     abstract fun playlistDao(): PlaylistDao
+    abstract fun themeDao(): ThemeDao
 
     companion object {
         @Volatile
@@ -28,13 +29,35 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS user_themes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        primaryColor INTEGER NOT NULL,
+                        secondaryColor INTEGER NOT NULL,
+                        accentColor INTEGER NOT NULL,
+                        backgroundColor INTEGER NOT NULL,
+                        surfaceColor INTEGER NOT NULL,
+                        textColor INTEGER NOT NULL,
+                        iconPackId TEXT NOT NULL DEFAULT 'default',
+                        playerLayoutId TEXT NOT NULL DEFAULT 'classic',
+                        fontStyle TEXT NOT NULL DEFAULT 'default',
+                        isPreset INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "music_downloader_db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
         }
     }

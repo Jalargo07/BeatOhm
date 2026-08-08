@@ -15,11 +15,18 @@
 local.properties
 secrets.properties
 
-# OpenCode / AI agents
+# AI agents / IA tools (NADA de IA se sube a git)
 opencode.json
 .opencode/
 AGENTS.md
+CLAUDE.md
 PROJECT_INDEX.json
+.cline/
+.cline
+.agents/
+.agents
+skills-lock.json
+$null
 
 # Development plans (not part of the app)
 PLAN*.md

@@ -31,7 +31,17 @@
         android:id="@+id/settingsFragment"
         android:name="com.musicdownloader.ui.SettingsFragment"
         android:label="@string/settings_title"
-        tools:layout="@layout/fragment_settings" />
+        tools:layout="@layout/fragment_settings">
+        <action
+            android:id="@+id/action_settings_to_themeSelector"
+            app:destination="@id/themeSelectionFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/themeSelectionFragment"
+        android:name="com.musicdownloader.ui.ThemeSelectionFragment"
+        android:label="@string/theme_selector_title"
+        tools:layout="@layout/fragment_theme_selection" />
 
     <fragment
         android:id="@+id/songListFragment"

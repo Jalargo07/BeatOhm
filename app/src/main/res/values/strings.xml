@@ -168,4 +168,38 @@
     <string name="settings_gradient_primary">Primario</string>
     <string name="settings_gradient_dark">Oscuro</string>
     <string name="coming_soon">Próximamente</string>
+
+    <!-- Icon pack settings -->
+    <string name="settings_icon_pack">Pack de iconos</string>
+    <string name="settings_icon_pack_default">Material</string>
+    <string name="settings_icon_pack_outline">Outline</string>
+    <string name="settings_icon_pack_filled">Filled</string>
+    <string name="settings_icon_pack_minimal">Minimal</string>
+    <string name="settings_icon_pack_bold">Bold</string>
+    <string name="settings_icon_pack_neon">Neon</string>
+
+    <!-- Player layout settings -->
+    <string name="settings_player_layout">Estilo del reproductor</string>
+    <string name="settings_player_layout_classic">Clásico</string>
+    <string name="settings_player_layout_compact">Compacto</string>
+    <string name="settings_player_layout_vinyl">Vinilo</string>
+
+    <!-- Theme selector -->
+    <string name="theme_selector_title">Selector de Temas</string>
+    <string name="theme_new_custom">Nuevo Tema</string>
+    <string name="theme_type_preset">Preset</string>
+    <string name="theme_type_custom">Personalizado</string>
+    <string name="theme_applied">Tema aplicado</string>
+    <string name="theme_active">Activo</string>
+    <string name="select_theme_button">Selector de Temas</string>
+    <string name="theme_create_title">Crear Tema</string>
+    <string name="theme_create_hint">Nombre del tema</string>
+    <string name="theme_create_confirm">Crear</string>
+    <string name="theme_create_cancel">Cancelar</string>
+    <string name="theme_create_empty_name">El nombre no puede estar vacío</string>
+    <string name="theme_create_success">Tema creado</string>
+    <string name="copied">Copiado</string>
+    <string name="theme_copied">Tema copiado al portapapeles</string>
+    <string name="theme_pasted">Tema pegado desde el portapapeles</string>
+    <string name="theme_share_error">Error al compartir</string>
 </resources>

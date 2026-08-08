@@ -1,23 +1,26 @@
 package com.musicdownloader.ui
 
-import android.content.ClipData
 import android.content.Context
 import android.os.Bundle
-import android.view.DragEvent
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.musicdownloader.BuildConfig
 import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentSettingsBinding
 import com.musicdownloader.model.PatternToken
 import com.musicdownloader.model.Song
+import com.musicdownloader.ui.player.PlayerLayoutManager
 import com.musicdownloader.util.FolderPatternParser
 
 class SettingsFragment : Fragment() {
@@ -53,6 +56,7 @@ class SettingsFragment : Fragment() {
         setupTokenBank()
         setupPatternBuilder()
         refreshFromBuilder()
+        setupPlayerSection()
 
         binding.btnSave.setOnClickListener {
             val pattern = buildPatternString().trim()
@@ -76,6 +80,9 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupAppearance() {
+        binding.btnSelectTheme.setOnClickListener {
+            findNavController().navigate(R.id.action_settings_to_themeSelector)
+        }
         binding.tvAboutVersion.text = getString(R.string.settings_about_version, BuildConfig.VERSION_NAME)
 
         setupPrimaryColorGrid()
@@ -172,12 +179,9 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupTokenBank() {
-        tokenBankAdapter = TokenBankAdapter { token, view ->
-            val index = PatternToken.available.indexOf(token)
-            if (index >= 0) {
-                val clip = ClipData.newPlainText(CLIP_LABEL, index.toString())
-                view.startDragAndDrop(clip, View.DragShadowBuilder(view), null, 0)
-            }
+        tokenBankAdapter = TokenBankAdapter { token ->
+            patternTokens.add(token)
+            refreshFromBuilder()
         }
         binding.rvTokenBank.layoutManager = LinearLayoutManager(requireContext(), RecyclerView.HORIZONTAL, false)
         binding.rvTokenBank.adapter = tokenBankAdapter
@@ -212,44 +216,6 @@ class SettingsFragment : Fragment() {
             override fun isLongPressDragEnabled(): Boolean = true
         })
         touchHelper.attachToRecyclerView(binding.rvPatternBuilder)
-
-        binding.rvPatternBuilder.setOnDragListener { v, event ->
-            when (event.action) {
-                DragEvent.ACTION_DRAG_STARTED -> {
-                    val isToken = event.clipData?.description?.label == CLIP_LABEL
-                    if (isToken) {
-                        binding.cardPatternDrop.setCardBackgroundColor(
-                            ContextCompat.getColor(requireContext(), R.color.surface_high)
-                        )
-                    }
-                    isToken
-                }
-                DragEvent.ACTION_DROP -> {
-                    val isToken = event.clipData?.description?.label == CLIP_LABEL
-                    if (isToken) {
-                        val tokenIndex = event.clipData
-                            ?.getItemAt(0)
-                            ?.text
-                            ?.toString()
-                            ?.toIntOrNull()
-                        val token = tokenIndex?.let { PatternToken.available.getOrNull(it) }
-                        if (token != null) {
-                            val position = dropPositionFromX(v as RecyclerView, event.x)
-                            patternTokens.add(position.coerceIn(0, patternTokens.size), token)
-                            refreshFromBuilder()
-                        }
-                    }
-                    isToken
-                }
-                DragEvent.ACTION_DRAG_ENDED -> {
-                    binding.cardPatternDrop.setCardBackgroundColor(
-                        ContextCompat.getColor(requireContext(), R.color.surface)
-                    )
-                    true
-                }
-                else -> true
-            }
-        }
     }
 
     private fun syncTokensFromAdapter() {
@@ -265,17 +231,6 @@ class SettingsFragment : Fragment() {
     private fun updateHintAndPreview() {
         binding.tvBuilderHint.visibility = if (patternTokens.isEmpty()) View.VISIBLE else View.GONE
         refreshPreview()
-    }
-
-    private fun dropPositionFromX(rv: RecyclerView, x: Float): Int {
-        val lm = rv.layoutManager as? LinearLayoutManager ?: return 0
-        for (i in 0 until lm.childCount) {
-            val child = lm.getChildAt(i) ?: continue
-            if (x < child.left + child.width / 2f) {
-                return rv.getChildAdapterPosition(child)
-            }
-        }
-        return rv.adapter?.itemCount ?: 0
     }
 
     private fun tokensFromPattern(pattern: String): List<PatternToken> {
@@ -311,6 +266,63 @@ class SettingsFragment : Fragment() {
 
     private fun buildPatternString(): String = patternTokens.joinToString("") { it.toPatternString() }
 
+    private fun setupPlayerSection() {
+        // Player layout chips
+        val chipGroupLayout = binding.chipGroupPlayerLayout
+        // Pre-select current layout
+        when (ThemeManager.currentPlayerLayout) {
+            "compact" -> chipGroupLayout.check(R.id.chip_layout_compact)
+            "vinyl" -> chipGroupLayout.check(R.id.chip_layout_vinyl)
+            else -> chipGroupLayout.check(R.id.chip_layout_classic)
+        }
+        chipGroupLayout.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val layoutId = when (checkedIds.first()) {
+                R.id.chip_layout_compact -> "compact"
+                R.id.chip_layout_vinyl -> "vinyl"
+                else -> "classic"
+            }
+            // Save to Room via ThemeManager
+            val current = ThemeManager.activeTheme ?: return@setOnCheckedStateChangeListener
+            val updated = current.copy(playerLayoutId = layoutId)
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                ThemeManager.updateTheme(updated)
+                ThemeManager.setActiveThemeBlocking(updated)
+            }
+            // Apply immediately if player fragment is visible
+            PlayerLayoutManager.currentStyle = layoutId
+        }
+
+        // Icon pack chips
+        val chipGroupIcon = binding.chipGroupIconPack
+        // Pre-select current icon pack
+        when (ThemeManager.currentIconPack) {
+            "outline" -> chipGroupIcon.check(R.id.chip_icon_outline)
+            "filled" -> chipGroupIcon.check(R.id.chip_icon_filled)
+            "minimal" -> chipGroupIcon.check(R.id.chip_icon_minimal)
+            "bold" -> chipGroupIcon.check(R.id.chip_icon_bold)
+            "neon" -> chipGroupIcon.check(R.id.chip_icon_neon)
+            else -> chipGroupIcon.check(R.id.chip_icon_material)
+        }
+        chipGroupIcon.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val packId = when (checkedIds.first()) {
+                R.id.chip_icon_outline -> "outline"
+                R.id.chip_icon_filled -> "filled"
+                R.id.chip_icon_minimal -> "minimal"
+                R.id.chip_icon_bold -> "bold"
+                R.id.chip_icon_neon -> "neon"
+                else -> "default"
+            }
+            val current = ThemeManager.activeTheme ?: return@setOnCheckedStateChangeListener
+            val updated = current.copy(iconPackId = packId)
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                ThemeManager.updateTheme(updated)
+                ThemeManager.setActiveThemeBlocking(updated)
+            }
+        }
+    }
+
     private fun currentPattern(): String {
         return prefs().getString(FolderPatternParser.KEY_FOLDER_PATTERN, FolderPatternParser.DEFAULT_PATTERN)
             ?: FolderPatternParser.DEFAULT_PATTERN
@@ -336,9 +348,5 @@ class SettingsFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
-    }
-
-    companion object {
-        private const val CLIP_LABEL = "pattern_token"
     }
 }

@@ -38,4 +38,5 @@
     <color name="shuffle_overlay">#22FFFFFF</color>
     <color name="download_button_pressed">#FF6B7E</color>
     <color name="bottom_nav_active_indicator">#339D35FF</color>
+    <color name="accent">#FF6F00</color>
 </resources>

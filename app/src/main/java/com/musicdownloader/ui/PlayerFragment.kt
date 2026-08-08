@@ -48,6 +48,7 @@ import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.data.PlaylistSong
 import com.musicdownloader.data.toSong
 import com.musicdownloader.databinding.FragmentPlayerBinding
+import com.musicdownloader.ui.player.PlayerLayoutManager
 import com.musicdownloader.model.Song
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -121,6 +122,8 @@ class PlayerFragment : Fragment() {
         setupControls()
         setupSwipeGesture()
         setupLyricsSwipe()
+        PlayerLayoutManager.applyStyle(binding.root)
+        applyIconPack()
     }
 
     override fun onStart() {
@@ -162,6 +165,7 @@ class PlayerFragment : Fragment() {
                 val path = song.filePath.ifBlank { song.youtubeUrl }
                 currentSongFilePath = path
                 binding.emptyPlayerState.visibility = View.GONE
+                PlayerLayoutManager.animateSongChange(binding.root)
                 animateSongChange(song, path)
                 updateFavoriteIcon(path)
                 loadWaveform(path, song.duration)
@@ -183,14 +187,17 @@ class PlayerFragment : Fragment() {
         }
 
         viewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
+            val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
             binding.btnPlayPause.setImageResource(
-                if (playing) R.drawable.ic_pause
-                else R.drawable.ic_play
+                if (playing) icons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
+                else icons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
             )
             if (playing) {
                 animateCoverPlaying()
+                PlayerLayoutManager.startVinylRotation(binding.root)
             } else {
                 stopCoverBreathe()
+                PlayerLayoutManager.stopVinylRotation(binding.root)
             }
         }
 
@@ -199,17 +206,18 @@ class PlayerFragment : Fragment() {
         }
 
         viewModel.repeatMode.observe(viewLifecycleOwner) { mode ->
+            val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
             when (mode) {
                 PlayerViewModel.RepeatMode.ALL -> {
-                    binding.btnRepeat.setImageResource(R.drawable.ic_repeat)
+                    binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT] ?: R.drawable.ic_repeat)
                     binding.btnRepeat.alpha = 1f
                 }
                 PlayerViewModel.RepeatMode.ONE -> {
-                    binding.btnRepeat.setImageResource(R.drawable.ic_repeat_one)
+                    binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT_ONE] ?: R.drawable.ic_repeat_one)
                     binding.btnRepeat.alpha = 1f
                 }
                 PlayerViewModel.RepeatMode.OFF -> {
-                    binding.btnRepeat.setImageResource(R.drawable.ic_repeat)
+                    binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT] ?: R.drawable.ic_repeat)
                     binding.btnRepeat.alpha = 0.4f
                 }
             }
@@ -233,7 +241,7 @@ class PlayerFragment : Fragment() {
             )
             binding.btnFavorite.colorFilter = if (isFav) {
                 PorterDuffColorFilter(
-                    ContextCompat.getColor(requireContext(), R.color.secondary),
+                    ThemeManager.accentColor,
                     PorterDuff.Mode.SRC_IN
                 )
             } else {
@@ -989,5 +997,25 @@ class PlayerFragment : Fragment() {
         private const val MAX_SEEK = 1000
         private const val PALETTE_DURATION = 2000L
         private const val PALETTE_SIZE = 128
+    }
+
+    /**
+     * Apply the active icon pack's icons to player control buttons.
+     */
+    private fun applyIconPack() {
+        val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
+        val isPlaying = viewModel.isPlaying.value == true
+
+        binding.btnPlayPause.setImageResource(
+            if (isPlaying) icons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
+            else icons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
+        )
+        binding.btnNext.setImageResource(icons[IconPackManager.ICON_NEXT] ?: R.drawable.ic_next)
+        binding.btnPrev.setImageResource(icons[IconPackManager.ICON_PREV] ?: R.drawable.ic_prev)
+        binding.btnShuffle.setImageResource(icons[IconPackManager.ICON_SHUFFLE] ?: R.drawable.ic_shuffle)
+        binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT] ?: R.drawable.ic_repeat)
+        binding.btnEqualizer.setImageResource(icons[IconPackManager.ICON_EQUALIZER] ?: R.drawable.ic_equalizer)
+        binding.btnQueue.setImageResource(icons[IconPackManager.ICON_QUEUE] ?: R.drawable.ic_queue_music)
+        binding.btnLyrics.setImageResource(icons[IconPackManager.ICON_LYRICS] ?: R.drawable.ic_lyrics)
     }
 }

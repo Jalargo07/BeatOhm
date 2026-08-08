@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neon Pack: Repeat - Rounded loop arrows -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17,17 L7,17 Q5.5,17 5.5,15.5 L5.5,15.5 L5.5,12 L7,13.5 L8.5,12 L7,10.5 L5.5,12 L5.5,15.5 Q5.5,18 7,18 L17,18 Q18.5,18 18.5,16.5 L18.5,9.5 Q18.5,8 17,8 L15.5,8 L17,9.5 L15.5,11 L14,9.5 L15.5,8 L15.5,8 L17,8 Q18.5,8 18.5,9.5 L18.5,16.5 Q18.5,18 17,18 Z" />
+</vector>

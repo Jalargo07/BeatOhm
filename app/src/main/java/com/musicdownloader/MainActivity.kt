@@ -79,6 +79,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeManager.init(this)
+        ThemeManager.initSync(this)
+        ThemeManager.ensurePresetThemes()
+        ThemeManager.migrateFromLegacy()
         ThemeManager.applyNightMode()
 
         val theme = theme

@@ -1,6 +1,9 @@
 package com.musicdownloader.ui
 
+import android.util.Log
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
@@ -45,13 +48,34 @@ class PatternBuilderAdapter(
     inner class ViewHolder(private val binding: ItemPatternTokenBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
+        private val gestureDetector = GestureDetector(
+            binding.root.context,
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    val pos = bindingAdapterPosition
+                    if (pos != RecyclerView.NO_POSITION) {
+                        Log.d("PatternDebug", "PATTERN_BUILDER double-tap pos=$pos")
+                        onRemove(pos)
+                    }
+                    return true
+                }
+            }
+        )
+
         fun bind(token: PatternToken) {
             binding.tvToken.text = token.displayName
             binding.ivDrag.visibility = View.GONE
             binding.btnRemove.visibility = View.VISIBLE
             binding.btnRemove.setOnClickListener {
                 val pos = bindingAdapterPosition
-                if (pos != RecyclerView.NO_POSITION) onRemove(pos)
+                if (pos != RecyclerView.NO_POSITION) {
+                    Log.d("PatternDebug", "PATTERN_BUILDER btn_remove click pos=$pos")
+                    onRemove(pos)
+                }
+            }
+            binding.root.setOnTouchListener { _, event ->
+                gestureDetector.onTouchEvent(event)
+                false
             }
         }
     }
