@@ -44,6 +44,12 @@ interface SongDao {
     @Query("SELECT DISTINCT year FROM songs WHERE year != '' ORDER BY year ASC")
     fun getAllYears(): Flow<List<String>>
 
+    @Query("SELECT album AS name, thumbnailUrl AS coverPath FROM songs WHERE thumbnailUrl IS NOT NULL AND thumbnailUrl != '' AND album IS NOT NULL AND album != '' GROUP BY album ORDER BY album COLLATE NOCASE ASC")
+    fun getAlbumsWithCover(): Flow<List<AlbumWithCover>>
+
+    @Query("SELECT artist AS name, thumbnailUrl AS coverPath FROM songs WHERE thumbnailUrl IS NOT NULL AND thumbnailUrl != '' AND artist IS NOT NULL AND artist != '' GROUP BY artist ORDER BY artist COLLATE NOCASE ASC")
+    fun getArtistsWithCover(): Flow<List<ArtistWithCover>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSong(song: LocalSong)
 
@@ -100,3 +106,6 @@ interface SongDao {
     @Query("UPDATE songs SET waveformData = ''")
     suspend fun clearAllWaveforms()
 }
+
+data class AlbumWithCover(val name: String, val coverPath: String)
+data class ArtistWithCover(val name: String, val coverPath: String)

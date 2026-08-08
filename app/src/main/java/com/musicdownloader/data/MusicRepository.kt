@@ -45,6 +45,8 @@ class MusicRepository(private val context: Context) {
     fun getAllArtists(): Flow<List<String>> = dao.getAllArtists()
     fun getAllGenres(): Flow<List<String>> = dao.getAllGenres()
     fun getAllYears(): Flow<List<String>> = dao.getAllYears()
+    fun getAllAlbumsWithCover(): Flow<List<AlbumWithCover>> = dao.getAlbumsWithCover()
+    fun getAllArtistsWithCover(): Flow<List<ArtistWithCover>> = dao.getArtistsWithCover()
     fun getSongsByAlbum(album: String): Flow<List<LocalSong>> = dao.getSongsByAlbum(album)
     fun getSongsByArtist(artist: String): Flow<List<LocalSong>> = dao.getSongsByArtist(artist)
     fun getSongsByGenre(genre: String): Flow<List<LocalSong>> = dao.getSongsByGenre(genre)
@@ -488,6 +490,15 @@ class MusicRepository(private val context: Context) {
         }
     }
 
+    fun getAlbumCoverOverride(album: String): String? = albumCoverPrefs().getString(album, null)
+
+    fun setAlbumCoverOverride(album: String, coverPath: String) {
+        albumCoverPrefs().edit().putString(album, coverPath).apply()
+    }
+
+    private fun albumCoverPrefs() =
+        context.getSharedPreferences(ALBUM_COVERS_PREFS, Context.MODE_PRIVATE)
+
     private fun foldersPrefs() =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -501,6 +512,7 @@ class MusicRepository(private val context: Context) {
     companion object {
         private const val PREFS_NAME = "library_prefs"
         private const val KEY_FOLDERS = "library_folders"
+        private const val ALBUM_COVERS_PREFS = "album_covers"
         private const val MAX_SCAN_DEPTH = 4
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav")
 

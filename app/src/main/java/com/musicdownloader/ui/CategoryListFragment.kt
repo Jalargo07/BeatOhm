@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
@@ -14,12 +15,19 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.musicdownloader.data.toSong
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.databinding.FragmentCategoryListBinding
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import coil.load
+import java.io.File
+
+data class CategoryItem(val name: String, val coverPath: String = "")
 
 class CategoryListFragment : Fragment() {
 
@@ -35,6 +43,7 @@ class CategoryListFragment : Fragment() {
     private var selectedCategoryValue = ""
     private var scrollPosition = 0
     private var scrollOffset = 0
+    private var coverDialogJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,19 +86,31 @@ class CategoryListFragment : Fragment() {
             }
         })
 
-        adapter = CategoryAdapter { name ->
-            val lm = binding.rvCategories.layoutManager as? LinearLayoutManager
-            if (lm != null) {
-                scrollPosition = lm.findFirstVisibleItemPosition()
-                val v = lm.findViewByPosition(scrollPosition)
-                scrollOffset = v?.top ?: 0
+        adapter = CategoryAdapter(
+            onItemClick = { name ->
+                val lm = binding.rvCategories.layoutManager as? LinearLayoutManager
+                if (lm != null) {
+                    scrollPosition = lm.findFirstVisibleItemPosition()
+                    val v = lm.findViewByPosition(scrollPosition)
+                    scrollOffset = v?.top ?: 0
+                }
+                selectedCategoryValue = name
+                showingSongs = true
+                binding.headerBar.visibility = View.VISIBLE
+                binding.tvCategoryTitle.text = name
+                loadSongsForCategory(name)
+            },
+            onItemLongClick = { item ->
+                if (categoryType == "album") {
+                    showAlbumCoverDialog(item.name)
+                }
+            },
+            defaultIconRes = when (categoryType) {
+                "album" -> R.drawable.ic_album
+                "artist" -> R.drawable.ic_mic
+                else -> R.drawable.ic_album
             }
-            selectedCategoryValue = name
-            showingSongs = true
-            binding.headerBar.visibility = View.VISIBLE
-            binding.tvCategoryTitle.text = name
-            loadSongsForCategory(name)
-        }
+        )
 
         binding.rvCategories.layoutManager = LinearLayoutManager(requireContext())
 
@@ -129,26 +150,58 @@ class CategoryListFragment : Fragment() {
     private fun loadCategories() {
         binding.rvCategories.adapter = adapter
         lifecycleScope.launch {
-            val flow = when (categoryType) {
-                "album" -> repository.getAllAlbums()
-                "artist" -> repository.getAllArtists()
-                "genre" -> repository.getAllGenres()
-                "year" -> repository.getAllYears()
-                else -> repository.getAllAlbums()
-            }
-            flow.collectLatest { items ->
-                val data = if (categoryType == "genre") {
-                    items.filter { it.isNotBlank() }
-                } else items
-                adapter.submitList(data)
-                if (data.isEmpty()) {
-                    binding.rvCategories.visibility = View.GONE
-                    binding.tvEmpty.visibility = View.VISIBLE
-                } else {
-                    binding.rvCategories.visibility = View.VISIBLE
-                    binding.tvEmpty.visibility = View.GONE
+            when (categoryType) {
+                "album" -> {
+                    repository.getAllAlbums().combine(repository.getAllAlbumsWithCover()) { allAlbums, covers ->
+                        val coverMap = covers.associateBy { it.name }
+                        val overrideMap = allAlbums.associateWith { repository.getAlbumCoverOverride(it) }
+                        allAlbums.map { name ->
+                            val cover = overrideMap[name]
+                                ?: coverMap[name]?.coverPath
+                                ?: ""
+                            CategoryItem(name, cover)
+                        }
+                    }.collectLatest { data ->
+                        adapter.submitList(data)
+                        updateEmptyState(data.isEmpty())
+                    }
+                }
+                "artist" -> {
+                    repository.getAllArtists().combine(repository.getAllArtistsWithCover()) { allArtists, covers ->
+                        val coverMap = covers.associateBy { it.name }
+                        allArtists.map { name ->
+                            CategoryItem(name, coverMap[name]?.coverPath ?: "")
+                        }
+                    }.collectLatest { data ->
+                        adapter.submitList(data)
+                        updateEmptyState(data.isEmpty())
+                    }
+                }
+                "genre" -> {
+                    repository.getAllGenres().collectLatest { items ->
+                        val data = items.filter { it.isNotBlank() }.map { CategoryItem(it) }
+                        adapter.submitList(data)
+                        updateEmptyState(data.isEmpty())
+                    }
+                }
+                else -> {
+                    repository.getAllAlbums().collectLatest { items ->
+                        val data = items.map { CategoryItem(it) }
+                        adapter.submitList(data)
+                        updateEmptyState(data.isEmpty())
+                    }
                 }
             }
+        }
+    }
+
+    private fun updateEmptyState(isEmpty: Boolean) {
+        if (isEmpty) {
+            binding.rvCategories.visibility = View.GONE
+            binding.tvEmpty.visibility = View.VISIBLE
+        } else {
+            binding.rvCategories.visibility = View.VISIBLE
+            binding.tvEmpty.visibility = View.GONE
         }
     }
 
@@ -175,14 +228,61 @@ class CategoryListFragment : Fragment() {
         }
     }
 
+    private fun showAlbumCoverDialog(albumName: String) {
+        coverDialogJob?.cancel()
+        coverDialogJob = lifecycleScope.launch {
+            repository.getSongsByAlbum(albumName).collectLatest { songsList ->
+                if (songsList.isEmpty()) return@collectLatest
+
+                val dialogItems = songsList.map { song ->
+                    if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
+                        "${song.title} ★"
+                    } else if (song.filePath.isNotBlank() && File(song.filePath).exists()) {
+                        "${song.title} ◆"
+                    } else {
+                        song.title
+                    }
+                }.toTypedArray()
+
+                val songArray = songsList.toTypedArray()
+
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(albumName)
+                    .setItems(dialogItems) { _, which ->
+                        val selectedSong = songArray[which]
+                        val coverPath = if (selectedSong.thumbnailUrl.isNotBlank() && File(selectedSong.thumbnailUrl).exists()) {
+                            selectedSong.thumbnailUrl
+                        } else if (selectedSong.filePath.isNotBlank() && File(selectedSong.filePath).exists()) {
+                            selectedSong.filePath
+                        } else {
+                            ""
+                        }
+                        if (coverPath.isNotBlank()) {
+                            repository.setAlbumCoverOverride(albumName, coverPath)
+                            loadCategories()
+                        }
+                    }
+                    .setNeutralButton("Quitar carátula") { _, _ ->
+                        repository.setAlbumCoverOverride(albumName, "")
+                        loadCategories()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
+        }
+    }
+
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
     }
 }
 
-class CategoryAdapter(private val onItemClick: (String) -> Unit) :
-    ListAdapter<String, CategoryAdapter.ViewHolder>(CategoryDiffCallback()) {
+class CategoryAdapter(
+    private val onItemClick: (String) -> Unit,
+    private val onItemLongClick: ((CategoryItem) -> Unit)? = null,
+    private val defaultIconRes: Int = R.drawable.ic_album
+) : ListAdapter<CategoryItem, CategoryAdapter.ViewHolder>(CategoryDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -192,17 +292,55 @@ class CategoryAdapter(private val onItemClick: (String) -> Unit) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        holder.name.text = if (item.isBlank()) holder.itemView.context.getString(R.string.unknown_artist) else item
-        holder.itemView.setOnClickListener { onItemClick(item) }
+        val ctx = holder.itemView.context
+        holder.name.text = if (item.name.isBlank()) ctx.getString(R.string.unknown_artist) else item.name
+        holder.count.visibility = View.GONE
+
+        val cover = holder.cover
+        if (item.coverPath.isNotBlank() && File(item.coverPath).exists()) {
+            cover.visibility = View.VISIBLE
+            cover.tag = null
+            if (isImageExtension(item.coverPath)) {
+                cover.load(File(item.coverPath)) {
+                    crossfade(true)
+                    placeholder(defaultIconRes)
+                    error(defaultIconRes)
+                }
+            } else {
+                ArtworkLoader.loadArtFromAudioFile(cover, item.coverPath)
+            }
+        } else if (item.coverPath.isNotBlank() && item.coverPath.contains("/")) {
+            cover.visibility = View.VISIBLE
+            cover.tag = item.coverPath
+            ArtworkLoader.loadArtFromAudioFile(cover, item.coverPath)
+        } else {
+            cover.visibility = View.VISIBLE
+            cover.tag = null
+            cover.setImageResource(defaultIconRes)
+        }
+
+        holder.itemView.setOnClickListener { onItemClick(item.name) }
+        holder.itemView.setOnLongClickListener {
+            onItemLongClick?.invoke(item)
+            true
+        }
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.tv_name)
         val count: TextView = view.findViewById(R.id.tv_count)
+        val cover: ImageView = view.findViewById(R.id.iv_category_cover)
     }
 
-    class CategoryDiffCallback : DiffUtil.ItemCallback<String>() {
-        override fun areItemsTheSame(old: String, new: String): Boolean = old == new
-        override fun areContentsTheSame(old: String, new: String): Boolean = old == new
+    class CategoryDiffCallback : DiffUtil.ItemCallback<CategoryItem>() {
+        override fun areItemsTheSame(old: CategoryItem, new: CategoryItem): Boolean = old.name == new.name
+        override fun areContentsTheSame(old: CategoryItem, new: CategoryItem): Boolean = old == new
+    }
+
+    private fun isImageExtension(path: String): Boolean {
+        val lower = path.lowercase()
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                lower.endsWith(".png") || lower.endsWith(".webp") ||
+                lower.endsWith(".bmp") || lower.endsWith(".gif")
     }
 }

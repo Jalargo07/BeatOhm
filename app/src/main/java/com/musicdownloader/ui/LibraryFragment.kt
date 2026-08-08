@@ -210,7 +210,6 @@ class LibraryFragment : Fragment() {
             "artists" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "artist"))
             "genres" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "genre"))
             "albums" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "album"))
-            "years" -> navController.navigate(R.id.categoryListFragment, bundleOf("category" to "year"))
             "playlists" -> navController.navigate(R.id.playlistsFragment)
             "favorites" -> navController.navigate(R.id.favoritesFragment)
             "most_played" -> navController.navigate(R.id.mostPlayedFragment)
@@ -341,7 +340,6 @@ class LibraryFragment : Fragment() {
             LibraryCategory("artists", R.string.by_artist, R.drawable.ic_mic),
             LibraryCategory("genres", R.string.by_genre, R.drawable.ic_genres),
             LibraryCategory("albums", R.string.albums, R.drawable.ic_album),
-            LibraryCategory("years", R.string.by_year, R.drawable.ic_calendar),
             LibraryCategory("playlists", R.string.playlists_menu, R.drawable.ic_playlist),
             LibraryCategory("favorites", R.string.favorites, R.drawable.ic_favorite),
             LibraryCategory("most_played", R.string.most_played, R.drawable.ic_trending_up),
