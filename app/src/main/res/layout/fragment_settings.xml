@@ -43,6 +43,59 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- ═══════════════ SECCIÓN: IDIOMA ═══════════════ -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/settings_section_language"
+            android:textColor="@color/on_surface"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/outline"
+            app:strokeWidth="1dp">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chip_group_language"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="12dp"
+                app:singleSelection="true"
+                app:selectionRequired="true">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_lang_es"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Español" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_lang_en"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="English" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_lang_pt"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Português" />
+
+            </com.google.android.material.chip.ChipGroup>
+
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- ═══════════════ SECCIÓN: APARIENCIA ═══════════════ -->
         <TextView
             android:layout_width="match_parent"

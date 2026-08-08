@@ -21,9 +21,13 @@ import coil.load
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.AppDatabase
+import com.musicdownloader.data.PlaylistSong
 import com.musicdownloader.databinding.FragmentSongListBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +59,15 @@ class SongListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         repository = MusicRepository(requireContext())
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
+
+        repository.regenProgress.observe(viewLifecycleOwner) { progress ->
+            if (progress != null) {
+                binding.llProgress.visibility = View.VISIBLE
+                binding.tvProgress.text = "Regenerando ${progress.first}/${progress.second}..."
+            } else {
+                binding.llProgress.visibility = View.GONE
+            }
+        }
 
         adapter = SongItemAdapter(
             onItemClick = { song ->
@@ -89,6 +102,39 @@ class SongListFragment : Fragment() {
 
         binding.rvSongs.layoutManager = LinearLayoutManager(requireContext())
         binding.rvSongs.adapter = adapter
+
+        adapter.onSelectionChanged = { count ->
+            if (adapter.isMultiSelectMode && count > 0) {
+                binding.llMultiSelectBar.visibility = View.VISIBLE
+                binding.tvSelectedCount.text = "$count seleccionada${if (count > 1) "s" else ""}"
+            } else {
+                binding.llMultiSelectBar.visibility = View.GONE
+            }
+        }
+
+        binding.btnCloseMultiSelect.setOnClickListener {
+            adapter.deselectAll()
+        }
+
+        binding.btnSelectAll.setOnClickListener {
+            if (adapter.getSelectedSongs().size == adapter.currentList.size) {
+                adapter.deselectAll()
+            } else {
+                adapter.selectAll()
+            }
+        }
+
+        binding.btnAddToPlaylist.setOnClickListener {
+            val selected = adapter.getSelectedSongs()
+            if (selected.isEmpty()) return@setOnClickListener
+            showAddToPlaylistDialog(selected)
+        }
+
+        binding.btnRegenerateMetadata.setOnClickListener {
+            val selected = adapter.getSelectedSongs()
+            if (selected.isEmpty()) return@setOnClickListener
+            regenerateMetadata(selected)
+        }
 
         if (folderPath.isNotBlank()) {
             binding.spinnerSort.visibility = View.GONE
@@ -190,6 +236,71 @@ class SongListFragment : Fragment() {
         }
     }
 
+    private fun showAddToPlaylistDialog(songs: List<LocalSong>) {
+        val db = AppDatabase.getInstance(requireContext())
+        lifecycleScope.launch {
+            val list = withContext(Dispatchers.IO) { db.playlistDao().getAllPlaylists().first() }
+            if (list.isEmpty()) {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Sin playlists")
+                    .setMessage("Crea una playlist primero desde la pestaña Playlists.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@launch
+            }
+            val names = list.map { it.name }.toTypedArray()
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Agregar ${songs.size} cancione${if (songs.size > 1) "s" else ""} a playlist")
+                .setItems(names) { _, which ->
+                    val playlist = list[which]
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            for (song in songs) {
+                                db.playlistDao().addSongToPlaylist(
+                                    PlaylistSong(playlist.id, song.filePath, 0)
+                                )
+                            }
+                        }
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "${songs.size} cancione${if (songs.size > 1) "s" else ""} agregada${if (songs.size > 1) "s" else ""} a '${playlist.name}'",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        adapter.deselectAll()
+                    }
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
+    }
+
+    private fun regenerateMetadata(songs: List<LocalSong>) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Regenerar metadata")
+            .setMessage("Re-buscar metadata, artwork y letras de ${songs.size} cancione${if (songs.size > 1) "s" else ""}?")
+            .setPositiveButton("Regenerar") { _, _ ->
+                adapter.deselectAll()
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        repository.startRegenProgress(songs.size)
+                        for ((index, song) in songs.withIndex()) {
+                            repository.updateRegenProgress(index + 1, songs.size)
+                            repository.resetWaveform(song)
+                            repository.enrichSong(song, skipTagWrite = true, fetchLyrics = true)
+                        }
+                        repository.finishRegenProgress()
+                    }
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Metadata regenerada (${songs.size}/${songs.size})",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     override fun onDestroyView() {
         collectJob?.cancel()
         _binding = null
@@ -213,6 +324,11 @@ class SongItemAdapter(
     private val onItemClick: (LocalSong) -> Unit,
     private val onLongClick: ((LocalSong) -> Unit)? = null
 ) : ListAdapter<LocalSong, SongItemAdapter.ViewHolder>(SongDiffCallback()) {
+
+    private val selectedIds = mutableSetOf<String>()
+    var isMultiSelectMode = false
+        private set
+    var onSelectionChanged: ((count: Int) -> Unit)? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -241,17 +357,69 @@ class SongItemAdapter(
             holder.thumbnail.setImageResource(playerRes)
         }
 
-        holder.itemView.setOnClickListener { onItemClick(song) }
+        holder.checkBox.setOnCheckedChangeListener(null)
+        holder.checkBox.visibility = if (isMultiSelectMode) View.VISIBLE else View.GONE
+        holder.checkBox.isChecked = selectedIds.contains(song.id)
+        holder.checkBox.setOnCheckedChangeListener { _, _ ->
+            toggleSelection(song)
+        }
+
+        holder.itemView.setOnClickListener {
+            if (isMultiSelectMode) {
+                toggleSelection(song)
+            } else {
+                onItemClick(song)
+            }
+        }
         holder.itemView.setOnLongClickListener {
-            onLongClick?.invoke(song)
+            if (!isMultiSelectMode) {
+                isMultiSelectMode = true
+                selectedIds.add(song.id)
+                notifyDataSetChanged()
+                onSelectionChanged?.invoke(selectedIds.size)
+            } else {
+                onLongClick?.invoke(song)
+            }
             true
         }
+    }
+
+    private fun toggleSelection(song: LocalSong) {
+        if (selectedIds.contains(song.id)) {
+            selectedIds.remove(song.id)
+        } else {
+            selectedIds.add(song.id)
+        }
+        if (selectedIds.isEmpty()) {
+            isMultiSelectMode = false
+        }
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke(selectedIds.size)
+    }
+
+    fun selectAll() {
+        selectedIds.clear()
+        selectedIds.addAll(currentList.map { it.id })
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke(selectedIds.size)
+    }
+
+    fun deselectAll() {
+        selectedIds.clear()
+        isMultiSelectMode = false
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke(0)
+    }
+
+    fun getSelectedSongs(): List<LocalSong> {
+        return currentList.filter { selectedIds.contains(it.id) }
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val thumbnail: ImageView = view.findViewById(R.id.iv_thumbnail)
         val title: TextView = view.findViewById(R.id.tv_title)
         val artist: TextView = view.findViewById(R.id.tv_artist)
+        val checkBox: android.widget.CheckBox = view.findViewById(R.id.cb_select)
     }
 
     class SongDiffCallback : DiffUtil.ItemCallback<LocalSong>() {

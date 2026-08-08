@@ -42,7 +42,7 @@ class WaveformSeekBar @JvmOverloads constructor(
     private var flingVelocity = 0f
 
     private val density = resources.displayMetrics.density
-    private val barWidth = 4f * density
+    private val barWidth = 12f * density
     private val barSpacing = 2f * density
     private val minBarHeight = 4f * density
     private val cornerRadius = 1.2f * density
@@ -199,7 +199,7 @@ class WaveformSeekBar @JvmOverloads constructor(
         val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = primaryColor
             strokeWidth = 2f * density
-            alpha = 180
+            alpha = 0
         }
         canvas.drawLine(cursorX, 0f, cursorX, height.toFloat(), cursorPaint)
     }

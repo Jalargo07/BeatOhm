@@ -18,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -33,6 +35,9 @@ class MusicRepository(private val context: Context) {
     private val dao = AppDatabase.getInstance(context).songDao()
     private val metadataFetcher = MetadataFetcher()
     private val lyricsFetcher = LyricsFetcher()
+
+    private val _regenProgress = MutableLiveData<Pair<Int, Int>?>()
+    val regenProgress: LiveData<Pair<Int, Int>?> = _regenProgress
 
     suspend fun getAllSongsNow(): List<LocalSong> = dao.getAllSongsNow()
 
@@ -84,6 +89,18 @@ class MusicRepository(private val context: Context) {
         val json = Gson().toJson(data.toList())
         dao.updateWaveform(song.id, json)
         Log.d("MusicRepository", "resetWaveform: saved ${data.size} bars to DB")
+    }
+
+    fun startRegenProgress(total: Int) {
+        _regenProgress.postValue(0 to total)
+    }
+
+    fun updateRegenProgress(done: Int, total: Int) {
+        _regenProgress.postValue(done to total)
+    }
+
+    fun finishRegenProgress() {
+        _regenProgress.postValue(null)
     }
 
     fun getLibraryFolders(): List<String> {

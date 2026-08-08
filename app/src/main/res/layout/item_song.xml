@@ -19,6 +19,14 @@
         android:orientation="horizontal"
         android:padding="10dp">
 
+        <CheckBox
+            android:id="@+id/cb_select"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:buttonTint="@color/primary"
+            android:visibility="gone" />
+
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/iv_thumbnail"
             android:layout_width="@dimen/thumbnail_song"

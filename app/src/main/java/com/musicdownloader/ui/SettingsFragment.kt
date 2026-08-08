@@ -22,6 +22,8 @@ import com.musicdownloader.databinding.FragmentSettingsBinding
 import com.musicdownloader.model.PatternToken
 import com.musicdownloader.model.Song
 import com.musicdownloader.ui.player.PlayerLayoutManager
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.musicdownloader.util.FolderPatternParser
 
 class SettingsFragment : Fragment() {
@@ -78,6 +80,7 @@ class SettingsFragment : Fragment() {
         }
 
         setupAppearance()
+        setupLanguageChips()
     }
 
     private fun setupAppearance() {
@@ -176,6 +179,27 @@ class SettingsFragment : Fragment() {
                 else -> 0
             }
             ThemeManager.playerGradient = gradient
+        }
+    }
+
+    private fun setupLanguageChips() {
+        val current = AppCompatDelegate.getApplicationLocales()
+        val currentLang = if (current.isEmpty) "es" else current[0]?.language ?: "es"
+        when (currentLang) {
+            "en" -> binding.chipLangEn.isChecked = true
+            "pt" -> binding.chipLangPt.isChecked = true
+            else -> binding.chipLangEs.isChecked = true
+        }
+
+        binding.chipGroupLanguage.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val locale = when (checkedIds.first()) {
+                R.id.chip_lang_en -> "en"
+                R.id.chip_lang_pt -> "pt"
+                else -> "es"
+            }
+            val appLocales = LocaleListCompat.forLanguageTags(locale)
+            AppCompatDelegate.setApplicationLocales(appLocales)
         }
     }
 
