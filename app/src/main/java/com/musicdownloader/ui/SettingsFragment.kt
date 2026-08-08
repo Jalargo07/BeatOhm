@@ -299,9 +299,10 @@ class SettingsFragment : Fragment() {
         when (ThemeManager.currentIconPack) {
             "outline" -> chipGroupIcon.check(R.id.chip_icon_outline)
             "filled" -> chipGroupIcon.check(R.id.chip_icon_filled)
-            "minimal" -> chipGroupIcon.check(R.id.chip_icon_minimal)
-            "bold" -> chipGroupIcon.check(R.id.chip_icon_bold)
-            "neon" -> chipGroupIcon.check(R.id.chip_icon_neon)
+            "mainstage" -> chipGroupIcon.check(R.id.chip_icon_minimal)
+            "darknova" -> chipGroupIcon.check(R.id.chip_icon_bold)
+            "mononoki" -> chipGroupIcon.check(R.id.chip_icon_neon)
+            "boowop" -> chipGroupIcon.check(R.id.chip_icon_boowop)
             else -> chipGroupIcon.check(R.id.chip_icon_material)
         }
         chipGroupIcon.setOnCheckedStateChangeListener { _, checkedIds ->
@@ -309,9 +310,10 @@ class SettingsFragment : Fragment() {
             val packId = when (checkedIds.first()) {
                 R.id.chip_icon_outline -> "outline"
                 R.id.chip_icon_filled -> "filled"
-                R.id.chip_icon_minimal -> "minimal"
-                R.id.chip_icon_bold -> "bold"
-                R.id.chip_icon_neon -> "neon"
+                R.id.chip_icon_minimal -> "mainstage"
+                R.id.chip_icon_bold -> "darknova"
+                R.id.chip_icon_neon -> "mononoki"
+                R.id.chip_icon_boowop -> "boowop"
                 else -> "default"
             }
             val current = ThemeManager.activeTheme ?: return@setOnCheckedStateChangeListener

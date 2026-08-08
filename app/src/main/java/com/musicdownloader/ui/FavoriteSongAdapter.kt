@@ -29,6 +29,7 @@ class FavoriteSongAdapter(
         b.tvFavTitle.text = song.title
         b.tvFavArtist.text = song.artist.ifBlank { b.root.context.getString(R.string.unknown_artist) }
 
+        val icons = IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
             b.ivFavCover.tag = null
             b.ivFavCover.load(File(song.thumbnailUrl)) {
@@ -45,7 +46,8 @@ class FavoriteSongAdapter(
         }
 
         b.btnFavToggle.setImageResource(
-            if (song.isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite_border
+            if (song.isFavorite) icons[IconPackManager.ICON_HEART] ?: R.drawable.ic_favorite
+            else icons[IconPackManager.ICON_HEART_BORDER] ?: R.drawable.ic_favorite_border
         )
 
         b.root.setOnClickListener { onPlay(song) }

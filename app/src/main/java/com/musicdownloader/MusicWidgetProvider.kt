@@ -10,7 +10,9 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
+import com.musicdownloader.ui.IconPackManager
 import com.musicdownloader.ui.PlayerViewModel
+import com.musicdownloader.ui.ThemeManager
 
 class MusicWidgetProvider : AppWidgetProvider() {
 
@@ -78,7 +80,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
                     views.setTextViewText(R.id.widget_artist_small, artist)
 
                     // Play/Pause icons
-                    val icon = if (playing) R.drawable.ic_pause else R.drawable.ic_play
+                    val miniIcons = IconPackManager.getMiniPlayerIconResIds(ThemeManager.currentIconPack)
+                    val icon = if (playing) miniIcons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
+                    else miniIcons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
                     views.setImageViewResource(R.id.widget_play_pause, icon)
                     views.setImageViewResource(R.id.widget_play_pause_small, icon)
 
@@ -113,8 +117,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
                     views.setTextViewText(R.id.widget_artist, "—")
                     views.setTextViewText(R.id.widget_title_small, "Sin canción")
                     views.setTextViewText(R.id.widget_artist_small, "—")
-                    views.setImageViewResource(R.id.widget_play_pause, R.drawable.ic_play)
-                    views.setImageViewResource(R.id.widget_play_pause_small, R.drawable.ic_play)
+                    val miniIcons = IconPackManager.getMiniPlayerIconResIds(ThemeManager.currentIconPack)
+                    views.setImageViewResource(R.id.widget_play_pause, miniIcons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play)
+                    views.setImageViewResource(R.id.widget_play_pause_small, miniIcons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play)
                     views.setImageViewResource(R.id.widget_cover, R.drawable.ic_player)
                     views.setImageViewResource(R.id.widget_cover_small, R.drawable.ic_player)
                 }

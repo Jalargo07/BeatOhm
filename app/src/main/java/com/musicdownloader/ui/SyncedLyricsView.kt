@@ -73,6 +73,10 @@ class SyncedLyricsView @JvmOverloads constructor(
     private val maxTextWidthMargin = 16f * scaledDensity
     private val scrollTouchSlop = 8f * resources.displayMetrics.density
 
+    private var cumulativeHeights: FloatArray = floatArrayOf()
+    private var totalContentHeight = 0f
+    private var needsRecompute = false
+
     private val normalPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.on_surface)
         textSize = 18f * scaledDensity
@@ -86,6 +90,45 @@ class SyncedLyricsView @JvmOverloads constructor(
         setShadowLayer(32f, 0f, 0f, 0xCCFFFFFF.toInt())
     }
 
+    private fun precomputeHeights(maxWidth: Int) {
+        val texts: List<String> = when {
+            isSynced && lines.isNotEmpty() -> lines.map { it.text }
+            !isSynced && plainText.isNotBlank() -> plainText.lines().map { it.trim() }
+            else -> {
+                cumulativeHeights = floatArrayOf()
+                totalContentHeight = 0f
+                return
+            }
+        }
+        if (maxWidth <= 0) {
+            cumulativeHeights = floatArrayOf()
+            totalContentHeight = 0f
+            return
+        }
+        val refLayout = StaticLayout.Builder.obtain(
+            "A", 0, 1, normalPaint, maxWidth
+        )
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setLineSpacing(0f, 1f)
+            .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+            .build()
+        val gap = (lineSpacing - refLayout.height.toFloat()).coerceAtLeast(0f)
+        cumulativeHeights = FloatArray(texts.size)
+        var accumulated = 0f
+        for (i in texts.indices) {
+            val layout = StaticLayout.Builder.obtain(
+                texts[i], 0, texts[i].length, normalPaint, maxWidth
+            )
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setLineSpacing(0f, 1f)
+                .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+                .build()
+            cumulativeHeights[i] = accumulated
+            accumulated += layout.height + gap
+        }
+        totalContentHeight = if (texts.isNotEmpty()) accumulated - gap else 0f
+    }
+
     fun setLyrics(lrcText: String) {
         lines = LrcParser.parse(lrcText)
         isSynced = lines.isNotEmpty()
@@ -95,7 +138,23 @@ class SyncedLyricsView @JvmOverloads constructor(
         currentIndex = -1
         scrollOffset = 0f
         targetScrollOffset = 0f
+        if (width > 0) {
+            val maxTextWidth = width - paddingLeft - paddingRight - maxTextWidthMargin
+            precomputeHeights(maxTextWidth.toInt())
+        } else {
+            needsRecompute = true
+        }
         invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && (needsRecompute || w != oldw)) {
+            needsRecompute = false
+            val maxTextWidth = w - paddingLeft - paddingRight - maxTextWidthMargin
+            precomputeHeights(maxTextWidth.toInt())
+            invalidate()
+        }
     }
 
     fun updatePosition(positionMs: Long) {
@@ -108,7 +167,7 @@ class SyncedLyricsView @JvmOverloads constructor(
             invalidate()
             // Auto-scroll only if enabled
             if (autoScrollEnabled) {
-                targetScrollOffset = currentIndex * lineSpacing
+                targetScrollOffset = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
                 Log.d("LyricsScroll", "  → AUTO-SCROLL to target=$targetScrollOffset")
                 animateScroll()
             } else {
@@ -149,11 +208,21 @@ class SyncedLyricsView @JvmOverloads constructor(
     private fun getLineAtY(y: Float): Int {
         if (!isSynced || lines.isEmpty()) return -1
         val firstLineY = height / 2f - scrollOffset
+        val localY = y - firstLineY
+        if (cumulativeHeights.isNotEmpty()) {
+            for (i in cumulativeHeights.size - 1 downTo 0) {
+                if (localY >= cumulativeHeights[i]) return i
+            }
+            return 0
+        }
         val index = ((y - firstLineY) / lineSpacing).toInt()
         return if (index in lines.indices) index else -1
     }
 
     private fun getMaxScroll(): Float {
+        if (cumulativeHeights.isNotEmpty()) {
+            return cumulativeHeights.last().coerceAtLeast(0f)
+        }
         return ((lines.size - 1) * lineSpacing).coerceAtLeast(0f)
     }
 
@@ -207,11 +276,12 @@ class SyncedLyricsView @JvmOverloads constructor(
         val zoneTop = height / 2f - autoScrollZone / 2f
         val zoneBottom = height / 2f + autoScrollZone / 2f
         val inZone = currentLineScreenPos in zoneTop..zoneBottom
-        Log.d("LyricsScroll", "CHECK AUTO-SCROLL: currentIndex=$currentIndex, scrollOffset=$scrollOffset, target=${currentIndex * lineSpacing}, inZone=$inZone")
+        val target = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
+        Log.d("LyricsScroll", "CHECK AUTO-SCROLL: currentIndex=$currentIndex, scrollOffset=$scrollOffset, target=$target, inZone=$inZone")
         if (inZone) {
             // Re-enable auto-scroll and snap to current line
             autoScrollEnabled = true
-            targetScrollOffset = currentIndex * lineSpacing
+            targetScrollOffset = target
             Log.d("LyricsScroll", "  → REACTIVATING auto-scroll to target=$targetScrollOffset")
             animateScroll()
         } else {
@@ -342,8 +412,9 @@ class SyncedLyricsView @JvmOverloads constructor(
         val firstLineY = centerY - scrollOffset
 
         for (i in lines.indices) {
-            val y = firstLineY + i * lineSpacing
-            if (y < -lineSpacing || y > height + lineSpacing) continue
+            val y = firstLineY + cumulativeHeights.getOrElse(i) { i * lineSpacing }
+            val blockBottom = firstLineY + cumulativeHeights.getOrElse(i + 1) { (i + 1) * lineSpacing }
+            if (blockBottom < 0 || y > height) continue
 
             if (i == currentIndex) {
                 drawCenteredText(canvas, lines[i].text, centerX, y, highlightPaint, maxTextWidth)
@@ -355,16 +426,13 @@ class SyncedLyricsView @JvmOverloads constructor(
 
     private fun drawPlainText(canvas: Canvas, centerX: Float, centerY: Float, maxTextWidth: Float) {
         val allLines = plainText.lines()
-        val totalHeight = allLines.size * lineSpacing
         normalPaint.alpha = 170
-        var y = centerY - totalHeight / 2f + lineSpacing
-        for (line in allLines) {
-            if (y < -lineSpacing || y > height + lineSpacing) {
-                y += lineSpacing
-                continue
-            }
-            drawCenteredText(canvas, line.trim(), centerX, y, normalPaint, maxTextWidth)
-            y += lineSpacing
+        val startY = centerY - totalContentHeight / 2f
+        for (i in allLines.indices) {
+            val y = startY + cumulativeHeights.getOrElse(i) { i * lineSpacing }
+            val blockBottom = startY + cumulativeHeights.getOrElse(i + 1) { (i + 1) * lineSpacing }
+            if (blockBottom < 0 || y > height) continue
+            drawCenteredText(canvas, allLines[i].trim(), centerX, y, normalPaint, maxTextWidth)
         }
     }
 

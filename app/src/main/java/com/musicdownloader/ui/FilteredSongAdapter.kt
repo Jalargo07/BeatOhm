@@ -29,19 +29,20 @@ class FilteredSongAdapter(
         holder.title.text = song.title
         holder.artist.text = song.artist.ifBlank { holder.itemView.context.getString(R.string.unknown_artist) }
 
+        val playerRes = IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)[IconPackManager.ICON_PLAYER] ?: R.drawable.ic_player
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
             holder.thumbnail.tag = null
             holder.thumbnail.load(File(song.thumbnailUrl)) {
                 crossfade(true)
-                placeholder(R.drawable.ic_player)
-                error(R.drawable.ic_player)
+                placeholder(playerRes)
+                error(playerRes)
             }
         } else if (song.filePath.isNotBlank() && File(song.filePath).exists()) {
             holder.thumbnail.tag = song.filePath
             ArtworkLoader.loadArtFromAudioFile(holder.thumbnail, song.filePath)
         } else {
             holder.thumbnail.tag = null
-            holder.thumbnail.setImageResource(R.drawable.ic_player)
+            holder.thumbnail.setImageResource(playerRes)
         }
 
         holder.itemView.setOnClickListener { onItemClick(song) }

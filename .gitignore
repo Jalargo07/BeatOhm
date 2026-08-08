@@ -28,13 +28,16 @@ PROJECT_INDEX.json
 skills-lock.json
 $null
 
-# Development plans (not part of the app)
+# Development plans & docs (not part of the app)
 PLAN*.md
 REVIEW*.md
 MANUAL_*.md
 PLAYER_REDESIGN_PLAN.md
 UI_UX_SPRINT_PLAN.md
 docs/
+tasks/
+Guia.md
+design-system/
 
 # OS
 .DS_Store

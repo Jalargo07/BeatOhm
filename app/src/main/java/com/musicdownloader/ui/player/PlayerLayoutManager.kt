@@ -1,16 +1,13 @@
 package com.musicdownloader.ui.player
 
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
 import android.graphics.Outline
-import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.animation.OvershootInterpolator
-import androidx.cardview.widget.CardView
+import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.constraintlayout.widget.ConstraintSet
 import com.musicdownloader.R
 import com.musicdownloader.ui.ThemeManager
 
@@ -21,7 +18,22 @@ import com.musicdownloader.ui.ThemeManager
  */
 object PlayerLayoutManager {
 
+    private const val BASE_SIZE_DP = 280
+
     var currentStyle: String = ThemeManager.currentPlayerLayout
+        set(value) {
+            field = value
+            currentScaleFactor = when (value) {
+                "compact" -> 180f / BASE_SIZE_DP
+                "vinyl" -> 240f / BASE_SIZE_DP
+                else -> 260f / BASE_SIZE_DP
+            }
+        }
+
+    var currentScaleFactor = 1f
+        private set
+
+    private var vinylRecordView: VinylRecordView? = null
 
     /**
      * Apply the current theme's player style to the player layout.
@@ -36,20 +48,14 @@ object PlayerLayoutManager {
         }
     }
 
-    /**
-     * Classic style: Default centered layout with large album art
-     */
     private fun applyClassicStyle(root: ConstraintLayout) {
-        // Cover: 260dp, rounded corners
+        currentScaleFactor = 260f / BASE_SIZE_DP
+        removeVinylView(root)
+
         root.findViewById<View>(R.id.cover_container)?.let { cover ->
-            cover.scaleX = 1f
-            cover.scaleY = 1f
+            cover.scaleX = currentScaleFactor
+            cover.scaleY = currentScaleFactor
             cover.rotation = 0f
-            val params = cover.layoutParams as ConstraintLayout.LayoutParams
-            params.width = dpToPx(260)
-            params.height = dpToPx(260)
-            params.topMargin = dpToPx(32)
-            cover.layoutParams = params
             cover.outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
                     outline.setRoundRect(0, 0, view.width, view.height, dpToPx(24).toFloat())
@@ -58,8 +64,8 @@ object PlayerLayoutManager {
             cover.clipToOutline = true
         }
 
-        // Cover image: rounded
         root.findViewById<View>(R.id.iv_cover)?.let { iv ->
+            iv.visibility = View.VISIBLE
             iv.scaleX = 1f
             iv.scaleY = 1f
             iv.rotation = 0f
@@ -71,34 +77,26 @@ object PlayerLayoutManager {
             iv.clipToOutline = true
         }
 
-        // Glow: visible, blurred
         root.findViewById<View>(R.id.iv_glow)?.let { glow ->
             glow.alpha = 0.6f
             glow.scaleX = 1f
             glow.scaleY = 1f
         }
 
-        // Controls container
         root.findViewById<View>(R.id.controls_container)?.let { controls ->
             controls.scaleX = 1f
             controls.scaleY = 1f
         }
     }
 
-    /**
-     * Compact style: Smaller cover art, tighter spacing, more compact controls
-     */
     private fun applyCompactStyle(root: ConstraintLayout) {
-        // Cover: 180dp, more rounded
+        currentScaleFactor = 180f / BASE_SIZE_DP
+        removeVinylView(root)
+
         root.findViewById<View>(R.id.cover_container)?.let { cover ->
-            cover.scaleX = 1f
-            cover.scaleY = 1f
+            cover.scaleX = currentScaleFactor
+            cover.scaleY = currentScaleFactor
             cover.rotation = 0f
-            val params = cover.layoutParams as ConstraintLayout.LayoutParams
-            params.width = dpToPx(180)
-            params.height = dpToPx(180)
-            params.topMargin = dpToPx(16)
-            cover.layoutParams = params
             cover.outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
                     outline.setRoundRect(0, 0, view.width, view.height, dpToPx(16).toFloat())
@@ -107,8 +105,8 @@ object PlayerLayoutManager {
             cover.clipToOutline = true
         }
 
-        // Cover image: rounded
         root.findViewById<View>(R.id.iv_cover)?.let { iv ->
+            iv.visibility = View.VISIBLE
             iv.scaleX = 1f
             iv.scaleY = 1f
             iv.rotation = 0f
@@ -120,34 +118,25 @@ object PlayerLayoutManager {
             iv.clipToOutline = true
         }
 
-        // Glow: subtle
         root.findViewById<View>(R.id.iv_glow)?.let { glow ->
             glow.alpha = 0.35f
             glow.scaleX = 0.8f
             glow.scaleY = 0.8f
         }
 
-        // Controls: slightly smaller
         root.findViewById<View>(R.id.controls_container)?.let { controls ->
             controls.scaleX = 0.9f
             controls.scaleY = 0.9f
         }
     }
 
-    /**
-     * Vinyl style: Circular cover art (like a vinyl record), with rotation animation
-     */
     private fun applyVinylStyle(root: ConstraintLayout) {
-        // Cover: 240dp, fully circular
-        root.findViewById<View>(R.id.cover_container)?.let { cover ->
-            cover.scaleX = 1f
-            cover.scaleY = 1f
+        currentScaleFactor = 240f / BASE_SIZE_DP
+
+        root.findViewById<FrameLayout>(R.id.cover_container)?.let { cover ->
+            cover.scaleX = currentScaleFactor
+            cover.scaleY = currentScaleFactor
             cover.rotation = 0f
-            val params = cover.layoutParams as ConstraintLayout.LayoutParams
-            params.width = dpToPx(240)
-            params.height = dpToPx(240)
-            params.topMargin = dpToPx(40)
-            cover.layoutParams = params
             cover.outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
                     val size = minOf(view.width, view.height)
@@ -155,30 +144,29 @@ object PlayerLayoutManager {
                 }
             }
             cover.clipToOutline = true
-        }
 
-        // Cover image: fully circular
-        root.findViewById<View>(R.id.iv_cover)?.let { iv ->
-            iv.scaleX = 1f
-            iv.scaleY = 1f
-            iv.rotation = 0f
-            iv.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    val size = minOf(view.width, view.height)
-                    outline.setOval(0, 0, size, size)
+            if (vinylRecordView == null) {
+                val vinyl = VinylRecordView(root.context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
                 }
+                cover.addView(vinyl)
+                vinylRecordView = vinyl
             }
-            iv.clipToOutline = true
         }
 
-        // Glow: ring effect
+        root.findViewById<ImageView>(R.id.iv_cover)?.let { iv ->
+            iv.visibility = View.GONE
+        }
+
         root.findViewById<View>(R.id.iv_glow)?.let { glow ->
             glow.alpha = 0.5f
             glow.scaleX = 1.1f
             glow.scaleY = 1.1f
         }
 
-        // Controls
         root.findViewById<View>(R.id.controls_container)?.let { controls ->
             controls.scaleX = 1f
             controls.scaleY = 1f
@@ -190,22 +178,12 @@ object PlayerLayoutManager {
      */
     fun startVinylRotation(view: View) {
         if (currentStyle != "vinyl") return
-        val cover = view.findViewById<View>(R.id.cover_container) ?: return
-        ObjectAnimator.ofFloat(cover, "rotation", 0f, 360f).apply {
-            duration = 8000
-            repeatCount = ObjectAnimator.INFINITE
-            interpolator = OvershootInterpolator(0f)
-            start()
-        }
+        vinylRecordView?.setPlaying(true)
     }
 
-    /**
-     * Stop vinyl rotation animation.
-     */
     fun stopVinylRotation(view: View) {
         if (currentStyle != "vinyl") return
-        val cover = view.findViewById<View>(R.id.cover_container) ?: return
-        cover.animate().cancel()
+        vinylRecordView?.setPlaying(false)
     }
 
     /**
@@ -214,12 +192,12 @@ object PlayerLayoutManager {
     fun animateSongChange(root: ConstraintLayout) {
         val cover = root.findViewById<View>(R.id.cover_container) ?: return
         cover.alpha = 0f
-        cover.scaleX = 0.8f
-        cover.scaleY = 0.8f
+        cover.scaleX = currentScaleFactor * 0.8f
+        cover.scaleY = currentScaleFactor * 0.8f
         cover.animate()
             .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
+            .scaleX(currentScaleFactor)
+            .scaleY(currentScaleFactor)
             .setDuration(350)
             .setInterpolator(OvershootInterpolator(1.5f))
             .start()
@@ -261,6 +239,22 @@ object PlayerLayoutManager {
             .scaleY(1f)
             .setDuration(200)
             .start()
+    }
+
+    fun updateVinylArtwork(bitmap: android.graphics.Bitmap?) {
+        vinylRecordView?.setArtwork(bitmap)
+    }
+
+    fun removeVinylViewIfAny(root: ConstraintLayout) {
+        removeVinylView(root)
+    }
+
+    private fun removeVinylView(root: ConstraintLayout) {
+        vinylRecordView?.let { vinyl ->
+            vinyl.cleanup()
+            (vinyl.parent as? ViewGroup)?.removeView(vinyl)
+        }
+        vinylRecordView = null
     }
 
     private fun dpToPx(dp: Int): Int {

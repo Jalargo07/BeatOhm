@@ -362,21 +362,28 @@
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_minimal" />
+                        android:text="@string/settings_icon_pack_mainstage" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip_icon_bold"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_bold" />
+                        android:text="@string/settings_icon_pack_darknova" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip_icon_neon"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_neon" />
+                        android:text="@string/settings_icon_pack_mononoki" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_icon_boowop"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_icon_pack_boowop" />
 
                 </com.google.android.material.chip.ChipGroup>
 

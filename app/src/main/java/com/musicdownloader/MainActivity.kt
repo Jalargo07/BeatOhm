@@ -41,6 +41,7 @@ import com.musicdownloader.ui.ArtworkLoader
 import com.musicdownloader.ui.MainViewModel
 import com.musicdownloader.ui.PlayerViewModel
 import com.musicdownloader.ui.ThemeManager
+import com.musicdownloader.ui.IconPackManager
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -133,6 +134,8 @@ class MainActivity : AppCompatActivity() {
                 if (destination.id == R.id.playerFragment) View.GONE else View.VISIBLE
         }
 
+        applyBottomNavIcons()
+
         setupMiniPlayer()
 
         checkPermissions()
@@ -202,8 +205,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         playerViewModel.isPlaying.observe(this) { playing ->
+            val miniIcons = IconPackManager.getMiniPlayerIconResIds(ThemeManager.currentIconPack)
             findViewById<ImageButton>(R.id.btn_mini_play_pause).setImageResource(
-                if (playing) R.drawable.ic_pause else R.drawable.ic_play
+                if (playing) miniIcons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
+                else miniIcons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
             )
             if (playing) {
                 miniHandler.post(miniProgressUpdate)
@@ -320,5 +325,18 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         try { unbindService(serviceConnection) } catch (_: Exception) {}
         super.onDestroy()
+    }
+
+    private fun applyBottomNavIcons() {
+        val navIcons = IconPackManager.getBottomNavIconResIds(ThemeManager.currentIconPack)
+        binding.bottomNav.menu.findItem(R.id.playerFragment)?.setIcon(
+            navIcons[IconPackManager.ICON_PLAYER] ?: R.drawable.ic_player
+        )
+        binding.bottomNav.menu.findItem(R.id.libraryFragment)?.setIcon(
+            navIcons[IconPackManager.ICON_LIBRARY] ?: R.drawable.ic_library
+        )
+        binding.bottomNav.menu.findItem(R.id.downloadsFragment)?.setIcon(
+            navIcons[IconPackManager.ICON_DOWNLOADS] ?: R.drawable.ic_downloads
+        )
     }
 }

@@ -250,7 +250,32 @@ object ThemeManager {
         get() = activeTheme?.secondaryColor ?: primaryColor
 
     val currentIconPack: String
-        get() = activeTheme?.iconPackId ?: "default"
+        get() {
+            val raw = activeTheme?.iconPackId ?: "default"
+            return when (raw) {
+                "neon" -> {
+                    migrateIconPackId("mononoki")
+                    "mononoki"
+                }
+                "minimal" -> {
+                    migrateIconPackId("mainstage")
+                    "mainstage"
+                }
+                "bold" -> {
+                    migrateIconPackId("darknova")
+                    "darknova"
+                }
+                else -> raw
+            }
+        }
+
+    private fun migrateIconPackId(newId: String) {
+        val theme = activeTheme ?: return
+        if (theme.iconPackId == newId) return
+        val updated = theme.copy(iconPackId = newId)
+        activeTheme = updated
+        scope.launch { db?.themeDao()?.update(updated) }
+    }
 
     val currentPlayerLayout: String
         get() = activeTheme?.playerLayoutId ?: "classic"

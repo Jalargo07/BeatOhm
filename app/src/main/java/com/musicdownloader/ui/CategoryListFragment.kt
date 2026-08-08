@@ -106,9 +106,9 @@ class CategoryListFragment : Fragment() {
                 }
             },
             defaultIconRes = when (categoryType) {
-                "album" -> R.drawable.ic_album
-                "artist" -> R.drawable.ic_mic
-                else -> R.drawable.ic_album
+                "album" -> IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)[IconPackManager.ICON_ALBUM] ?: R.drawable.ic_album
+                "artist" -> IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)[IconPackManager.ICON_MIC] ?: R.drawable.ic_mic
+                else -> IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)[IconPackManager.ICON_ALBUM] ?: R.drawable.ic_album
             }
         )
 

@@ -160,7 +160,9 @@ class PlayerFragment : Fragment() {
             binding.timeRow.visibility = View.VISIBLE
             binding.controlsContainer.visibility = View.VISIBLE
             binding.bottomActions.visibility = View.VISIBLE
-            binding.ivCover.visibility = View.VISIBLE
+            if (PlayerLayoutManager.currentStyle != "vinyl") {
+                binding.ivCover.visibility = View.VISIBLE
+            }
             if (song != null) {
                 val path = song.filePath.ifBlank { song.youtubeUrl }
                 currentSongFilePath = path
@@ -360,10 +362,16 @@ class PlayerFragment : Fragment() {
                         val bmp = (result.drawable as? BitmapDrawable)?.bitmap
                             ?: if (_binding != null) (binding.ivCover.drawable as? BitmapDrawable)?.bitmap else null
                         applyPalette(bmp)
+                        if (PlayerLayoutManager.currentStyle == "vinyl") {
+                            PlayerLayoutManager.updateVinylArtwork(bmp)
+                        }
                     },
                     onError = { _, _ ->
                         if (_binding != null) binding.pbCover.visibility = View.GONE
                         applyPalette(null)
+                        if (PlayerLayoutManager.currentStyle == "vinyl") {
+                            PlayerLayoutManager.updateVinylArtwork(null)
+                        }
                     }
                 )
             }
@@ -374,11 +382,17 @@ class PlayerFragment : Fragment() {
             lifecycleScope.launch {
                 val bitmap = ArtworkLoader.loadBitmapFor(path)
                 if (_binding != null) applyPalette(bitmap)
+                if (_binding != null && PlayerLayoutManager.currentStyle == "vinyl") {
+                    PlayerLayoutManager.updateVinylArtwork(bitmap)
+                }
             }
         } else {
             binding.pbCover.visibility = View.GONE
             binding.ivCover.setImageResource(R.drawable.ic_player)
             applyPalette(null)
+            if (PlayerLayoutManager.currentStyle == "vinyl") {
+                PlayerLayoutManager.updateVinylArtwork(null)
+            }
         }
     }
 
@@ -475,11 +489,12 @@ class PlayerFragment : Fragment() {
 
     private fun animateCoverPlaying() {
         stopCoverBreathe()
-        binding.coverContainer.scaleX = 0.95f
-        binding.coverContainer.scaleY = 0.95f
+        val sf = PlayerLayoutManager.currentScaleFactor
+        binding.coverContainer.scaleX = sf * 0.95f
+        binding.coverContainer.scaleY = sf * 0.95f
         binding.coverContainer.animate()
-            .scaleX(1f)
-            .scaleY(1f)
+            .scaleX(sf)
+            .scaleY(sf)
             .setDuration(400)
             .setInterpolator(DecelerateInterpolator())
             .withEndAction {
@@ -489,7 +504,8 @@ class PlayerFragment : Fragment() {
     }
 
     private fun startCoverBreathe() {
-        val animator = ValueAnimator.ofFloat(0.98f, 1.0f).apply {
+        val sf = PlayerLayoutManager.currentScaleFactor
+        val animator = ValueAnimator.ofFloat(sf * 0.98f, sf).apply {
             duration = 1600L
             interpolator = AccelerateDecelerateInterpolator()
             repeatCount = ValueAnimator.INFINITE
@@ -508,8 +524,8 @@ class PlayerFragment : Fragment() {
         coverBreatheAnimator?.cancel()
         coverBreatheAnimator = null
         binding.coverContainer.animate().cancel()
-        binding.coverContainer.scaleX = 1f
-        binding.coverContainer.scaleY = 1f
+        binding.coverContainer.scaleX = PlayerLayoutManager.currentScaleFactor
+        binding.coverContainer.scaleY = PlayerLayoutManager.currentScaleFactor
     }
 
     private fun animatePlayPausePress() {
@@ -905,7 +921,9 @@ class PlayerFragment : Fragment() {
                     }
                     binding.coverContainer.visibility = View.VISIBLE
                     binding.ivGlow.visibility = View.VISIBLE
-                    binding.ivCover.visibility = View.VISIBLE
+                    if (PlayerLayoutManager.currentStyle != "vinyl") {
+                        binding.ivCover.visibility = View.VISIBLE
+                    }
                     binding.titleContainer.visibility = View.VISIBLE
                     binding.waveformSeekbar.visibility = View.VISIBLE
                     binding.timeRow.visibility = View.VISIBLE
@@ -986,6 +1004,8 @@ class PlayerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        PlayerLayoutManager.stopVinylRotation(binding.root)
+        PlayerLayoutManager.removeVinylViewIfAny(binding.root)
         stopCoverBreathe()
         cancelSwipeAnimations()
         updateRunnable?.let { binding.root.removeCallbacks(it) }

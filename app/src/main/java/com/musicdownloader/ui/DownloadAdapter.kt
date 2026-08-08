@@ -39,16 +39,17 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
             binding.tvSubtitle.text = song.artist.ifBlank { state.url }
             binding.tvMeta.text = metaText(state)
 
+            val musicNoteRes = IconPackManager.getDownloadIconResId(ThemeManager.currentIconPack)
             if (song.thumbnailUrl.isNotBlank()) {
                 binding.ivCover.load(song.thumbnailUrl) {
-                    placeholder(R.drawable.ic_music_note)
-                    error(R.drawable.ic_music_note)
+                    placeholder(musicNoteRes)
+                    error(musicNoteRes)
                 }
             } else if (state.filePath.isNotBlank() && File(state.filePath).exists()) {
                 binding.ivCover.tag = state.filePath
                 ArtworkLoader.loadArtFromAudioFile(binding.ivCover, state.filePath)
             } else {
-                binding.ivCover.setImageResource(R.drawable.ic_music_note)
+                binding.ivCover.setImageResource(musicNoteRes)
             }
 
             applyStatus(state)
