@@ -20,8 +20,8 @@
         <item name="android:colorBackground">@color/background</item>
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/background</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+        <item name="android:windowLightNavigationBar">?attr/isLightTheme</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="materialCardViewStyle">@style/Widget.Material3.CardView.Elevated</item>
         <item name="bottomNavigationStyle">@style/Widget.Material3.BottomNavigationView</item>
@@ -34,11 +34,110 @@
         <item name="titleTextColor">@color/on_surface</item>
     </style>
 
-    <!-- Sprint 7 UI/UX: indicador activo tipo cápsula (pill) en la bottom nav -->
     <style name="BottomNav.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/bottom_nav_active_indicator</item>
         <item name="android:width">48dp</item>
         <item name="android:height">32dp</item>
         <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+    </style>
+
+    <!-- Primary color overlays -->
+    <style name="OverlayPrimary0">
+        <item name="colorPrimary">#9D35FF</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#2D0F60</item>
+        <item name="colorOnPrimaryContainer">#F3E8FF</item>
+    </style>
+    <style name="OverlayPrimary1">
+        <item name="colorPrimary">#3D7BFF</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#002D6B</item>
+        <item name="colorOnPrimaryContainer">#D8E2FF</item>
+    </style>
+    <style name="OverlayPrimary2">
+        <item name="colorPrimary">#00C2A8</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#004D42</item>
+        <item name="colorOnPrimaryContainer">#C8FFF5</item>
+    </style>
+    <style name="OverlayPrimary3">
+        <item name="colorPrimary">#FF6B2C</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#5C2800</item>
+        <item name="colorOnPrimaryContainer">#FFDBCF</item>
+    </style>
+    <style name="OverlayPrimary4">
+        <item name="colorPrimary">#FF304F</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#6B0014</item>
+        <item name="colorOnPrimaryContainer">#FFDADF</item>
+    </style>
+    <style name="OverlayPrimary5">
+        <item name="colorPrimary">#12A150</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#004D25</item>
+        <item name="colorOnPrimaryContainer">#B8FFD4</item>
+    </style>
+    <style name="OverlayPrimary6">
+        <item name="colorPrimary">#E8A600</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#4D3800</item>
+        <item name="colorOnPrimaryContainer">#FFF0CC</item>
+    </style>
+    <style name="OverlayPrimary7">
+        <item name="colorPrimary">#8B5CF6</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#2D1070</item>
+        <item name="colorOnPrimaryContainer">#EDE4FF</item>
+    </style>
+
+    <!-- Accent color overlays -->
+    <style name="OverlayAccent0">
+        <item name="colorSecondary">#FF304F</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#6B0014</item>
+        <item name="colorOnSecondaryContainer">#FFDADF</item>
+    </style>
+    <style name="OverlayAccent1">
+        <item name="colorSecondary">#FF6B2C</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#5C2800</item>
+        <item name="colorOnSecondaryContainer">#FFDBCF</item>
+    </style>
+    <style name="OverlayAccent2">
+        <item name="colorSecondary">#3D7BFF</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#002D6B</item>
+        <item name="colorOnSecondaryContainer">#D8E2FF</item>
+    </style>
+    <style name="OverlayAccent3">
+        <item name="colorSecondary">#00C2A8</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#004D42</item>
+        <item name="colorOnSecondaryContainer">#C8FFF5</item>
+    </style>
+    <style name="OverlayAccent4">
+        <item name="colorSecondary">#12A150</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#004D25</item>
+        <item name="colorOnSecondaryContainer">#B8FFD4</item>
+    </style>
+    <style name="OverlayAccent5">
+        <item name="colorSecondary">#E8A600</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#4D3800</item>
+        <item name="colorOnSecondaryContainer">#FFF0CC</item>
+    </style>
+    <style name="OverlayAccent6">
+        <item name="colorSecondary">#9D35FF</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#2D0F60</item>
+        <item name="colorOnSecondaryContainer">#F3E8FF</item>
+    </style>
+    <style name="OverlayAccent7">
+        <item name="colorSecondary">#FF8FB2</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#6B3050</item>
+        <item name="colorOnSecondaryContainer">#FFD9E5</item>
     </style>
 </resources>

@@ -145,4 +145,27 @@
     <string name="error_no_internet">Conectate a internet para buscar</string>
     <string name="error_download_generic">Error al descargar. Intenta de nuevo.</string>
     <string name="widget_description">Control de música rápido</string>
+
+    <!-- Phase 9: Theme settings -->
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_section_downloads">Descargas</string>
+    <string name="settings_section_player">Reproductor</string>
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_about_version">Music Downloader v%1$s</string>
+    <string name="settings_primary_color">Color primario</string>
+    <string name="settings_accent_color">Color de acento</string>
+    <string name="settings_font">Fuente</string>
+    <string name="settings_night_mode">Modo</string>
+    <string name="settings_gradient">Gradiente del reproductor</string>
+    <string name="settings_night_system">Sistema</string>
+    <string name="settings_night_light">Claro</string>
+    <string name="settings_night_dark">Oscuro</string>
+    <string name="settings_font_default">Predeterminada</string>
+    <string name="settings_font_serif">Serif</string>
+    <string name="settings_font_monospace">Monospace</string>
+    <string name="settings_gradient_auto">Automático</string>
+    <string name="settings_gradient_static">Púrpura</string>
+    <string name="settings_gradient_primary">Primario</string>
+    <string name="settings_gradient_dark">Oscuro</string>
+    <string name="coming_soon">Próximamente</string>
 </resources>

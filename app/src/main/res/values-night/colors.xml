@@ -2,26 +2,26 @@
 <resources>
     <color name="primary">#9D35FF</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="primary_container">#EADDFF</color>
-    <color name="on_primary_container">#21005E</color>
+    <color name="primary_container">#6D22C9</color>
+    <color name="on_primary_container">#F3E8FF</color>
     <color name="secondary">#FF304F</color>
     <color name="on_secondary">#FFFFFF</color>
-    <color name="secondary_container">#FFDAD9</color>
-    <color name="on_secondary_container">#410008</color>
-    <color name="background">#FAF9FB</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="cards">#F3F2F7</color>
-    <color name="surface_low">#F0EFF5</color>
-    <color name="surface_high">#E8E7ED</color>
-    <color name="surface_variant">#E4E3EA</color>
-    <color name="on_surface">#1A1A22</color>
-    <color name="on_surface_variant">#46464F</color>
-    <color name="outline">#C8C7CE</color>
-    <color name="text_secondary">#5F5F6E</color>
+    <color name="secondary_container">#5C1E1E</color>
+    <color name="on_secondary_container">#FFDADA</color>
+    <color name="background">#0B0910</color>
+    <color name="surface">#12101A</color>
+    <color name="cards">#191722</color>
+    <color name="surface_low">#1E1E26</color>
+    <color name="surface_high">#262630</color>
+    <color name="surface_variant">#2A2A34</color>
+    <color name="on_surface">#EDEDF2</color>
+    <color name="on_surface_variant">#A0A0B0</color>
+    <color name="outline">#3A3A46</color>
+    <color name="text_secondary">#A7A3B0</color>
     <color name="queue_current_bg">#339D35FF</color>
     <color name="success">#4CAF50</color>
 
-    <!-- Player specific — same as dark to keep the immersive player look -->
+    <!-- Player specific -->
     <color name="player_gradient_start">#1A0B2E</color>
     <color name="player_gradient_end">#0F0F14</color>
     <color name="glow_purple">#1F9D35FF</color>

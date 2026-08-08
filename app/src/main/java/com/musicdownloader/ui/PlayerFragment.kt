@@ -15,6 +15,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.media.AudioManager
 import android.os.Build
@@ -104,7 +105,7 @@ class PlayerFragment : Fragment() {
         viewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
         repository = MusicRepository(requireContext())
         audioManager = requireContext().getSystemService(AudioManager::class.java)
-        primaryColor = ContextCompat.getColor(requireContext(), R.color.primary)
+        primaryColor = ThemeManager.primaryColor
         requireActivity().volumeControlStream = AudioManager.STREAM_MUSIC
 
         binding.root.background = dynamicGradient
@@ -374,14 +375,38 @@ class PlayerFragment : Fragment() {
     }
 
     private fun applyPalette(bitmap: Bitmap?) {
-        if (bitmap == null) {
+        val gradientMode = ThemeManager.playerGradient
+        if (bitmap == null || gradientMode == 1) {
             dynamicGradient.resetToDefault(PALETTE_DURATION)
             glowDrawable.setColor(primaryColor, PALETTE_DURATION)
             titleTextColor = Color.WHITE
             bodyTextColor = Color.WHITE
             binding.tvTitle.setTextColor(titleTextColor)
             binding.tvArtist.setTextColor(bodyTextColor)
+            applyThemeFont()
             return
+        }
+        when (gradientMode) {
+            2 -> {
+                dynamicGradient.setPrimaryGradient(ThemeManager.primaryColor, PALETTE_DURATION)
+                glowDrawable.setColor(ThemeManager.primaryColor, PALETTE_DURATION)
+                titleTextColor = Color.WHITE
+                bodyTextColor = Color.WHITE
+                binding.tvTitle.setTextColor(titleTextColor)
+                binding.tvArtist.setTextColor(bodyTextColor)
+                applyThemeFont()
+                return
+            }
+            3 -> {
+                dynamicGradient.setNeutralDark(PALETTE_DURATION)
+                glowDrawable.setColor(primaryColor, PALETTE_DURATION)
+                titleTextColor = Color.WHITE
+                bodyTextColor = Color.WHITE
+                binding.tvTitle.setTextColor(titleTextColor)
+                binding.tvArtist.setTextColor(bodyTextColor)
+                applyThemeFont()
+                return
+            }
         }
         try {
             // createScaledBitmap siempre devuelve un bitmap software (Palette no lee HARDWARE)
@@ -414,17 +439,30 @@ class PlayerFragment : Fragment() {
                         PALETTE_DURATION
                     )
                     glowDrawable.setColor(dominant, PALETTE_DURATION)
+                    applyThemeFont()
                 } catch (e: Exception) {
                     // Palette generation failed, use defaults
                     dynamicGradient.resetToDefault(PALETTE_DURATION)
                     glowDrawable.setColor(primaryColor, PALETTE_DURATION)
+                    applyThemeFont()
                 }
             }
         } catch (e: Exception) {
             // Bitmap scaling failed, use defaults
             dynamicGradient.resetToDefault(PALETTE_DURATION)
             glowDrawable.setColor(primaryColor, PALETTE_DURATION)
+            applyThemeFont()
         }
+    }
+
+    private fun applyThemeFont() {
+        val typeface = when (ThemeManager.fontFamily) {
+            "serif" -> Typeface.create("serif", Typeface.NORMAL)
+            "monospace" -> Typeface.create("monospace", Typeface.NORMAL)
+            else -> Typeface.DEFAULT
+        }
+        binding.tvTitle.typeface = Typeface.create(typeface, Typeface.BOLD)
+        binding.tvArtist.typeface = typeface
     }
 
     private fun animateCoverPlaying() {

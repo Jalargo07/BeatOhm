@@ -51,6 +51,17 @@ class DynamicGradientDrawable(
         )
     }
 
+    fun setPrimaryGradient(primaryColor: Int, durationMs: Long) {
+        val top = blend(BASE_COLOR, primaryColor, 0.45f)
+        val mid = blend(BASE_COLOR, primaryColor, 0.25f)
+        val bottom = BASE_COLOR
+        animateTo(top, mid, bottom, blend(BASE_COLOR, primaryColor, 0.30f), durationMs)
+    }
+
+    fun setNeutralDark(durationMs: Long) {
+        animateTo(0xFF1A1A24.toInt(), 0xFF131320.toInt(), BASE_COLOR, 0xFF0F0F18.toInt(), durationMs)
+    }
+
     fun resetToDefault(durationMs: Long) {
         animateTo(DEFAULT_TOP, DEFAULT_MID, DEFAULT_BOTTOM, DEFAULT_DARK_VIBRANT, durationMs)
     }

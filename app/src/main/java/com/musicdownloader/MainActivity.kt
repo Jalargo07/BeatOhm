@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -21,7 +22,6 @@ import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageButton
-import com.google.android.material.progressindicator.LinearProgressIndicator
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -33,12 +33,14 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupWithNavController
 import coil.load
 import com.google.android.material.imageview.ShapeableImageView
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.databinding.ActivityMainBinding
 import com.musicdownloader.model.Song
 import com.musicdownloader.ui.ArtworkLoader
 import com.musicdownloader.ui.MainViewModel
 import com.musicdownloader.ui.PlayerViewModel
+import com.musicdownloader.ui.ThemeManager
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -76,11 +78,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeManager.init(this)
+        ThemeManager.applyNightMode()
+
+        val theme = theme
+        val primaryOverlays = intArrayOf(
+            R.style.OverlayPrimary0, R.style.OverlayPrimary1, R.style.OverlayPrimary2,
+            R.style.OverlayPrimary3, R.style.OverlayPrimary4, R.style.OverlayPrimary5,
+            R.style.OverlayPrimary6, R.style.OverlayPrimary7
+        )
+        val accentOverlays = intArrayOf(
+            R.style.OverlayAccent0, R.style.OverlayAccent1, R.style.OverlayAccent2,
+            R.style.OverlayAccent3, R.style.OverlayAccent4, R.style.OverlayAccent5,
+            R.style.OverlayAccent6, R.style.OverlayAccent7
+        )
+        theme.applyStyle(primaryOverlays[ThemeManager.primaryColorIndex()], true)
+        theme.applyStyle(accentOverlays[ThemeManager.accentColorIndex()], true)
+
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         ArtworkLoader.init(MusicRepository(this).getAlbumArtCacheDir())
+
+        val primaryColor = ThemeManager.primaryColor
+        val colorNav = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf(-android.R.attr.state_checked)),
+            intArrayOf(primaryColor, ContextCompat.getColor(this, R.color.text_secondary))
+        )
+        binding.bottomNav.itemIconTintList = colorNav
+        binding.bottomNav.itemTextColor = colorNav
 
         ViewModelProvider(this)[MainViewModel::class.java]
 

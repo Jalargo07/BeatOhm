@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.musicdownloader.BuildConfig
 import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentSettingsBinding
 import com.musicdownloader.model.PatternToken
@@ -44,6 +45,8 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        ThemeManager.init(requireContext())
+
         patternTokens.clear()
         patternTokens.addAll(tokensFromPattern(currentPattern()))
 
@@ -67,6 +70,104 @@ class SettingsFragment : Fragment() {
             refreshFromBuilder()
             prefs().edit().putString(FolderPatternParser.KEY_FOLDER_PATTERN, FolderPatternParser.DEFAULT_PATTERN).apply()
             Toast.makeText(requireContext(), R.string.folder_pattern_saved, Toast.LENGTH_SHORT).show()
+        }
+
+        setupAppearance()
+    }
+
+    private fun setupAppearance() {
+        binding.tvAboutVersion.text = getString(R.string.settings_about_version, BuildConfig.VERSION_NAME)
+
+        setupPrimaryColorGrid()
+        setupAccentColorGrid()
+        setupFontChips()
+        setupNightModeChips()
+        setupGradientChips()
+    }
+
+    private fun setupPrimaryColorGrid() {
+        val adapter = ColorPaletteAdapter(
+            ThemeManager.PRIMARY_COLORS,
+            ThemeManager.primaryColorIndex()
+        ) { color ->
+            ThemeManager.primaryColor = color
+            requireActivity().recreate()
+        }
+        binding.rvPrimaryColors.layoutManager = LinearLayoutManager(requireContext(), RecyclerView.HORIZONTAL, false)
+        binding.rvPrimaryColors.adapter = adapter
+    }
+
+    private fun setupAccentColorGrid() {
+        val adapter = ColorPaletteAdapter(
+            ThemeManager.ACCENT_COLORS,
+            ThemeManager.accentColorIndex()
+        ) { color ->
+            ThemeManager.accentColor = color
+            requireActivity().recreate()
+        }
+        binding.rvAccentColors.layoutManager = LinearLayoutManager(requireContext(), RecyclerView.HORIZONTAL, false)
+        binding.rvAccentColors.adapter = adapter
+    }
+
+    private fun setupFontChips() {
+        val currentFont = ThemeManager.fontFamily
+        when (currentFont) {
+            "default" -> binding.chipFontDefault.isChecked = true
+            "serif" -> binding.chipFontSerif.isChecked = true
+            "monospace" -> binding.chipFontMonospace.isChecked = true
+        }
+
+        binding.chipGroupFont.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val font = when (checkedIds.first()) {
+                R.id.chip_font_serif -> "serif"
+                R.id.chip_font_monospace -> "monospace"
+                else -> "default"
+            }
+            ThemeManager.fontFamily = font
+            requireActivity().recreate()
+        }
+    }
+
+    private fun setupNightModeChips() {
+        val currentMode = ThemeManager.nightMode
+        when (currentMode) {
+            0 -> binding.chipNightSystem.isChecked = true
+            1 -> binding.chipNightLight.isChecked = true
+            2 -> binding.chipNightDark.isChecked = true
+        }
+
+        binding.chipGroupNight.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val mode = when (checkedIds.first()) {
+                R.id.chip_night_light -> 1
+                R.id.chip_night_dark -> 2
+                else -> 0
+            }
+            ThemeManager.nightMode = mode
+            ThemeManager.applyNightMode()
+            requireActivity().recreate()
+        }
+    }
+
+    private fun setupGradientChips() {
+        val currentGradient = ThemeManager.playerGradient
+        when (currentGradient) {
+            0 -> binding.chipGradientAuto.isChecked = true
+            1 -> binding.chipGradientStatic.isChecked = true
+            2 -> binding.chipGradientPrimary.isChecked = true
+            3 -> binding.chipGradientDark.isChecked = true
+        }
+
+        binding.chipGroupGradient.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val gradient = when (checkedIds.first()) {
+                R.id.chip_gradient_static -> 1
+                R.id.chip_gradient_primary -> 2
+                R.id.chip_gradient_dark -> 3
+                else -> 0
+            }
+            ThemeManager.playerGradient = gradient
         }
     }
 
