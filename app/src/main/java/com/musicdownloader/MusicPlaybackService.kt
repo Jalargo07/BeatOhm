@@ -47,6 +47,7 @@ class MusicPlaybackService : MediaSessionService() {
     private val playbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var durationCheckRunnable: Runnable? = null
+    private var widgetTickerRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -96,6 +97,7 @@ class MusicPlaybackService : MediaSessionService() {
             ACTION_PREV -> advanceSong(false)
         }
         startForeground(NOTIFICATION_ID, buildNotification())
+        MusicWidgetProvider.updateAllWidgets(this)
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -179,12 +181,14 @@ class MusicPlaybackService : MediaSessionService() {
     private fun updateNotification() {
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, buildNotification())
+        MusicWidgetProvider.updateAllWidgets(this)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
         durationCheckRunnable?.let { mainHandler.removeCallbacks(it) }
+        widgetTickerRunnable?.let { mainHandler.removeCallbacks(it) }
         playbackScope.cancel()
         mediaSession?.release()
         mediaSession = null
@@ -217,6 +221,7 @@ class MusicPlaybackService : MediaSessionService() {
         syncExoPlayerRepeatMode()
         player.prepare()
         player.play()
+        startWidgetTicker()
 
         val path = filePath
         playbackScope.launch {
@@ -340,11 +345,26 @@ class MusicPlaybackService : MediaSessionService() {
         }
     }
 
+    private fun startWidgetTicker() {
+        widgetTickerRunnable?.let { mainHandler.removeCallbacks(it) }
+        widgetTickerRunnable = object : Runnable {
+            override fun run() {
+                if (player.isPlaying) {
+                    playerViewModel?.setPosition(player.currentPosition)
+                    MusicWidgetProvider.updateAllWidgets(this@MusicPlaybackService)
+                }
+                mainHandler.postDelayed(this, 1000)
+            }
+        }
+        mainHandler.post(widgetTickerRunnable!!)
+    }
+
     private fun setupPlayerListeners() {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playerViewModel?.setPlaying(isPlaying)
                 updateNotification()
+                if (isPlaying) startWidgetTicker()
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
