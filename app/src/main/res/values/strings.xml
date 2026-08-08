@@ -131,6 +131,7 @@
     <string name="downloads_empty_hint">Busca tu música o pega un enlace de YouTube</string>
     <string name="download_button_idle">↓ Descargar</string>
     <string name="download_done">✓</string>
+    <string name="play_preview">Reproducir preview</string>
 
     <!-- Sprint 8 UI/UX: Empty/Loading/Error states -->
     <string name="unknown_artist">Desconocido</string>

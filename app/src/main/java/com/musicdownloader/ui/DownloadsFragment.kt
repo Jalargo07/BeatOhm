@@ -31,10 +31,10 @@ class DownloadsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
         adapter = DownloadAdapter()
-        searchAdapter = SearchResultAdapter { result ->
+        searchAdapter = SearchResultAdapter(onDownload = { result ->
             searchAdapter.setDownloading(result.videoId)
             viewModel.downloadFromSearch(result)
-        }
+        })
 
         binding.rvDownloads.layoutManager = LinearLayoutManager(requireContext())
         binding.rvDownloads.adapter = adapter

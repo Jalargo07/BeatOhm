@@ -14,7 +14,8 @@ import com.musicdownloader.databinding.ItemSearchResultBinding
 import com.musicdownloader.model.SearchResult
 
 class SearchResultAdapter(
-    private val onDownload: (SearchResult) -> Unit
+    private val onDownload: (SearchResult) -> Unit,
+    private val onPlay: ((SearchResult) -> Unit)? = null
 ) : ListAdapter<SearchResult, SearchResultAdapter.ViewHolder>(DiffCallback()) {
 
     enum class ButtonState { IDLE, DOWNLOADING, COMPLETED }
@@ -57,7 +58,7 @@ class SearchResultAdapter(
         val binding = ItemSearchResultBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
-        return ViewHolder(binding, onDownload)
+        return ViewHolder(binding, onDownload, onPlay)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
@@ -66,7 +67,8 @@ class SearchResultAdapter(
 
     class ViewHolder(
         private val binding: ItemSearchResultBinding,
-        private val onDownload: (SearchResult) -> Unit
+        private val onDownload: (SearchResult) -> Unit,
+        private val onPlay: ((SearchResult) -> Unit)? = null
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private var lastState: ButtonState? = null
@@ -80,6 +82,7 @@ class SearchResultAdapter(
                 error(R.drawable.ic_music_note)
             }
             binding.btnDownload.setOnClickListener { onDownload(result) }
+            binding.btnPlay.setOnClickListener { onPlay?.invoke(result) }
             applyState(state)
         }
 
