@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Music Downloader</string>
+    <string name="url_hint">Pega la URL de YouTube / YouTube Music</string>
+    <string name="download">Descargar</string>
+    <string name="downloading">Descargando...</string>
+    <string name="extracting">Extrayendo información...</string>
+    <string name="fetching_metadata">Buscando metadata...</string>
+    <string name="completed">Completado</string>
+    <string name="error">Error</string>
+    <string name="channel_notification">Descargas activas</string>
+    <string name="shuffle">Modo aleatorio</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="equalizer_not_supported">Equalizer no soportado en este dispositivo</string>
+    <string name="lyrics">Letras</string>
+    <string name="close">Cerrar</string>
+    <string name="no_lyrics">Sin letras disponibles</string>
+    <string name="sort_order">Ordenar por</string>
+    <string name="favorite">Favorito</string>
+    <string name="bookmark">Bookmark</string>
+    <string name="previous">Anterior</string>
+    <string name="next">Siguiente</string>
+    <string name="rewind">Retroceder 10s</string>
+    <string name="forward">Adelantar 10s</string>
+    <string name="play">Reproducir</string>
+    <string name="pause">Pausar</string>
+    <string name="volume">Volumen</string>
+    <string name="seek_position">Posición de reproducción</string>
+    <string name="add_playlist">Agregar a playlist</string>
+    <string name="back">Volver</string>
+    <string name="no_song">No hay canción reproduciendo</string>
+    <string name="songs">Canciones</string>
+    <string name="empty_songs">No hay canciones descargadas</string>
+    <string name="albums">Álbumes</string>
+    <string name="artists">Artistas</string>
+    <string name="genres">Géneros</string>
+    <string name="favorites">Favoritos</string>
+    <string name="playlists">Playlists</string>
+    <string name="folders">Carpetas</string>
+    <string name="my_folders">Mis carpetas</string>
+    <string name="add_folder">Agregar carpeta</string>
+    <string name="remove_folder">Quitar</string>
+    <string name="folder_added">Carpeta agregada</string>
+    <string name="folder_already_added">Esa carpeta ya está en la biblioteca</string>
+    <string name="folder_invalid">Carpeta no compatible. Probá con otra.</string>
+    <string name="folder_remove_title">Quitar carpeta</string>
+    <string name="folder_remove_message">¿Querés quitar también las canciones de esta carpeta de la biblioteca?</string>
+    <string name="folder_remove_and_songs">Quitar carpeta y canciones</string>
+    <string name="folder_remove_only">Solo quitar carpeta</string>
+    <string name="enrich_dialog_title">Completar metadatos</string>
+    <string name="enrich_dialog_message">Se encontraron %1$d canciones sin metadatos completos (artista, álbum o carátula). ¿Deseás completarlos en segundo plano? Podés seguir usando la app.</string>
+    <string name="enrich_accept">Completar</string>
+    <string name="enrich_decline">No, gracias</string>
+    <string name="enrich_progress">Completando metadatos %1$d de %2$d</string>
+    <string name="enrich_done">Metadatos completados (%1$d canciones)</string>
+    <string name="enrich_manual">Buscar metadata de canciones</string>
+    <string name="enrich_manual_count">Buscar metadata (%1$d canciones sin info)</string>
+    <string name="select_songs_title">Seleccionar canciones</string>
+    <string name="select_songs_subtitle">Elegí cuáles querés actualizar</string>
+    <string name="select_songs_selected_count">%1$d de %2$d seleccionadas</string>
+    <string name="enrich_selected">Buscar metadata</string>
+    <string name="no_songs_available">No hay canciones en la biblioteca</string>
+    <string name="select_all">Seleccionar todas</string>
+    <string name="deselect_all">Deseleccionar todas</string>
+    <string name="song_incomplete_hint"> • sin info</string>
+    <string name="also_fetch_lyrics">También buscar letras</string>
+    <string name="lyrics_fetch_progress">Buscando letras...</string>
+    <string name="lyrics_found">Letra encontrada</string>
+    <string name="lyrics_not_found">Letra no encontrada</string>
+    <string name="enrich_progress_with_lyrics">Completando metadatos %1$d de %2$d (incluyendo letras)</string>
+    <string name="queue">Cola de reproducción</string>
+    <string name="queue_count">Cola (%1$d canciones)</string>
+    <string name="queue_header">Cola de reproducción (%1$d canciones)</string>
+    <string name="repeat">Repetir</string>
+    <string name="repeat_one">Repetir una</string>
+    <string name="cancel">Cancelar</string>
+    <string name="remove_from_queue">Quitar de la cola</string>
+    <string name="by_artist">Por cantantes</string>
+    <string name="by_genre">Por género</string>
+    <string name="by_year">Por año</string>
+    <string name="most_played">Más escuchadas</string>
+    <string name="playlists_menu">Listas de reproducción</string>
+    <string name="library_title">Biblioteca</string>
+    <string name="categories">Categorías</string>
+    <string name="search_library_hint">Buscar en tu música...</string>
+    <string name="your_library">Tu biblioteca</string>
+    <string name="see_all">Ver todos</string>
+    <string name="library_search">Resultados de búsqueda</string>
+    <string name="player_title">Reproductor</string>
+    <string name="downloads_title">Descargas</string>
+    <string-array name="sort_options">
+        <item>Título</item>
+        <item>Artista</item>
+        <item>Álbum</item>
+        <item>Duración</item>
+    </string-array>
+
+    <!-- Feature 3: Settings / patrón de carpetas -->
+    <string name="settings_title">Configuración</string>
+    <string name="settings_description">Las descargas se organizan automáticamente en carpetas según el patrón. Usá los placeholders para personalizar la estructura.</string>
+    <string name="folder_pattern_hint">Patrón de carpetas</string>
+    <string name="folder_pattern_placeholder_title">Vista previa</string>
+    <string name="folder_pattern_placeholders">Placeholders disponibles: {Artist} {Album} {Title} {Track} {Year} {Genre} {ArtistInitial}</string>
+    <string name="folder_pattern_save">Guardar</string>
+    <string name="folder_pattern_reset">Restablecer</string>
+    <string name="folder_pattern_saved">Patrón guardado</string>
+    <string name="folder_pattern_invalid">El patrón no puede estar vacío</string>
+    <string name="folder_pattern_tokens_title">Tokens disponibles (mantené presionado para arrastrar)</string>
+    <string name="folder_pattern_builder_title">Tu patrón</string>
+    <string name="folder_pattern_builder_hint">Soltá acá los tokens para armar el patrón</string>
+    <string name="folder_pattern_token_drag">Arrastrar token</string>
+    <string name="folder_pattern_token_remove">Quitar token</string>
+    <string name="downloads_empty">No hay descargas. Pega una URL de YouTube arriba.</string>
+
+    <!-- Feature 4: Búsqueda de canciones -->
+    <string name="search_hint">Buscar canción...</string>
+    <string name="search_button">Buscar</string>
+    <string name="search_empty">Escribí el nombre de una canción</string>
+    <string name="search_no_results">No se encontraron resultados</string>
+    <string name="search_error">Error de búsqueda</string>
+    <string name="search_query_required">Ingresá un nombre de canción</string>
+    <string name="download_url_required">Ingresa una URL</string>
+    <string name="download_url_invalid">URL de YouTube inválida</string>
+    <string name="drag_handle">Arrastrar para reordenar</string>
+    <string name="media_playback_channel_name">Reproducción de música</string>
+
+    <!-- Sprint 5 UI/UX: Downloads con identidad -->
+    <string name="downloads_section_search">Buscar música</string>
+    <string name="downloads_section_url">Descargar por URL</string>
+    <string name="downloads_empty_equalizer">▂ ▅ ▇ ▅ ▂</string>
+    <string name="downloads_empty_hint">Busca tu música o pega un enlace de YouTube</string>
+    <string name="download_button_idle">↓ Descargar</string>
+    <string name="download_done">✓</string>
+
+    <!-- Sprint 8 UI/UX: Empty/Loading/Error states -->
+    <string name="unknown_artist">Desconocido</string>
+    <string name="placeholder_title">T</string>
+    <string name="placeholder_artist">Artista</string>
+    <string name="placeholder_time">0:00</string>
+    <string name="empty_folders">No hay carpetas configuradas</string>
+    <string name="empty_playlists">No hay playlists. Toca + para crear una.</string>
+    <string name="empty_category">Vacío</string>
+    <string name="empty_state_equalizer">▂ ▅ ▇ ▅ ▂</string>
+    <string name="library_empty_hint">Agrega carpetas en Biblioteca &gt; Carpetas</string>
+    <string name="error_no_internet">Conectate a internet para buscar</string>
+    <string name="error_download_generic">Error al descargar. Intenta de nuevo.</string>
+    <string name="widget_description">Control de música rápido</string>
+
+    <!-- Phase 9: Theme settings -->
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_section_downloads">Descargas</string>
+    <string name="settings_section_player">Reproductor</string>
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_section_language">IDIOMA</string>
+    <string name="settings_about_version">Music Downloader v%1$s</string>
+    <string name="settings_primary_color">Color primario</string>
+    <string name="settings_accent_color">Color de acento</string>
+    <string name="settings_font">Fuente</string>
+    <string name="settings_night_mode">Modo</string>
+    <string name="settings_gradient">Gradiente del reproductor</string>
+    <string name="settings_night_system">Sistema</string>
+    <string name="settings_night_light">Claro</string>
+    <string name="settings_night_dark">Oscuro</string>
+    <string name="settings_font_default">Predeterminada</string>
+    <string name="settings_font_serif">Serif</string>
+    <string name="settings_font_monospace">Monospace</string>
+    <string name="settings_gradient_auto">Automático</string>
+    <string name="settings_gradient_static">Púrpura</string>
+    <string name="settings_gradient_primary">Primario</string>
+    <string name="settings_gradient_dark">Oscuro</string>
+    <string name="coming_soon">Próximamente</string>
+
+    <!-- Icon pack settings -->
+    <string name="settings_icon_pack">Pack de iconos</string>
+    <string name="settings_icon_pack_default">Material</string>
+    <string name="settings_icon_pack_outline">Outline</string>
+    <string name="settings_icon_pack_filled">Filled</string>
+    <string name="settings_icon_pack_boowop">BooWop</string>
+    <string name="settings_icon_pack_darknova">DarkNova</string>
+    <string name="settings_icon_pack_mononoki">Mononoki</string>
+    <string name="settings_icon_pack_mainstage">Mainstage</string>
+
+    <!-- Player layout settings -->
+    <string name="settings_player_layout">Estilo del reproductor</string>
+    <string name="settings_player_layout_classic">Clásico</string>
+    <string name="settings_player_layout_compact">Compacto</string>
+    <string name="settings_player_layout_vinyl">Vinilo</string>
+
+    <!-- Theme selector -->
+    <string name="theme_selector_title">Selector de Temas</string>
+    <string name="theme_new_custom">Nuevo Tema</string>
+    <string name="theme_type_preset">Preset</string>
+    <string name="theme_type_custom">Personalizado</string>
+    <string name="theme_applied">Tema aplicado</string>
+    <string name="theme_active">Activo</string>
+    <string name="select_theme_button">Selector de Temas</string>
+    <string name="theme_create_title">Crear Tema</string>
+    <string name="theme_create_hint">Nombre del tema</string>
+    <string name="theme_create_confirm">Crear</string>
+    <string name="theme_create_cancel">Cancelar</string>
+    <string name="theme_create_empty_name">El nombre no puede estar vacío</string>
+    <string name="theme_create_success">Tema creado</string>
+    <string name="copied">Copiado</string>
+    <string name="theme_copied">Tema copiado al portapapeles</string>
+    <string name="theme_pasted">Tema pegado desde el portapapeles</string>
+    <string name="theme_share_error">Error al compartir</string>
+</resources>
