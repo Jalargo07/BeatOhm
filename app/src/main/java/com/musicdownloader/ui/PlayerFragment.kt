@@ -128,6 +128,21 @@ class PlayerFragment : Fragment() {
         setupSwipeGesture()
         setupLyricsSwipe()
         applyIconPack()
+
+        TutorialManager.showTutorial(
+            requireActivity(),
+            "player",
+            listOf(
+                TutorialManager.TooltipStep({ binding.btnPlayPause }, getString(R.string.tutorial_player_play), getString(R.string.tutorial_player_play_desc)),
+                TutorialManager.TooltipStep({ binding.btnPrev }, getString(R.string.tutorial_player_prev_next), getString(R.string.tutorial_player_prev_next_desc)),
+                TutorialManager.TooltipStep({ binding.btnShuffle }, getString(R.string.tutorial_player_shuffle), getString(R.string.tutorial_player_shuffle_desc)),
+                TutorialManager.TooltipStep({ binding.btnRepeat }, getString(R.string.tutorial_player_repeat), getString(R.string.tutorial_player_repeat_desc)),
+                TutorialManager.TooltipStep({ binding.btnQueue }, getString(R.string.tutorial_player_queue), getString(R.string.tutorial_player_queue_desc)),
+                TutorialManager.TooltipStep({ binding.btnLyrics }, getString(R.string.tutorial_player_lyrics), getString(R.string.tutorial_player_lyrics_desc)),
+                TutorialManager.TooltipStep({ binding.btnFavorite }, getString(R.string.tutorial_player_favorito), getString(R.string.tutorial_player_favorito_desc)),
+                TutorialManager.TooltipStep({ binding.waveformSeekbar }, getString(R.string.tutorial_player_waveform), getString(R.string.tutorial_player_waveform_desc))
+            )
+        )
     }
 
     override fun onStart() {

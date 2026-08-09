@@ -210,4 +210,22 @@
     <!-- Tutorial / Tooltips -->
     <string name="tutorial_got_it">Entendido</string>
     <string name="tutorial_skip">Saltar tutorial</string>
+
+    <!-- Tutorial - Reproductor -->
+    <string name="tutorial_player_play">Reproducir / Pausar</string>
+    <string name="tutorial_player_play_desc">Toca para reproducir o pausar la canción actual</string>
+    <string name="tutorial_player_prev_next">Anterior / Siguiente</string>
+    <string name="tutorial_player_prev_next_desc">Navega entre las canciones de la cola</string>
+    <string name="tutorial_player_shuffle">Aleatorio</string>
+    <string name="tutorial_player_shuffle_desc">Mezcla el orden de reproducción</string>
+    <string name="tutorial_player_repeat">Repetir</string>
+    <string name="tutorial_player_repeat_desc">Repite la canción o toda la cola</string>
+    <string name="tutorial_player_queue">Cola de reproducción</string>
+    <string name="tutorial_player_queue_desc">Ve y edita las canciones en espera</string>
+    <string name="tutorial_player_lyrics">Letras</string>
+    <string name="tutorial_player_lyrics_desc">Muestra la letra sincronizada de la canción</string>
+    <string name="tutorial_player_favorito">Favorito</string>
+    <string name="tutorial_player_favorito_desc">Guarda la canción en tus favoritos</string>
+    <string name="tutorial_player_waveform">Waveform</string>
+    <string name="tutorial_player_waveform_desc">Arrastra para avanzar o retroceder en la canción</string>
 </resources>

@@ -204,4 +204,22 @@
     <string name="theme_copied">Tema copiado para a área de transferência</string>
     <string name="theme_pasted">Tema colado da área de transferência</string>
     <string name="theme_share_error">Erro ao compartilhar</string>
+
+    <!-- Tutorial - Reprodutor -->
+    <string name="tutorial_player_play">Reproduzir / Pausar</string>
+    <string name="tutorial_player_play_desc">Toque para reproduzir ou pausar a música atual</string>
+    <string name="tutorial_player_prev_next">Anterior / Próxima</string>
+    <string name="tutorial_player_prev_next_desc">Navegue entre as músicas da fila</string>
+    <string name="tutorial_player_shuffle">Aleatório</string>
+    <string name="tutorial_player_shuffle_desc">Embaralha a ordem de reprodução</string>
+    <string name="tutorial_player_repeat">Repetir</string>
+    <string name="tutorial_player_repeat_desc">Repete a música ou toda a fila</string>
+    <string name="tutorial_player_queue">Fila de reprodução</string>
+    <string name="tutorial_player_queue_desc">Veja e edite as músicas na espera</string>
+    <string name="tutorial_player_lyrics">Letras</string>
+    <string name="tutorial_player_lyrics_desc">Mostra a letra sincronizada da música</string>
+    <string name="tutorial_player_favorito">Favorito</string>
+    <string name="tutorial_player_favorito_desc">Salve a música nos seus favoritos</string>
+    <string name="tutorial_player_waveform">Waveform</string>
+    <string name="tutorial_player_waveform_desc">Arraste para avançar ou voltar na música</string>
 </resources>
