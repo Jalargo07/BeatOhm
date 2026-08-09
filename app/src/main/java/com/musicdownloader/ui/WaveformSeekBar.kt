@@ -42,10 +42,10 @@ class WaveformSeekBar @JvmOverloads constructor(
     private var flingVelocity = 0f
 
     private val density = resources.displayMetrics.density
-    private val barWidth = 12f * density
+    private val barWidth = 3f * density
     private val barSpacing = 2f * density
-    private val minBarHeight = 4f * density
-    private val cornerRadius = 1.2f * density
+    private val minBarHeight = 3f * density
+    private val cornerRadius = 1.5f * density
 
     // Cursor position: fixed at 30% from left edge
     private val cursorPositionRatio = 0.3f
@@ -165,14 +165,25 @@ class WaveformSeekBar @JvmOverloads constructor(
     var onProgressStop: ((progress: Int) -> Unit)? = null
 
     fun setWaveformData(data: FloatArray) {
-        bars = data
-        barCount = data.size
+        bars = smoothAmplitudes(data)
+        barCount = bars.size
         isPlaceholder = false
         playedPath.reset()
         unplayedPath.reset()
         scroller.forceFinished(true)
         isFlinging = false
         invalidate()
+    }
+
+    private fun smoothAmplitudes(rawAmplitudes: FloatArray): FloatArray {
+        val smoothed = FloatArray(rawAmplitudes.size)
+        for (i in rawAmplitudes.indices) {
+            val compressed = kotlin.math.sqrt(rawAmplitudes[i].toDouble()).toFloat().coerceIn(0f, 1f)
+            val prev = if (i > 0) kotlin.math.sqrt(rawAmplitudes[i - 1].toDouble()).toFloat() else compressed
+            val next = if (i < rawAmplitudes.size - 1) kotlin.math.sqrt(rawAmplitudes[i + 1].toDouble()).toFloat() else compressed
+            smoothed[i] = (prev * 0.2f) + (compressed * 0.6f) + (next * 0.2f)
+        }
+        return smoothed
     }
 
     private var isPlaceholder = false
