@@ -154,8 +154,8 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        val waveHeight = h * 0.4f * (0.1f + energyModulator * 0.9f)
-        val baseY = h * 0.95f
+        val waveHeight = h * 0.85f * (0.05f + energyModulator * 0.95f)
+        val baseY = h * 0.98f
 
         wavePath.rewind()
         wavePath.moveTo(0f, h)
