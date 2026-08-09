@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Music Downloader</string>
+    <string name="url_hint">Paste a YouTube / YouTube Music URL</string>
+    <string name="download">Download</string>
+    <string name="downloading">Downloading…</string>
+    <string name="extracting">Extracting information…</string>
+    <string name="fetching_metadata">Fetching metadata…</string>
+    <string name="completed">Completed</string>
+    <string name="error">Error</string>
+    <string name="channel_notification">Active downloads</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="equalizer_not_supported">Equalizer not supported on this device</string>
+    <string name="lyrics">Lyrics</string>
+    <string name="close">Close</string>
+    <string name="no_lyrics">No lyrics available</string>
+    <string name="sort_order">Sort by</string>
+    <string name="favorite">Favorite</string>
+    <string name="bookmark">Bookmark</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="rewind">Rewind 10s</string>
+    <string name="forward">Forward 10s</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="volume">Volume</string>
+    <string name="seek_position">Playback position</string>
+    <string name="add_playlist">Add to playlist</string>
+    <string name="back">Back</string>
+    <string name="no_song">No song playing</string>
+    <string name="songs">Songs</string>
+    <string name="empty_songs">No downloaded songs</string>
+    <string name="albums">Albums</string>
+    <string name="artists">Artists</string>
+    <string name="genres">Genres</string>
+    <string name="favorites">Favorites</string>
+    <string name="playlists">Playlists</string>
+    <string name="folders">Folders</string>
+    <string name="my_folders">My folders</string>
+    <string name="add_folder">Add folder</string>
+    <string name="remove_folder">Remove</string>
+    <string name="folder_added">Folder added</string>
+    <string name="folder_already_added">That folder is already in the library</string>
+    <string name="folder_invalid">Folder not supported. Try another one.</string>
+    <string name="folder_remove_title">Remove folder</string>
+    <string name="folder_remove_message">Do you also want to remove songs from this folder from the library?</string>
+    <string name="folder_remove_and_songs">Remove folder and songs</string>
+    <string name="folder_remove_only">Remove folder only</string>
+    <string name="enrich_dialog_title">Complete metadata</string>
+    <string name="enrich_dialog_message">%1$d songs were found without complete metadata (artist, album, or cover). Would you like to complete them in the background? You can keep using the app.</string>
+    <string name="enrich_accept">Complete</string>
+    <string name="enrich_decline">No, thanks</string>
+    <string name="enrich_progress">Completing metadata %1$d of %2$d</string>
+    <string name="enrich_done">Metadata completed (%1$d songs)</string>
+    <string name="enrich_manual">Fetch song metadata</string>
+    <string name="enrich_manual_count">Fetch metadata (%1$d songs without info)</string>
+    <string name="select_songs_title">Select songs</string>
+    <string name="select_songs_subtitle">Choose which ones you want to update</string>
+    <string name="select_songs_selected_count">%1$d of %2$d selected</string>
+    <string name="enrich_selected">Fetch metadata</string>
+    <string name="no_songs_available">No songs in the library</string>
+    <string name="select_all">Select all</string>
+    <string name="deselect_all">Deselect all</string>
+    <string name="song_incomplete_hint"> • no info</string>
+    <string name="also_fetch_lyrics">Also fetch lyrics</string>
+    <string name="lyrics_fetch_progress">Fetching lyrics…</string>
+    <string name="lyrics_found">Lyrics found</string>
+    <string name="lyrics_not_found">Lyrics not found</string>
+    <string name="enrich_progress_with_lyrics">Completing metadata %1$d of %2$d (including lyrics)</string>
+    <string name="queue">Play queue</string>
+    <string name="queue_count">Queue (%1$d songs)</string>
+    <string name="queue_header">Play queue (%1$d songs)</string>
+    <string name="repeat">Repeat</string>
+    <string name="repeat_one">Repeat one</string>
+    <string name="cancel">Cancel</string>
+    <string name="remove_from_queue">Remove from queue</string>
+    <string name="by_artist">By artist</string>
+    <string name="by_genre">By genre</string>
+    <string name="by_year">By year</string>
+    <string name="most_played">Most played</string>
+    <string name="playlists_menu">Playlists</string>
+    <string name="library_title">Library</string>
+    <string name="categories">Categories</string>
+    <string name="search_library_hint">Search your music…</string>
+    <string name="your_library">Your library</string>
+    <string name="see_all">See all</string>
+    <string name="library_search">Search results</string>
+    <string name="player_title">Player</string>
+    <string name="downloads_title">Downloads</string>
+    <string-array name="sort_options">
+        <item>Title</item>
+        <item>Artist</item>
+        <item>Album</item>
+        <item>Duration</item>
+    </string-array>
+
+    <!-- Feature 3: Settings / folder pattern -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_description">Downloads are automatically organized into folders based on the pattern. Use the placeholders to customize the structure.</string>
+    <string name="folder_pattern_hint">Folder pattern</string>
+    <string name="folder_pattern_placeholder_title">Preview</string>
+    <string name="folder_pattern_placeholders">Available placeholders: {Artist} {Album} {Title} {Track} {Year} {Genre} {ArtistInitial}</string>
+    <string name="folder_pattern_save">Save</string>
+    <string name="folder_pattern_reset">Reset</string>
+    <string name="folder_pattern_saved">Pattern saved</string>
+    <string name="folder_pattern_invalid">Pattern cannot be empty</string>
+    <string name="folder_pattern_tokens_title">Available tokens (press and hold to drag)</string>
+    <string name="folder_pattern_builder_title">Your pattern</string>
+    <string name="folder_pattern_builder_hint">Drop tokens here to build the pattern</string>
+    <string name="folder_pattern_token_drag">Drag token</string>
+    <string name="folder_pattern_token_remove">Remove token</string>
+    <string name="downloads_empty">No downloads. Paste a YouTube URL above.</string>
+
+    <!-- Feature 4: Song search -->
+    <string name="search_hint">Search song…</string>
+    <string name="search_button">Search</string>
+    <string name="search_empty">Type a song name</string>
+    <string name="search_no_results">No results found</string>
+    <string name="search_error">Search error</string>
+    <string name="search_query_required">Enter a song name</string>
+    <string name="download_url_required">Enter a URL</string>
+    <string name="download_url_invalid">Invalid YouTube URL</string>
+    <string name="drag_handle">Drag to reorder</string>
+    <string name="media_playback_channel_name">Music playback</string>
+
+    <!-- Sprint 5 UI/UX: Downloads with identity -->
+    <string name="downloads_section_search">Search music</string>
+    <string name="downloads_section_url">Download by URL</string>
+    <string name="downloads_empty_equalizer">▂ ▅ ▇ ▅ ▂</string>
+    <string name="downloads_empty_hint">Search your music or paste a YouTube link</string>
+    <string name="download_button_idle">↓ Download</string>
+    <string name="download_done">✓</string>
+    <string name="play_preview">Play preview</string>
+
+    <!-- Sprint 8 UI/UX: Empty/Loading/Error states -->
+    <string name="unknown_artist">Unknown</string>
+    <string name="placeholder_title">T</string>
+    <string name="placeholder_artist">Artist</string>
+    <string name="placeholder_time">0:00</string>
+    <string name="empty_folders">No folders configured</string>
+    <string name="empty_playlists">No playlists. Tap + to create one.</string>
+    <string name="empty_category">Empty</string>
+    <string name="empty_state_equalizer">▂ ▅ ▇ ▅ ▂</string>
+    <string name="library_empty_hint">Add folders in Library &gt; Folders</string>
+    <string name="error_no_internet">Connect to the internet to search</string>
+    <string name="error_download_generic">Download error. Try again.</string>
+    <string name="error_stream">Error getting audio stream</string>
+    <string name="widget_description">Quick music control</string>
+
+    <!-- Phase 9: Theme settings -->
+    <string name="settings_section_appearance">APPEARANCE</string>
+    <string name="settings_section_downloads">DOWNLOADS</string>
+    <string name="settings_section_player">Player</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_section_language">LANGUAGE</string>
+    <string name="reset_tutorial">Reset tutorial</string>
+    <string name="settings_about_version">Music Downloader v%1$s</string>
+    <string name="settings_primary_color">Primary color</string>
+    <string name="settings_accent_color">Accent color</string>
+    <string name="settings_font">Font</string>
+    <string name="settings_night_mode">Mode</string>
+    <string name="settings_gradient">Player gradient</string>
+    <string name="settings_night_system">System</string>
+    <string name="settings_night_light">Light</string>
+    <string name="settings_night_dark">Dark</string>
+    <string name="settings_font_default">Default</string>
+    <string name="settings_font_serif">Serif</string>
+    <string name="settings_font_monospace">Monospace</string>
+    <string name="settings_gradient_auto">Auto</string>
+    <string name="settings_gradient_static">Purple</string>
+    <string name="settings_gradient_primary">Primary</string>
+    <string name="settings_gradient_dark">Dark</string>
+    <string name="coming_soon">Coming soon</string>
+
+    <!-- Icon pack settings -->
+    <string name="settings_icon_pack">Icon pack</string>
+    <string name="settings_icon_pack_default">Material</string>
+    <string name="settings_icon_pack_outline">Outline</string>
+    <string name="settings_icon_pack_filled">Filled</string>
+    <string name="settings_icon_pack_boowop">BooWop</string>
+    <string name="settings_icon_pack_darknova">DarkNova</string>
+    <string name="settings_icon_pack_mononoki">Mononoki</string>
+    <string name="settings_icon_pack_mainstage">Mainstage</string>
+
+    <!-- Player layout settings -->
+    <string name="settings_player_layout">Player style</string>
+    <string name="settings_player_layout_classic">Classic</string>
+    <string name="settings_player_layout_compact">Compact</string>
+    <string name="settings_player_layout_vinyl">Vinyl</string>
+
+    <!-- Theme selector -->
+    <string name="theme_selector_title">Theme Selector</string>
+    <string name="theme_new_custom">New Theme</string>
+    <string name="theme_type_preset">Preset</string>
+    <string name="theme_type_custom">Custom</string>
+    <string name="theme_applied">Theme applied</string>
+    <string name="theme_active">Active</string>
+    <string name="select_theme_button">Theme Selector</string>
+    <string name="theme_create_title">Create Theme</string>
+    <string name="theme_create_hint">Theme name</string>
+    <string name="theme_create_confirm">Create</string>
+    <string name="theme_create_cancel">Cancel</string>
+    <string name="theme_create_empty_name">Name cannot be empty</string>
+    <string name="theme_create_success">Theme created</string>
+    <string name="copied">Copied</string>
+    <string name="theme_copied">Theme copied to clipboard</string>
+    <string name="theme_pasted">Theme pasted from clipboard</string>
+    <string name="theme_share_error">Error sharing</string>
+
+    <!-- Tutorial / Tooltips -->
+    <string name="tutorial_got_it">Got it</string>
+    <string name="tutorial_skip">Skip tutorial</string>
+
+    <!-- Tutorial - Player -->
+    <string name="tutorial_player_play">Play / Pause</string>
+    <string name="tutorial_player_play_desc">Tap to play or pause the current song</string>
+    <string name="tutorial_player_prev_next">Previous / Next</string>
+    <string name="tutorial_player_prev_next_desc">Navigate through the songs in the queue</string>
+    <string name="tutorial_player_shuffle">Shuffle</string>
+    <string name="tutorial_player_shuffle_desc">Shuffle the playback order</string>
+    <string name="tutorial_player_repeat">Repeat</string>
+    <string name="tutorial_player_repeat_desc">Repeat the song or the entire queue</string>
+    <string name="tutorial_player_queue">Play queue</string>
+    <string name="tutorial_player_queue_desc">View and edit the upcoming songs</string>
+    <string name="tutorial_player_lyrics">Lyrics</string>
+    <string name="tutorial_player_lyrics_desc">Show the synchronized lyrics of the song</string>
+    <string name="tutorial_player_favorito">Favorite</string>
+    <string name="tutorial_player_favorito_desc">Save the song to your favorites</string>
+    <string name="tutorial_player_waveform">Waveform</string>
+    <string name="tutorial_player_waveform_desc">Drag to seek forward or backward in the song</string>
+
+    <!-- Tutorial - Library -->
+    <string name="tutorial_lib_search">Search</string>
+    <string name="tutorial_lib_search_desc">Type the name of a song, artist, or album</string>
+    <string name="tutorial_lib_categories">Categories</string>
+    <string name="tutorial_lib_categories_desc">Browse your music by artist, album, genre, and more</string>
+    <string name="tutorial_lib_enrich"> Enrich</string>
+    <string name="tutorial_lib_enrich_desc">Fetch metadata, artwork, and lyrics automatically</string>
+    <string name="tutorial_lib_folders">Folders</string>
+    <string name="tutorial_lib_folders_desc">Add folders with your downloaded music</string>
+
+    <!-- Tutorial - Downloads -->
+    <string name="tutorial_dl_url">YouTube URL</string>
+    <string name="tutorial_dl_url_desc">Paste a YouTube video or playlist link</string>
+    <string name="tutorial_dl_search">Search</string>
+    <string name="tutorial_dl_search_desc">Search for a song name to find it</string>
+    <string name="tutorial_dl_results">Results</string>
+    <string name="tutorial_dl_results_desc">Play a preview or download directly</string>
+
+    <!-- Tutorial - Lyrics -->
+    <string name="tutorial_lyrics_tap">Jump to position</string>
+    <string name="tutorial_lyrics_tap_desc">Tap a line to jump to that part of the song</string>
+    <string name="tutorial_lyrics_swipe">Close panel</string>
+    <string name="tutorial_lyrics_swipe_desc">Press and hold, then drag down to close</string>
+
+    <!-- Player -->
+    <string name="sin_playlists">No playlists</string>
+    <string name="crea_playlist_primero">Create a playlist first from the Playlists tab.</string>
+    <string name="agregar_a_playlist">Add to playlist</string>
+
+    <!-- Playlists -->
+    <string name="nueva_playlist">New Playlist</string>
+    <string name="canciones_count">%d songs</string>
+
+    <!-- Playlist Detail / Song List -->
+    <string name="quitar_de_playlist">Remove from playlist</string>
+    <string name="quitar_cancion_de_playlist">Remove %1$s from this playlist?</string>
+    <string name="cancion_quitada">Song removed</string>
+
+    <!-- Song List - Multi-select -->
+    <string name="seleccionada">%1$d selected</string>
+    <string name="seleccionadas">%1$d selected</string>
+
+    <!-- Song List - Regenerate -->
+    <string name="regenerando">Regenerating %1$d/%2$d\u2026</string>
+    <string name="reset_waveform">Reset Waveform</string>
+    <string name="regenerar_waveform">Regenerate waveform for \'%1$s\'?</string>
+    <string name="waveform_regenerado">Waveform regenerated</string>
+    <string name="agregar_canciones_a_playlist">Add %1$d song%2$s to playlist</string>
+    <string name="regenerar_metadata">Regenerate metadata</string>
+    <string name="rebuscar_metadata">Re-fetch metadata, artwork, and lyrics for %1$d song%2$s?</string>
+    <string name="metadata_regenerada">Metadata regenerated (%1$d/%2$d)</string>
+
+    <!-- Theme Selection -->
+    <string name="tema_copiado">Theme copied and ready to share</string>
+    <string name="no_tema_valido">No valid theme in clipboard</string>
+    <string name="importar_tema">Import theme</string>
+    <string name="importar_tema_pregunta">Import theme \"%1$s\"?</string>
+    <string name="tema_importado">Theme imported and activated</string>
+
+    <!-- Download Status -->
+    <string name="status_en_cola">In queue\u2026</string>
+    <string name="status_extrayendo">Extracting\u2026</string>
+    <string name="status_metadata">Metadata\u2026</string>
+    <string name="status_escribiendo_tags">Writing tags\u2026</string>
+    <string name="status_completado">\u2713</string>
+    <string name="status_error">\u2717</string>
+</resources>

@@ -246,7 +246,7 @@
     <string name="tutorial_lyrics_tap">Pular para posição</string>
     <string name="tutorial_lyrics_tap_desc">Toque em uma linha para pular para essa parte da música</string>
     <string name="tutorial_lyrics_swipe">Fechar painel</string>
-    <string name="tutorial_lyrics_swipe_desc">Deslize para baixo para voltar ao reprodutor</string>
+    <string name="tutorial_lyrics_swipe_desc">Mantenha pressionado um momento e arraste para baixo para fechar</string>
 
     <!-- Player -->
     <string name="sin_playlists">Sem playlists</string>

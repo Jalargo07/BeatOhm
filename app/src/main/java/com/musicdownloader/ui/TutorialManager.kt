@@ -125,24 +125,17 @@ object TutorialManager {
 
     private fun startHighlightLoop(view: View) {
         stopHighlightLoop(view)
-        var expanding = true
-        val scaleUp = 1.08f
-        val scaleDown = 1f
-        val duration = 400L
+        var phase = 0
+        val duration = 500L
 
         highlightAnimator = object : Runnable {
             override fun run() {
-                val target = if (expanding) scaleUp else scaleDown
-                view.animate()
-                    .scaleX(target)
-                    .scaleY(target)
-                    .setDuration(duration)
-                    .setInterpolator(DecelerateInterpolator())
-                    .withEndAction {
-                        expanding = !expanding
-                        view.post(this)
-                    }
-                    .start()
+                when (phase % 4) {
+                    0 -> view.animate().scaleX(1.1f).scaleY(1.1f).alpha(0.7f).setDuration(duration).setInterpolator(DecelerateInterpolator()).withEndAction { phase++; view.post(this) }.start()
+                    1 -> view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(duration).setInterpolator(DecelerateInterpolator()).withEndAction { phase++; view.post(this) }.start()
+                    2 -> view.animate().scaleX(1.05f).scaleY(1.05f).alpha(0.85f).setDuration(duration / 2).setInterpolator(DecelerateInterpolator()).withEndAction { phase++; view.post(this) }.start()
+                    3 -> view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(duration / 2).setInterpolator(DecelerateInterpolator()).withEndAction { phase++; view.post(this) }.start()
+                }
             }
         }
         view.post(highlightAnimator)
@@ -156,6 +149,7 @@ object TutorialManager {
         highlightAnimator = null
         view.scaleX = 1f
         view.scaleY = 1f
+        view.alpha = 1f
     }
 
     fun resetAll(context: Context) {
