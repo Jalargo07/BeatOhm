@@ -206,14 +206,28 @@ class WaveformSeekBar @JvmOverloads constructor(
             val x = i * (barWidth + barSpacing)
             val barHeight = minBarHeight + (maxHeight - minBarHeight) * bars[i]
             val top = centerY - barHeight / 2f
+            val barEnd = x + barWidth
 
-            // Played = bar position <= current progress position in waveform space
-            val targetPath = if (x + barWidth <= progressWaveX) playedPath else unplayedPath
-            targetPath.addRoundRect(
-                x, top, x + barWidth, top + barHeight,
-                cornerRadius, cornerRadius,
-                Path.Direction.CW
-            )
+            when {
+                barEnd <= progressWaveX -> {
+                    // Fully played
+                    playedPath.addRoundRect(x, top, barEnd, top + barHeight,
+                        cornerRadius, cornerRadius, Path.Direction.CW)
+                }
+                x >= progressWaveX -> {
+                    // Fully unplayed
+                    unplayedPath.addRoundRect(x, top, barEnd, top + barHeight,
+                        cornerRadius, cornerRadius, Path.Direction.CW)
+                }
+                else -> {
+                    // Partially played — split into played + unplayed fractions
+                    val splitX = progressWaveX.coerceIn(x, barEnd)
+                    playedPath.addRoundRect(x, top, splitX, top + barHeight,
+                        cornerRadius, cornerRadius, Path.Direction.CW)
+                    unplayedPath.addRoundRect(splitX, top, barEnd, top + barHeight,
+                        cornerRadius, cornerRadius, Path.Direction.CW)
+                }
+            }
         }
     }
 
