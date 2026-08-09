@@ -7,11 +7,13 @@ import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * Fondo degradado diagonal del reproductor.
@@ -29,9 +31,7 @@ class DynamicGradientDrawable(
     private val evaluator = ArgbEvaluator()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var animator: ValueAnimator? = null
-    private var cachedGradient: LinearGradient? = null
-    private var lastBoundsWidth = 0
-    private var lastBoundsHeight = 0
+    var currentPhase: Float = 0f
 
     // Base colors for energy modulation
     private var baseTop = DEFAULT_TOP
@@ -92,7 +92,6 @@ class DynamicGradientDrawable(
                 midColor = evaluator.evaluate(f, startMid, mid) as Int
                 bottomColor = evaluator.evaluate(f, startBottom, bottom) as Int
                 darkVibrantColor = evaluator.evaluate(f, startDarkVibrant, darkVibrant) as Int
-                cachedGradient = null
                 invalidateSelf()
             }
             start()
@@ -115,26 +114,41 @@ class DynamicGradientDrawable(
         midColor = blend(BASE_COLOR, baseMid, 0.45f * factor)
         bottomColor = blend(BASE_COLOR, baseBottom, 0.35f * factor)
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
-        cachedGradient = null
         invalidateSelf()
     }
 
     override fun draw(canvas: Canvas) {
         val bounds = bounds
         if (bounds.isEmpty) return
-        val w = bounds.width()
+        val w = bounds.width().toFloat()
         val h = bounds.height()
-        if (cachedGradient == null || w != lastBoundsWidth || h != lastBoundsHeight) {
-            cachedGradient = LinearGradient(
-                0f, 0f, w.toFloat(), h.toFloat(),
+
+        canvas.drawColor(BASE_COLOR)
+
+        val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, 0f, 0f, h.toFloat(),
                 intArrayOf(topColor, midColor, bottomColor, darkVibrantColor),
                 null, Shader.TileMode.CLAMP
             )
-            lastBoundsWidth = w
-            lastBoundsHeight = h
         }
-        paint.shader = cachedGradient
-        canvas.drawRect(bounds, paint)
+
+        val wavePath = Path()
+        val waveHeight = h * 0.15f * (0.5f + energyModulator * 0.5f)
+        val baseY = h * 0.5f
+        val waveLength = w * 0.8f
+
+        wavePath.moveTo(0f, h.toFloat())
+        for (x in 0..w.toInt() step 2) {
+            val y = baseY + sin(
+                (x / waveLength) * 2 * Math.PI + currentPhase
+            ).toFloat() * waveHeight
+            wavePath.lineTo(x.toFloat(), y)
+        }
+        wavePath.lineTo(w, h.toFloat())
+        wavePath.close()
+
+        canvas.drawPath(wavePath, wavePaint)
     }
 
     override fun setAlpha(alpha: Int) {

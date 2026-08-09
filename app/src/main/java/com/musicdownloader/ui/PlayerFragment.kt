@@ -83,6 +83,9 @@ class PlayerFragment : Fragment() {
 
     private val dynamicGradient = DynamicGradientDrawable()
     private val glowDrawable = GlowDrawable()
+    private val wavePhaseAnimator = WavePhaseAnimator { phase ->
+        dynamicGradient.currentPhase = phase
+    }
     private var primaryColor: Int = Color.BLACK
     private var titleTextColor: Int = Color.WHITE
     private var bodyTextColor: Int = Color.WHITE
@@ -127,6 +130,7 @@ class PlayerFragment : Fragment() {
         binding.waveformSeekbar.setThemeMode(isDark)
         binding.root.background = dynamicGradient
         binding.ivGlow.background = glowDrawable
+        wavePhaseAnimator.start()
 
         if (Build.VERSION.SDK_INT >= 31) {
             binding.ivGlow.setRenderEffect(
@@ -1046,8 +1050,11 @@ class PlayerFragment : Fragment() {
     }
 
     private fun updateGradientFromWaveform(progress: Int) {
-        val energy = binding.waveformSeekbar.getEnergyAtProgress(progress)
-        dynamicGradient.modulateByEnergy(energy)
+        val currentBar = binding.waveformSeekbar.getEnergyAtProgress(progress)
+        val nextBar = binding.waveformSeekbar.getEnergyAtNextBar(progress)
+        val barFraction = binding.waveformSeekbar.getBarFraction(progress)
+        val interpolatedEnergy = currentBar + (nextBar - currentBar) * barFraction
+        dynamicGradient.modulateByEnergy(interpolatedEnergy)
     }
 
     private fun applyLyricsBlur(blur: Boolean) {
@@ -1126,6 +1133,7 @@ class PlayerFragment : Fragment() {
         PlayerLayoutManager.removeVinylViewIfAny(binding.root)
         stopCoverBreathe()
         cancelSwipeAnimations()
+        wavePhaseAnimator.stop()
         updateRunnable?.let { binding.root.removeCallbacks(it) }
         _binding = null
         super.onDestroyView()

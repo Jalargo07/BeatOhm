@@ -79,11 +79,40 @@ class WaveformSeekBar @JvmOverloads constructor(
 
     fun getEnergyAtProgress(progress: Int): Float {
         if (bars.isEmpty() || max == 0) return 0f
-        val barIndex = ((progress.toFloat() / max) * (bars.size - 1)).toInt().coerceIn(0, bars.size - 1)
-        val sampleRange = 5
+        val barIndex = getProgressToBarIndex(progress)
+        return getEnergyAtIndex(barIndex)
+    }
+
+    fun getBarAtIndex(index: Int): Float {
+        if (bars.isEmpty() || index < 0 || index >= bars.size) return 0f
+        return bars[index]
+    }
+
+    fun getBarCount(): Int = bars.size
+
+    fun getProgressToBarIndex(progress: Int): Int {
+        if (bars.isEmpty() || max == 0) return 0
+        return ((progress.toFloat() / max) * (bars.size - 1)).toInt().coerceIn(0, bars.size - 1)
+    }
+
+    fun getBarFraction(progress: Int): Float {
+        if (bars.isEmpty() || max == 0) return 0f
+        val exactPosition = (progress.toFloat() / max) * (bars.size - 1)
+        return exactPosition - exactPosition.toInt().toFloat()
+    }
+
+    fun getEnergyAtNextBar(progress: Int): Float {
+        val currentIndex = getProgressToBarIndex(progress)
+        val nextIndex = (currentIndex + 1).coerceAtMost(bars.size - 1)
+        return getEnergyAtIndex(nextIndex)
+    }
+
+    private fun getEnergyAtIndex(index: Int): Float {
+        if (bars.isEmpty()) return 0f
+        val sampleRange = 3
         var sum = 0f
         var count = 0
-        for (i in (barIndex - sampleRange)..(barIndex + sampleRange)) {
+        for (i in (index - sampleRange)..(index + sampleRange)) {
             if (i in bars.indices) {
                 sum += bars[i]
                 count++
