@@ -90,6 +90,15 @@ class WaveformSeekBar @JvmOverloads constructor(
 
     fun getBarCount(): Int = bars.size
 
+    fun getNearbyBars(progress: Int, count: Int): FloatArray {
+        if (bars.isEmpty() || max == 0) return floatArrayOf()
+        val centerIndex = getProgressToBarIndex(progress)
+        val half = count / 2
+        val start = (centerIndex - half).coerceAtLeast(0)
+        val end = (centerIndex + half + 1).coerceAtMost(bars.size)
+        return bars.copyOfRange(start, end)
+    }
+
     fun getProgressToBarIndex(progress: Int): Int {
         if (bars.isEmpty() || max == 0) return 0
         return ((progress.toFloat() / max) * (bars.size - 1)).toInt().coerceIn(0, bars.size - 1)

@@ -1055,6 +1055,7 @@ class PlayerFragment : Fragment() {
         val barFraction = binding.waveformSeekbar.getBarFraction(progress)
         val interpolatedEnergy = currentBar + (nextBar - currentBar) * barFraction
         dynamicGradient.modulateByEnergy(interpolatedEnergy)
+        dynamicGradient.waveData = binding.waveformSeekbar.getNearbyBars(progress, 20)
     }
 
     private fun applyLyricsBlur(blur: Boolean) {

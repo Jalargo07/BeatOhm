@@ -33,6 +33,16 @@ class DynamicGradientDrawable(
     private var animator: ValueAnimator? = null
     var currentPhase: Float = 0f
 
+    // Cached drawing objects
+    private var wavePaint: Paint? = null
+    private var waveGradient: LinearGradient? = null
+    private var cachedWaveWidth = 0
+    private var cachedWaveHeight = 0
+    private val wavePath = Path()
+
+    // Waveform data from audio bars
+    var waveData: FloatArray = floatArrayOf()
+
     // Base colors for energy modulation
     private var baseTop = DEFAULT_TOP
     private var baseMid = DEFAULT_MID
@@ -92,6 +102,7 @@ class DynamicGradientDrawable(
                 midColor = evaluator.evaluate(f, startMid, mid) as Int
                 bottomColor = evaluator.evaluate(f, startBottom, bottom) as Int
                 darkVibrantColor = evaluator.evaluate(f, startDarkVibrant, darkVibrant) as Int
+                rebuildWaveGradient(cachedWaveHeight)
                 invalidateSelf()
             }
             start()
@@ -114,41 +125,61 @@ class DynamicGradientDrawable(
         midColor = blend(BASE_COLOR, baseMid, 0.45f * factor)
         bottomColor = blend(BASE_COLOR, baseBottom, 0.35f * factor)
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
+        rebuildWaveGradient(cachedWaveHeight)
         invalidateSelf()
+    }
+
+    private fun rebuildWaveGradient(height: Int) {
+        if (height <= 0) return
+        waveGradient = LinearGradient(
+            0f, 0f, 0f, height.toFloat(),
+            intArrayOf(topColor, midColor, bottomColor, darkVibrantColor),
+            null, Shader.TileMode.CLAMP
+        )
+        wavePaint?.shader = waveGradient
     }
 
     override fun draw(canvas: Canvas) {
         val bounds = bounds
         if (bounds.isEmpty) return
         val w = bounds.width().toFloat()
-        val h = bounds.height()
+        val h = bounds.height().toFloat()
+
+        if (wavePaint == null || cachedWaveWidth != w.toInt() || cachedWaveHeight != h.toInt()) {
+            wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            rebuildWaveGradient(h.toInt())
+            cachedWaveWidth = w.toInt()
+            cachedWaveHeight = h.toInt()
+        }
 
         canvas.drawColor(BASE_COLOR)
 
-        val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f, 0f, 0f, h.toFloat(),
-                intArrayOf(topColor, midColor, bottomColor, darkVibrantColor),
-                null, Shader.TileMode.CLAMP
-            )
-        }
-
-        val wavePath = Path()
         val waveHeight = h * 0.15f * (0.5f + energyModulator * 0.5f)
         val baseY = h * 0.5f
-        val waveLength = w * 0.8f
 
-        wavePath.moveTo(0f, h.toFloat())
-        for (x in 0..w.toInt() step 2) {
-            val y = baseY + sin(
-                (x / waveLength) * 2 * Math.PI + currentPhase
-            ).toFloat() * waveHeight
-            wavePath.lineTo(x.toFloat(), y)
+        wavePath.rewind()
+        wavePath.moveTo(0f, h)
+
+        if (waveData.isNotEmpty()) {
+            val barStep = (waveData.size / (w / 4f).toInt().coerceAtLeast(1)).coerceAtLeast(1)
+            var barIndex = 0
+            for (x in 0..w.toInt() step 4) {
+                val barAmp = waveData[barIndex.coerceIn(0, waveData.size - 1)]
+                val y = baseY + sin((x / (w * 0.5f)) * 2 * Math.PI + currentPhase).toFloat() * waveHeight * (0.5f + barAmp * 0.5f)
+                wavePath.lineTo(x.toFloat(), y)
+                barIndex = (barIndex + barStep).coerceAtMost(waveData.size - 1)
+            }
+        } else {
+            for (x in 0..w.toInt() step 4) {
+                val y = baseY + sin((x / (w * 0.8f)) * 2 * Math.PI + currentPhase).toFloat() * waveHeight
+                wavePath.lineTo(x.toFloat(), y)
+            }
         }
-        wavePath.lineTo(w, h.toFloat())
+
+        wavePath.lineTo(w, h)
         wavePath.close()
 
-        canvas.drawPath(wavePath, wavePaint)
+        canvas.drawPath(wavePath, wavePaint!!)
     }
 
     override fun setAlpha(alpha: Int) {
