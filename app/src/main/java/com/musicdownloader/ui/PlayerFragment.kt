@@ -86,6 +86,10 @@ class PlayerFragment : Fragment() {
     private var primaryColor: Int = Color.BLACK
     private var titleTextColor: Int = Color.WHITE
     private var bodyTextColor: Int = Color.WHITE
+    private var isDarkMode: Boolean = true
+
+    private fun textColor(): Int = if (isDarkMode) Color.WHITE else Color.BLACK
+    private fun secondaryTextColor(): Int = if (isDarkMode) 0xFFB0B0B0.toInt() else 0xFF666666.toInt()
 
     private var downX = 0f
     private var downY = 0f
@@ -118,7 +122,9 @@ class PlayerFragment : Fragment() {
 
         val isDark = requireContext().resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        isDarkMode = isDark
         DynamicGradientDrawable.setThemeMode(isDark)
+        binding.waveformSeekbar.setThemeMode(isDark)
         binding.root.background = dynamicGradient
         binding.ivGlow.background = glowDrawable
 
@@ -479,8 +485,8 @@ class PlayerFragment : Fragment() {
         if (bitmap == null || gradientMode == 1) {
             dynamicGradient.resetToDefault(PALETTE_DURATION)
             glowDrawable.setColor(primaryColor, PALETTE_DURATION)
-            titleTextColor = Color.WHITE
-            bodyTextColor = Color.WHITE
+            titleTextColor = textColor()
+            bodyTextColor = secondaryTextColor()
             binding.tvTitle.setTextColor(titleTextColor)
             binding.tvArtist.setTextColor(bodyTextColor)
             applyThemeFont()
@@ -490,8 +496,8 @@ class PlayerFragment : Fragment() {
             2 -> {
                 dynamicGradient.setPrimaryGradient(ThemeManager.primaryColor, PALETTE_DURATION)
                 glowDrawable.setColor(ThemeManager.primaryColor, PALETTE_DURATION)
-                titleTextColor = Color.WHITE
-                bodyTextColor = Color.WHITE
+                titleTextColor = textColor()
+                bodyTextColor = secondaryTextColor()
                 binding.tvTitle.setTextColor(titleTextColor)
                 binding.tvArtist.setTextColor(bodyTextColor)
                 applyThemeFont()
@@ -500,8 +506,8 @@ class PlayerFragment : Fragment() {
             3 -> {
                 dynamicGradient.setNeutralDark(PALETTE_DURATION)
                 glowDrawable.setColor(primaryColor, PALETTE_DURATION)
-                titleTextColor = Color.WHITE
-                bodyTextColor = Color.WHITE
+                titleTextColor = textColor()
+                bodyTextColor = secondaryTextColor()
                 binding.tvTitle.setTextColor(titleTextColor)
                 binding.tvArtist.setTextColor(bodyTextColor)
                 applyThemeFont()
@@ -525,8 +531,8 @@ class PlayerFragment : Fragment() {
                     val darkMuted = palette.getDarkMutedColor(primaryColor)
                     val lightVibrant = palette.getLightVibrantColor(primaryColor)
                     val dominantSwatch = palette.dominantSwatch
-                    titleTextColor = dominantSwatch?.titleTextColor ?: Color.WHITE
-                    bodyTextColor = dominantSwatch?.bodyTextColor ?: Color.WHITE
+                    titleTextColor = dominantSwatch?.titleTextColor ?: textColor()
+                    bodyTextColor = dominantSwatch?.bodyTextColor ?: secondaryTextColor()
                     binding.tvTitle.setTextColor(titleTextColor)
                     binding.tvArtist.setTextColor(bodyTextColor)
                     dynamicGradient.setColors(

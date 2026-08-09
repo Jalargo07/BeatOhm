@@ -56,6 +56,15 @@ class WaveformSeekBar @JvmOverloads constructor(
         color = 0x29FFFFFF
     }
 
+    private var isDarkMode = true
+
+    fun setThemeMode(dark: Boolean) {
+        isDarkMode = dark
+        unplayedPaint.color = if (dark) 0x29FFFFFF else 0x29000000
+        playedGradient = null
+        invalidate()
+    }
+
     // Paths (rebuilt each frame for scrolling)
     private val playedPath = Path()
     private val unplayedPath = Path()
