@@ -194,21 +194,15 @@ class DynamicGradientDrawable(
 
         var maxPeakY = baseY
 
-        // 4. MUESTREO SINCRO (Fase con multiplicadores enteros)
+        // 4. MUESTREO: 3 ONDAS SIN CANCELACIÓN
         for (x in 0..w.toInt() step 3) {
             val fraction = x / w
 
-            val w1 = sin(fraction * Math.PI * 1.2f + currentPhase).toFloat() * 0.40f
-            val w4 = sin(fraction * Math.PI * 2.0f - currentPhase).toFloat() * 0.25f
-            val w8 = sin(fraction * Math.PI * 3.0f + currentPhase * 2f).toFloat() * 0.10f
+            val w1 = sin(fraction * Math.PI * 1.2f + currentPhase).toFloat() * 0.45f
+            val w4 = sin(fraction * Math.PI * 2.4f + currentPhase * 0.5f).toFloat() * 0.20f
+            val w8 = sin(fraction * Math.PI * 3.6f + currentPhase * 1.5f).toFloat() * 0.10f
 
-            val w2 = (w1 + w4) * 0.5f
-            val w3 = w1 * 0.6f + w4 * 0.4f
-            val w5 = (w4 + w8) * 0.5f
-            val w6 = w4 * 0.7f - w8 * 0.3f
-            val w7 = w8 * 0.5f
-
-            val combinedWave = (w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8) * energyModulator * 0.6f
+            val combinedWave = (w1 + w4 + w8) * energyModulator
             val calculatedY = baseY - (combinedWave * maxClimbHeight)
             val y = calculatedY.coerceAtMost(floorLimitY)
 
