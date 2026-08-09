@@ -6,20 +6,18 @@ import android.media.MediaFormat
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.nio.ByteBuffer
-import kotlin.math.abs
-import kotlin.math.sqrt
 
 object WaveformExtractor {
 
     private const val TAG = "WaveformExtractor"
 
     /**
-     * Calculates optimal number of bars: 1 bar per 3 seconds of audio.
+     * Calculates optimal number of bars: 1 bar per 0.1 seconds of audio.
+     * Higher resolution captures transients and dynamic range better.
      */
     fun barsForDuration(durationMs: Long): Int {
         val durationSec = durationMs / 1000.0
-        val bars = (durationSec / 0.5).toInt().coerceIn(20, 500)
+        val bars = (durationSec / 0.1).toInt().coerceIn(50, 1000)
         Log.d(TAG, "barsForDuration: durationMs=$durationMs → durationSec=${"%.1f".format(durationSec)} → bars=$bars")
         return bars
     }
@@ -78,9 +76,10 @@ object WaveformExtractor {
         val totalSamples = (durationUs / 1_000_000.0 * sampleRate).toLong()
         val samplesPerBar = (totalSamples / numBars).coerceAtLeast(1)
         val durationSec = durationUs / 1_000_000.0
+        val bytesPerSample = if (channelCount == 2) 4 else 2
 
         Log.d(TAG, "Audio: mime=$mime sampleRate=$sampleRate channels=$channelCount durationUs=$durationUs (${"%.1f".format(durationSec)}s)")
-        Log.d(TAG, "Calc: totalSamples=$totalSamples numBars=$numBars samplesPerBar=$samplesPerBar")
+        Log.d(TAG, "Calc: totalSamples=$totalSamples numBars=$numBars samplesPerBar=$samplesPerBar bytesPerSample=$bytesPerSample")
 
         // Configure decoder
         val codec = MediaCodec.createDecoderByType(mime)
@@ -89,10 +88,9 @@ object WaveformExtractor {
 
         val bufferInfo = MediaCodec.BufferInfo()
         val amplitudes = FloatArray(numBars)
-        val pcmBuffer = ByteBuffer.allocate(16384)
         var currentBar = 0
         var samplesInCurrentBar = 0
-        var sumSquares = 0.0
+        var maxPeakInBar = 0
         var isEOS = false
         var totalSamplesProcessed = 0L
         var outputCount = 0
@@ -127,18 +125,26 @@ object WaveformExtractor {
                     outputBuffer.limit(bufferInfo.offset + size)
                     outputCount++
 
-                    while (outputBuffer.remaining() >= 2 && currentBar < numBars) {
+                    while (outputBuffer.remaining() >= bytesPerSample && currentBar < numBars) {
                         val sample = outputBuffer.short.toFloat() / Short.MAX_VALUE
-                        sumSquares += sample * sample
+
+                        // For stereo: skip the second channel
+                        if (channelCount == 2 && outputBuffer.remaining() >= 2) {
+                            outputBuffer.short
+                        }
+
+                        val absValue = kotlin.math.abs(sample)
+                        if (absValue > maxPeakInBar) {
+                            maxPeakInBar = absValue.toInt()
+                        }
                         samplesInCurrentBar++
                         totalSamplesProcessed++
 
                         if (samplesInCurrentBar >= samplesPerBar) {
-                            val rms = sqrt(sumSquares / samplesInCurrentBar).toFloat()
-                            amplitudes[currentBar] = rms.coerceIn(0f, 1f)
+                            amplitudes[currentBar] = (maxPeakInBar.toFloat() / Short.MAX_VALUE).coerceIn(0f, 1f)
                             currentBar++
                             samplesInCurrentBar = 0
-                            sumSquares = 0.0
+                            maxPeakInBar = 0
 
                             if (currentBar % 20 == 0 || currentBar == numBars) {
                                 Log.d(TAG, "Progress: bar=$currentBar/$numBars samples=$totalSamplesProcessed")
@@ -170,12 +176,12 @@ object WaveformExtractor {
         codec.release()
         extractor.release()
 
-        // Normalize to 0.1 - 1.0 range
+        // Normalize to 0.0 - 1.0 range (no artificial floor)
         val maxAmp = amplitudes.maxOrNull() ?: 1f
         val minBefore = amplitudes.minOrNull() ?: 0f
         if (maxAmp > 0f) {
             for (i in amplitudes.indices) {
-                amplitudes[i] = (0.1f + 0.9f * (amplitudes[i] / maxAmp))
+                amplitudes[i] = (amplitudes[i] / maxAmp).coerceIn(0f, 1f)
             }
         }
         val minAfter = amplitudes.minOrNull() ?: 0f
