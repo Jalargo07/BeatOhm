@@ -1117,7 +1117,7 @@ class PlayerFragment : Fragment() {
                         b.syncedLyricsView.updatePosition(pos)
                     }
                 }
-                b.root.postDelayed(this, 100)
+                b.root.postDelayed(this, 40)
             }
         }
         _binding?.root?.postDelayed(updateRunnable!!, 500)
