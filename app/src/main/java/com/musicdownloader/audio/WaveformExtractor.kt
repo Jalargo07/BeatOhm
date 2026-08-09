@@ -49,7 +49,6 @@ object WaveformExtractor {
         val extractor = MediaExtractor()
         extractor.setDataSource(filePath)
 
-        // Find audio track
         var audioTrackIndex = -1
         var format: MediaFormat? = null
         for (i in 0 until extractor.trackCount) {
@@ -75,13 +74,7 @@ object WaveformExtractor {
 
         val totalSamples = (durationUs / 1_000_000.0 * sampleRate).toLong()
         val samplesPerBar = (totalSamples / numBars).coerceAtLeast(1)
-        val durationSec = durationUs / 1_000_000.0
-        val bytesPerSample = if (channelCount == 2) 4 else 2
 
-        Log.d(TAG, "Audio: mime=$mime sampleRate=$sampleRate channels=$channelCount durationUs=$durationUs (${"%.1f".format(durationSec)}s)")
-        Log.d(TAG, "Calc: totalSamples=$totalSamples numBars=$numBars samplesPerBar=$samplesPerBar bytesPerSample=$bytesPerSample")
-
-        // Configure decoder
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
@@ -92,13 +85,8 @@ object WaveformExtractor {
         var samplesInCurrentBar = 0
         var maxPeakInBar = 0
         var isEOS = false
-        var totalSamplesProcessed = 0L
-        var outputCount = 0
-
-        val decodeStart = System.currentTimeMillis()
 
         while (currentBar < numBars) {
-            // Feed input
             if (!isEOS) {
                 val inputIndex = codec.dequeueInputBuffer(10_000)
                 if (inputIndex >= 0) {
@@ -107,7 +95,6 @@ object WaveformExtractor {
                     if (sampleSize < 0) {
                         codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                         isEOS = true
-                        Log.d(TAG, "EOS sent at bar=$currentBar/$numBars")
                     } else {
                         codec.queueInputBuffer(inputIndex, 0, sampleSize, extractor.sampleTime, 0)
                         extractor.advance()
@@ -115,7 +102,6 @@ object WaveformExtractor {
                 }
             }
 
-            // Read output
             val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 10_000)
             if (outputIndex >= 0) {
                 val outputBuffer = codec.getOutputBuffer(outputIndex) ?: continue
@@ -123,52 +109,42 @@ object WaveformExtractor {
                 if (size > 0) {
                     outputBuffer.position(bufferInfo.offset)
                     outputBuffer.limit(bufferInfo.offset + size)
-                    outputCount++
 
-                    while (outputBuffer.remaining() >= bytesPerSample && currentBar < numBars) {
-                        val sample = outputBuffer.short.toFloat() / Short.MAX_VALUE
+                    val bytesPerFrame = channelCount * 2
 
-                        // For stereo: skip the second channel
-                        if (channelCount == 2 && outputBuffer.remaining() >= 2) {
+                    while (outputBuffer.remaining() >= bytesPerFrame && currentBar < numBars) {
+                        val rawSample = outputBuffer.short.toInt()
+
+                        if (channelCount == 2) {
                             outputBuffer.short
                         }
 
-                        val absValue = kotlin.math.abs(sample)
-                        if (absValue > maxPeakInBar) {
-                            maxPeakInBar = absValue.toInt()
+                        val absSample = kotlin.math.abs(rawSample)
+                        if (absSample > maxPeakInBar) {
+                            maxPeakInBar = absSample
                         }
+
                         samplesInCurrentBar++
-                        totalSamplesProcessed++
 
                         if (samplesInCurrentBar >= samplesPerBar) {
                             amplitudes[currentBar] = (maxPeakInBar.toFloat() / Short.MAX_VALUE).coerceIn(0f, 1f)
                             currentBar++
                             samplesInCurrentBar = 0
                             maxPeakInBar = 0
-
-                            if (currentBar % 20 == 0 || currentBar == numBars) {
-                                Log.d(TAG, "Progress: bar=$currentBar/$numBars samples=$totalSamplesProcessed")
-                            }
                         }
                     }
                 }
                 codec.releaseOutputBuffer(outputIndex, false)
                 if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-                    Log.d(TAG, "EOS received at bar=$currentBar/$numBars outputBuffers=$outputCount")
                     break
                 }
             }
         }
 
-        val decodeMs = System.currentTimeMillis() - decodeStart
-        Log.d(TAG, "Decode loop: ${decodeMs}ms barsFilled=$currentBar/$numBars totalSamples=$totalSamplesProcessed outputBuffers=$outputCount")
-
-        // Fill remaining bars if any
-        val remaining = numBars - currentBar
-        if (remaining > 0) {
-            Log.d(TAG, "Filling $remaining remaining bars (padded)")
+        if (currentBar < numBars) {
+            val lastVal = if (currentBar > 0) amplitudes[currentBar - 1] else 0.1f
             for (i in currentBar until numBars) {
-                amplitudes[i] = if (i > 0) amplitudes[i - 1] else 0.3f
+                amplitudes[i] = lastVal
             }
         }
 
@@ -176,17 +152,12 @@ object WaveformExtractor {
         codec.release()
         extractor.release()
 
-        // Normalize to 0.0 - 1.0 range (no artificial floor)
-        val maxAmp = amplitudes.maxOrNull() ?: 1f
-        val minBefore = amplitudes.minOrNull() ?: 0f
-        if (maxAmp > 0f) {
+        val maxGlobalPeak = amplitudes.maxOrNull() ?: 1f
+        if (maxGlobalPeak > 0f) {
             for (i in amplitudes.indices) {
-                amplitudes[i] = (amplitudes[i] / maxAmp).coerceIn(0f, 1f)
+                amplitudes[i] = (amplitudes[i] / maxGlobalPeak).coerceIn(0.05f, 1f)
             }
         }
-        val minAfter = amplitudes.minOrNull() ?: 0f
-        val maxAfter = amplitudes.maxOrNull() ?: 0f
-        Log.d(TAG, "Normalize: raw min=${"%.4f".format(minBefore)} max=${"%.4f".format(maxAmp)} → normalized min=${"%.3f".format(minAfter)} max=${"%.3f".format(maxAfter)}")
 
         return amplitudes
     }
