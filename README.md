@@ -168,6 +168,39 @@ app/src/main/java/com/musicdownloader/
 
 ## Changelog
 
+### v2.7-nightly.260809
+
+**Waveform Visualizer — Ola centrada con energía**
+- Ola única centrada que crece/disminuye según la energía del audio
+- Interpolación suave (lerp) entre barras para transiciones fluidas sin saltos
+- Actualización a 40ms (25fps) para movimiento natural
+- Colores del gradiente reactivos a la energía del waveform
+
+**Waveform refinado**
+- 1 barra por 0.5 segundos (era 1.2s), máximo 500 barras
+- Coloreado parcial de barras con fracción interpolada
+- Energía interpolada entre barra actual y siguiente
+
+**Player mejorado**
+- Mini lyrics preview con posición corregida
+- Scroll a línea actual al abrir panel de letras
+- Modo claro para gradiente, waveform y texto
+- Títulos adaptativos según gradiente del tema
+
+**Iconos**
+- Pack Heroic (antes Filled) con identidad visual propia
+- Solo 3 packs: Material, DarkNova, Heroic
+- Todos los iconos usan tint dinámico del tema
+
+**Fixes**
+- Fix: metadata cleaning para nombres de playlist y canales de YouTube
+- Fix: 4 intentos de búsqueda de metadata (iTunes + MusicBrainz)
+- Fix: waveform extractor con 1 barra/0.5s para mayor resolución
+- Fix: modo claro funcional en gradiente y waveform
+- Fix: mini lyrics constraint y posición del preview
+
+---
+
 ### v2.7-nightly.260808
 
 **Multi-idioma**
