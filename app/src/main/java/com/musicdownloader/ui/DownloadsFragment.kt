@@ -27,6 +27,10 @@ import com.musicdownloader.model.SearchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 class DownloadsFragment : Fragment() {
 
@@ -189,7 +193,7 @@ class DownloadsFragment : Fragment() {
         stopPreview()
         currentPreviewVideoId = result.videoId
         searchAdapter.setLoading(result.videoId)
-        Log.d(TAG, "togglePreview: starting preview for '${result.title}' (${result.videoId})")
+        Log.d(TAG, "togglePreview: starting preview for '${result.title}'")
 
         lifecycleScope.launch {
             try {
@@ -200,12 +204,40 @@ class DownloadsFragment : Fragment() {
                 }
                 if (audioResult.isSuccess) {
                     val audio = audioResult.getOrThrow()
-                    Log.d(TAG, "togglePreview: stream OK url=${audio.url.take(80)}... mime=${audio.mimeType}")
-                    val mediaItem = MediaItem.fromUri(audio.url)
+                    Log.d(TAG, "togglePreview: stream URL obtained, downloading temp file...")
+
+                    val tempFile = withContext(Dispatchers.IO) {
+                        val cacheDir = File(requireContext().cacheDir, "previews")
+                        cacheDir.mkdirs()
+                        val ext = if (audio.mimeType.contains("webm")) "webm" else "mp3"
+                        val file = File(cacheDir, "${result.videoId}.$ext")
+                        if (!file.exists() || file.length() == 0L) {
+                            val client = OkHttpClient.Builder()
+                                .connectTimeout(15, TimeUnit.SECONDS)
+                                .readTimeout(30, TimeUnit.SECONDS)
+                                .build()
+                            val request = Request.Builder()
+                                .url(audio.url)
+                                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                                .header("Referer", "https://www.youtube.com/")
+                                .build()
+                            client.newCall(request).execute().use { response ->
+                                if (response.isSuccessful) {
+                                    response.body?.bytes()?.let { file.writeBytes(it) }
+                                } else {
+                                    throw Exception("Download failed: ${response.code}")
+                                }
+                            }
+                        }
+                        file
+                    }
+
+                    Log.d(TAG, "togglePreview: temp file ready (${tempFile.length()} bytes)")
+                    val mediaItem = MediaItem.fromUri(android.net.Uri.fromFile(tempFile))
                     player.setMediaItem(mediaItem)
                     player.prepare()
                     player.play()
-                    Log.d(TAG, "togglePreview: player.play() called, volume=${player.volume}")
+                    Log.d(TAG, "togglePreview: player.play() called")
                     searchAdapter.setPlaying(result.videoId)
                     player.seekTo(0)
                     previewHandler.postDelayed({ stopPreview() }, 40_000)
@@ -226,7 +258,13 @@ class DownloadsFragment : Fragment() {
         previewHandler.removeCallbacksAndMessages(null)
         previewPlayer?.stop()
         previewPlayer?.clearMediaItems()
-        currentPreviewVideoId?.let { searchAdapter.setIdle(it) }
+        currentPreviewVideoId?.let { id ->
+            searchAdapter.setIdle(id)
+            try {
+                val cacheDir = File(requireContext().cacheDir, "previews")
+                cacheDir.listFiles()?.filter { it.name.startsWith(id) }?.forEach { it.delete() }
+            } catch (_: Exception) {}
+        }
         currentPreviewVideoId = null
     }
 
