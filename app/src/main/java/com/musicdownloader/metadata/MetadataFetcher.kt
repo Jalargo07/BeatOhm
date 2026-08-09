@@ -112,6 +112,21 @@ class MetadataFetcher {
                 return@withContext Result.success(cleaned)
             }
 
+            // Attempt 4: MusicBrainz with ONLY title
+            Log.e(TAG, "fetchFullMetadata iTunes title-only falló, intentando MusicBrainz solo con título...")
+            val mbTitleOnly = searchMusicBrainz("", song.title)
+            if (mbTitleOnly != null) {
+                val cleaned = song.copy(
+                    title = mbTitleOnly.title ?: song.title,
+                    artist = mbTitleOnly.artist ?: song.artist,
+                    album = mbTitleOnly.album ?: "",
+                    genre = mbTitleOnly.genre ?: "",
+                    year = mbTitleOnly.year ?: ""
+                )
+                Log.e(TAG, "fetchFullMetadata MusicBrainz (title-only) OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
+                return@withContext Result.success(cleaned)
+            }
+
             Log.e(TAG, "fetchFullMetadata SIN RESULTADO para '${song.artist}' - '${song.title}'")
             Result.success(song)
         } catch (e: Exception) {
@@ -123,7 +138,8 @@ class MetadataFetcher {
     private fun searchItunes(artist: String, title: String): ITunesResult? {
         try {
             val cleanArtist = cleanChannelName(artist)
-            val cleanTitle = title.replace(Regex("\\s*\\(.*?\\)$"), "").replace(Regex("\\s*\\[.*?\\]$"), "").trim()
+            val cleanTitle = cleanTitle(title)
+            Log.e(TAG, "searchItunes: artist='$artist' → '$cleanArtist', title='$title' → '$cleanTitle'")
             val query = if (cleanArtist.isNotBlank()) {
                 URLEncoder.encode("$cleanArtist $cleanTitle", "UTF-8")
             } else {
@@ -165,8 +181,14 @@ class MetadataFetcher {
     private fun searchMusicBrainz(artist: String, title: String): MusicBrainzResult? {
         try {
             val cleanArtist = cleanChannelName(artist)
-            val cleanTitle = title.replace(Regex("\\s*\\(.*?\\)$"), "").replace(Regex("\\s*\\[.*?\\]$"), "").trim()
-            val query = URLEncoder.encode("artist:\"$cleanArtist\" AND recording:\"$cleanTitle\"", "UTF-8")
+            val cleanTitle = cleanTitle(title)
+            Log.e(TAG, "searchMusicBrainz: artist='$artist' → '$cleanArtist', title='$title' → '$cleanTitle'")
+            val query = if (cleanArtist.isNotBlank()) {
+                URLEncoder.encode("artist:\"$cleanArtist\" AND recording:\"$cleanTitle\"", "UTF-8")
+            } else {
+                URLEncoder.encode("recording:\"$cleanTitle\"", "UTF-8")
+            }
+            Log.e(TAG, "searchMusicBrainz query: '$query'")
             val url = "https://musicbrainz.org/ws/2/recording/?query=$query&fmt=json&limit=3"
             val request = Request.Builder()
                 .url(url)
@@ -229,6 +251,8 @@ class MetadataFetcher {
         var clean = artist
         // Remover paréntesis/corchetes con contenido: "(Oficial)", "[Official]", etc.
         clean = clean.replace(Regex("\\s*[\\(\\[].*?[\\)\\]]"), "")
+        // Remover nombres de playlists: "Letras Trap & Más", "Lyrics & Vibes", etc.
+        clean = clean.replace(Regex("^\\s*(?:Letras?|Lyrics?|Canciones?|Songs?|Músicas?|Music)\\b.*", RegexOption.IGNORE_CASE), "")
         // Remover "En Español", "En vivo", "En Directo", "En Concierto" al final
         clean = clean.replace(Regex("\\s+En\\s+(?:Español|Espanol|Vivo|Directo|Concierto)$", RegexOption.IGNORE_CASE), "")
         // Remover sufijos comunes de canales
@@ -237,6 +261,7 @@ class MetadataFetcher {
         clean = clean.replace(Regex("TV$"), "")
         // Remover prefijos de canales concatenados: "elvecindariocalle13", "lamoscatsetsé"
         clean = clean.replace(Regex("^(?:el|la|los|las)(?=[a-záéíóúñ])", RegexOption.IGNORE_CASE), "")
+        Log.e(TAG, "cleanChannelName: '$artist' → '$clean'")
         return clean.trim()
     }
 
