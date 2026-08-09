@@ -2,6 +2,7 @@ package com.musicdownloader.ui
 
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -15,12 +16,6 @@ import android.graphics.drawable.Drawable
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/**
- * Fondo degradado diagonal del reproductor.
- * Recibe los 6 colores extraídos con Palette (dominant, vibrant, muted,
- * darkVibrant, darkMuted, lightVibrant), los mezcla con el fondo oscuro base
- * y anima la transición entre canciones.
- */
 class DynamicGradientDrawable(
     private var topColor: Int = DEFAULT_TOP,
     private var midColor: Int = DEFAULT_MID,
@@ -51,12 +46,8 @@ class DynamicGradientDrawable(
     private var targetEnergy = 0f
 
     fun setColors(
-        dominant: Int,
-        vibrant: Int,
-        muted: Int,
-        darkVibrant: Int,
-        darkMuted: Int,
-        lightVibrant: Int,
+        dominant: Int, vibrant: Int, muted: Int,
+        darkVibrant: Int, darkMuted: Int, lightVibrant: Int,
         durationMs: Long
     ) {
         animateTo(
@@ -86,14 +77,8 @@ class DynamicGradientDrawable(
     private fun animateTo(top: Int, mid: Int, bottom: Int, darkVibrant: Int, durationMs: Long) {
         if (top == topColor && mid == midColor && bottom == bottomColor && darkVibrant == darkVibrantColor) return
         animator?.cancel()
-        baseTop = top
-        baseMid = mid
-        baseBottom = bottom
-        baseDarkVibrant = darkVibrant
-        val startTop = topColor
-        val startMid = midColor
-        val startBottom = bottomColor
-        val startDarkVibrant = darkVibrantColor
+        baseTop = top; baseMid = mid; baseBottom = bottom; baseDarkVibrant = darkVibrant
+        val startTop = topColor; val startMid = midColor; val startBottom = bottomColor; val startDarkVibrant = darkVibrantColor
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = durationMs
             addUpdateListener { anim ->
@@ -130,7 +115,6 @@ class DynamicGradientDrawable(
         )
         wavePaint?.shader = waveGradient
 
-        // Glow gradient: bright colors for the glow effect
         val brightTop = blend(0xFFFFFFFF.toInt(), baseTop, 0.7f)
         val brightMid = blend(0xFFFFFFFF.toInt(), baseMid, 0.6f)
         val brightBottom = blend(0xFFFFFFFF.toInt(), baseBottom, 0.5f)
@@ -150,9 +134,7 @@ class DynamicGradientDrawable(
 
         if (wavePaint == null || cachedWaveWidth != w.toInt() || cachedWaveHeight != h.toInt()) {
             wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                maskFilter = android.graphics.BlurMaskFilter(40f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-            }
+            glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             rebuildWaveGradient(h.toInt())
             cachedWaveWidth = w.toInt()
             cachedWaveHeight = h.toInt()
@@ -160,6 +142,7 @@ class DynamicGradientDrawable(
 
         canvas.drawColor(BASE_COLOR)
 
+        // Interpolación de energía
         energyModulator += (targetEnergy - energyModulator) * 0.15f
         if (kotlin.math.abs(targetEnergy - energyModulator) > 0.001f) invalidateSelf()
 
@@ -170,49 +153,65 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        val waveHeight = h * 0.78f * (0.05f + energyModulator * 0.95f)
-        val baseY = h * 0.88f
+        // 1. AVANCE DE FASE CONTINUO (Fluidez horizontal)
+        currentPhase += 0.02f + (energyModulator * 0.03f)
+        if (currentPhase > 2 * Math.PI) currentPhase -= (2 * Math.PI).toFloat()
+
+        // 2. PARÁMETROS DE POSICIÓN Y ALTURA
+        val baseY = h * 0.52f
+        val baseWaveHeight = h * 0.15f
+        val dynamicHeight = h * 0.25f * energyModulator
+        val totalHeight = baseWaveHeight + dynamicHeight
 
         wavePath.rewind()
         wavePath.moveTo(0f, h)
 
-        for (x in 0..w.toInt() step 2) {
+        var maxPeakY = baseY
+
+        // 3. MATEMÁTICA MULTI-ARMÓNICA
+        for (x in 0..w.toInt() step 4) {
             val fraction = x / w
-            val y = baseY - sin(fraction * Math.PI).toFloat() * waveHeight
+
+            val wave1 = sin(fraction * Math.PI + currentPhase).toFloat()
+            val wave2 = sin(fraction * Math.PI * 2.5f - currentPhase * 1.5f).toFloat() * 0.3f
+            val wave3 = sin(fraction * Math.PI * 5f + currentPhase * 3f).toFloat() * 0.1f * energyModulator
+
+            val combinedWave = wave1 + wave2 + wave3
+            val y = baseY - (combinedWave * totalHeight)
+
+            if (y < maxPeakY) {
+                maxPeakY = y
+            }
+
             wavePath.lineTo(x.toFloat(), y)
         }
 
         wavePath.lineTo(w, h)
         wavePath.close()
 
-        // Draw main wave
+        // Dibujar cuerpo de la ola
         canvas.drawPath(wavePath, wavePaint!!)
 
-        // Draw glow effect with dynamic brightness (follows energy like the wave)
-        val glowAlpha = (energyModulator * 255).toInt()
-        glowPaint?.apply {
-            alpha = glowAlpha
-        }
+        // 4. BRILLO Y GLOW RESPONSIVO AL PICO
+        val peakAmplitude = (baseY - maxPeakY).coerceAtLeast(0f)
+        val normalizedPeak = (peakAmplitude / (h * 0.40f)).coerceIn(0f, 1f)
+
+        val blurRadius = (20f + (normalizedPeak * 60f)).coerceAtLeast(1f)
+        glowPaint?.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+
+        val glowAlpha = (normalizedPeak * 255 * (0.4f + 0.6f * energyModulator)).toInt().coerceIn(0, 255)
+        glowPaint?.alpha = glowAlpha
+
         canvas.drawPath(wavePath, glowPaint!!)
-    }
 
-    override fun setAlpha(alpha: Int) {
-        paint.alpha = alpha
+        // Mantener la animación fluyendo continuamente
         invalidateSelf()
     }
 
-    override fun setColorFilter(colorFilter: ColorFilter?) {
-        paint.colorFilter = colorFilter
-        invalidateSelf()
-    }
-
-    @Deprecated("Deprecated in Android API 24")
-    override fun getOpacity(): Int = PixelFormat.OPAQUE
-
-    override fun onBoundsChange(bounds: Rect) {
-        super.onBoundsChange(bounds)
-        invalidateSelf()
-    }
+    override fun setAlpha(alpha: Int) { paint.alpha = alpha; invalidateSelf() }
+    override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter; invalidateSelf() }
+    @Deprecated("Deprecated in Android API 24") override fun getOpacity(): Int = PixelFormat.OPAQUE
+    override fun onBoundsChange(bounds: Rect) { super.onBoundsChange(bounds); invalidateSelf() }
 
     companion object {
         private const val BASE_COLOR_DARK = 0xFF0B0910.toInt()
