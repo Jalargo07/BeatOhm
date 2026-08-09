@@ -22,10 +22,22 @@ class SearchResultAdapter(
 
     private val states = mutableMapOf<String, ButtonState>()
     private val playingIds = mutableSetOf<String>()
+    private val loadingIds = mutableSetOf<String>()
 
     fun setPlaying(videoId: String) {
         playingIds.clear()
         playingIds.add(videoId)
+        loadingIds.remove(videoId)
+        notifyDataSetChanged()
+    }
+
+    fun setLoading(videoId: String) {
+        loadingIds.add(videoId)
+        notifyDataSetChanged()
+    }
+
+    fun clearLoading(videoId: String) {
+        loadingIds.remove(videoId)
         notifyDataSetChanged()
     }
 
@@ -76,7 +88,8 @@ class SearchResultAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
         val isPlaying = playingIds.contains(item.videoId)
-        holder.bind(item, states[item.videoId] ?: ButtonState.IDLE, isPlaying)
+        val isLoading = loadingIds.contains(item.videoId)
+        holder.bind(item, states[item.videoId] ?: ButtonState.IDLE, isPlaying, isLoading)
     }
 
     class ViewHolder(
@@ -87,7 +100,7 @@ class SearchResultAdapter(
 
         private var lastState: ButtonState? = null
 
-        fun bind(result: SearchResult, state: ButtonState, isPlaying: Boolean = false) {
+        fun bind(result: SearchResult, state: ButtonState, isPlaying: Boolean = false, isLoading: Boolean = false) {
             binding.tvTitle.text = result.title
             binding.tvChannel.text = result.channelName
             binding.tvDuration.text = result.durationText
@@ -95,10 +108,18 @@ class SearchResultAdapter(
                 placeholder(R.drawable.ic_music_note)
                 error(R.drawable.ic_music_note)
             }
-            binding.btnPlay.setIconResource(
-                if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-            )
-            binding.btnPlay.setOnClickListener { onPlay?.invoke(result) }
+            if (isLoading) {
+                binding.btnPlay.isEnabled = false
+                binding.btnPlay.setIconResource(R.drawable.ic_pause)
+                binding.btnPlay.alpha = 0.5f
+            } else {
+                binding.btnPlay.isEnabled = true
+                binding.btnPlay.alpha = 1f
+                binding.btnPlay.setIconResource(
+                    if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+                )
+            }
+            binding.btnPlay.setOnClickListener { if (!isLoading) onPlay?.invoke(result) }
             binding.btnDownload.setOnClickListener { onDownload(result) }
             applyState(state)
         }

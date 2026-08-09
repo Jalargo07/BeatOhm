@@ -166,7 +166,7 @@ class DownloadsFragment : Fragment() {
         }
         stopPreview()
         currentPreviewVideoId = result.videoId
-        searchAdapter.setPlaying(result.videoId)
+        searchAdapter.setLoading(result.videoId)
 
         lifecycleScope.launch {
             try {
@@ -180,14 +180,15 @@ class DownloadsFragment : Fragment() {
                     player.setMediaItem(mediaItem)
                     player.prepare()
                     player.play()
+                    searchAdapter.setPlaying(result.videoId)
                     player.seekTo(0)
                     previewHandler.postDelayed({ stopPreview() }, 40_000)
                 } else {
-                    stopPreview()
+                    searchAdapter.clearLoading(result.videoId)
                     Toast.makeText(requireContext(), R.string.error_stream, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                stopPreview()
+                searchAdapter.clearLoading(result.videoId)
                 Toast.makeText(requireContext(), R.string.error_stream, Toast.LENGTH_SHORT).show()
             }
         }
