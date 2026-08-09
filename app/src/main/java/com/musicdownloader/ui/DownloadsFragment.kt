@@ -3,6 +3,7 @@ package com.musicdownloader.ui
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,7 +14,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.snackbar.Snackbar
 import com.musicdownloader.R
@@ -47,7 +50,16 @@ class DownloadsFragment : Fragment() {
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
         adapter = DownloadAdapter()
 
-        previewPlayer = ExoPlayer.Builder(requireContext()).build().apply {
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setDefaultRequestProperties(mapOf(
+                "Referer" to "https://www.youtube.com/",
+                "Origin" to "https://www.youtube.com"
+            ))
+
+        previewPlayer = ExoPlayer.Builder(requireContext())
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build().apply {
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     if (state == Player.STATE_ENDED) {
@@ -177,27 +189,33 @@ class DownloadsFragment : Fragment() {
         stopPreview()
         currentPreviewVideoId = result.videoId
         searchAdapter.setLoading(result.videoId)
+        Log.d(TAG, "togglePreview: starting preview for '${result.title}' (${result.videoId})")
 
         lifecycleScope.launch {
             try {
                 val extractor = YouTubeExtractor()
+                Log.d(TAG, "togglePreview: extracting audio stream...")
                 val audioResult = withContext(Dispatchers.IO) {
                     extractor.getBestAudioStream(result.youtubeUrl)
                 }
                 if (audioResult.isSuccess) {
                     val audio = audioResult.getOrThrow()
+                    Log.d(TAG, "togglePreview: stream OK url=${audio.url.take(80)}... mime=${audio.mimeType}")
                     val mediaItem = MediaItem.fromUri(audio.url)
                     player.setMediaItem(mediaItem)
                     player.prepare()
                     player.play()
+                    Log.d(TAG, "togglePreview: player.play() called, volume=${player.volume}")
                     searchAdapter.setPlaying(result.videoId)
                     player.seekTo(0)
                     previewHandler.postDelayed({ stopPreview() }, 40_000)
                 } else {
+                    Log.e(TAG, "togglePreview: stream FAILED: ${audioResult.exceptionOrNull()?.message}")
                     searchAdapter.clearLoading(result.videoId)
                     Toast.makeText(requireContext(), R.string.error_stream, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "togglePreview: EXCEPTION: ${e.message}", e)
                 searchAdapter.clearLoading(result.videoId)
                 Toast.makeText(requireContext(), R.string.error_stream, Toast.LENGTH_SHORT).show()
             }
@@ -218,5 +236,9 @@ class DownloadsFragment : Fragment() {
         previewPlayer = null
         _binding = null
         super.onDestroyView()
+    }
+
+    companion object {
+        private const val TAG = "DownloadsPreview"
     }
 }
