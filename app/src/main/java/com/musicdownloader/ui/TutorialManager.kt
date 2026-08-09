@@ -2,11 +2,15 @@ package com.musicdownloader.ui
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.content.edit
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.musicdownloader.R
 
 object TutorialManager {
@@ -75,32 +79,41 @@ object TutorialManager {
         val btnSkip = dialogView.findViewById<TextView>(R.id.btn_tooltip_skip)
         val btnNext = dialogView.findViewById<TextView>(R.id.btn_tooltip_next)
 
-        if (remaining > 0) {
-            btnSkip.visibility = View.VISIBLE
-            btnSkip.text = activity.getString(R.string.tutorial_skip)
-        } else {
-            btnSkip.visibility = View.GONE
-        }
-
+        btnSkip.visibility = if (remaining > 0) View.VISIBLE else View.GONE
         btnNext.text = activity.getString(R.string.tutorial_got_it)
 
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setView(dialogView)
-            .setCancelable(false)
-            .create()
+        val popup = PopupWindow(
+            dialogView,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            elevation = 16f
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            isOutsideTouchable = true
+        }
 
         btnSkip.setOnClickListener {
-            dialog.dismiss()
+            popup.dismiss()
             markSectionShown(activity, section)
             onFinished?.invoke()
         }
 
         btnNext.setOnClickListener {
-            dialog.dismiss()
+            popup.dismiss()
             showStep(activity, steps, index + 1, section, onFinished)
         }
 
-        dialog.show()
+        val location = IntArray(2)
+        target.getLocationOnScreen(location)
+        val targetY = location[1]
+        val targetHeight = target.height
+
+        popup.width = (activity.resources.displayMetrics.widthPixels * 0.85).toInt()
+
+        popup.setOnDismissListener { highlightView(target) }
+
+        popup.showAtLocation(target, Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, targetY + targetHeight + 16)
 
         highlightView(target)
     }
