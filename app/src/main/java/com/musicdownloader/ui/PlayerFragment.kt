@@ -48,6 +48,8 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.musicdownloader.R
 import com.musicdownloader.data.AppDatabase
+import com.musicdownloader.lrc.LrcParser
+import com.musicdownloader.lrc.LrcLine
 import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.data.PlaylistSong
 import com.musicdownloader.data.toSong
@@ -74,6 +76,7 @@ class PlayerFragment : Fragment() {
     private var updateRunnable: Runnable? = null
     private var currentSongFilePath: String? = null
     private var coverBreatheAnimator: ValueAnimator? = null
+    private var miniLrcLines: List<LrcLine> = emptyList()
 
     private var audioManager: AudioManager? = null
     private var isVolumeDragging = false
@@ -901,6 +904,9 @@ class PlayerFragment : Fragment() {
                 closeLyrics()
             }
             loadLyricsBackground(song)
+            miniLrcLines = LrcParser.parse(lyrics)
+            updateMiniLyrics()
+            binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty()) View.VISIBLE else View.GONE
             binding.ivLyricsBackground.visibility = View.VISIBLE
             binding.lyricsPanel.visibility = View.VISIBLE
             binding.coverContainer.visibility = View.INVISIBLE
@@ -977,6 +983,8 @@ class PlayerFragment : Fragment() {
 
     private fun closeLyrics() {
         isLyricsVisible = false
+        binding.miniLyricsContainer.visibility = View.GONE
+        miniLrcLines = emptyList()
         applyLyricsBlur(false)
         val panelHeight = binding.lyricsPanel.height.toFloat()
         binding.lyricsPanel.animate()
@@ -1007,6 +1015,19 @@ class PlayerFragment : Fragment() {
                 }
             }
             .start()
+    }
+
+    private fun updateMiniLyrics() {
+        if (miniLrcLines.isEmpty()) return
+        val pos = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.getCurrentPosition() ?: 0L
+        var currentIdx = -1
+        for (i in miniLrcLines.indices) {
+            if (miniLrcLines[i].timeMs <= pos) currentIdx = i else break
+        }
+        if (currentIdx >= 0) {
+            binding.tvMiniLyricsCurrent.text = miniLrcLines[currentIdx].text
+            binding.tvMiniLyricsNext.text = if (currentIdx + 1 < miniLrcLines.size) miniLrcLines[currentIdx + 1].text else ""
+        }
     }
 
     private fun applyLyricsBlur(blur: Boolean) {
@@ -1062,6 +1083,7 @@ class PlayerFragment : Fragment() {
                     b.waveformSeekbar.setProgress(progress.coerceIn(0, MAX_SEEK))
                     b.tvCurrentTime.text = formatTime(pos)
                     viewModel.setPosition(pos)
+                    updateMiniLyrics()
                     if (isLyricsVisible) {
                         b.syncedLyricsView.updatePosition(pos)
                     }

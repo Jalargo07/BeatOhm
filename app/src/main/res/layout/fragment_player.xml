@@ -114,7 +114,7 @@
     <com.musicdownloader.ui.WaveformSeekBar
         android:id="@+id/waveform_seekbar"
         android:layout_width="0dp"
-        android:layout_height="120dp"
+        android:layout_height="160dp"
         android:layout_marginStart="0dp"
         android:layout_marginEnd="0dp"
         android:contentDescription="@string/seek_position"
@@ -312,6 +312,46 @@
             android:contentDescription="@string/lyrics"
             android:src="@drawable/ic_lyrics"
             app:tint="@color/on_surface" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mini_lyrics_container"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/bottom_actions"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav">
+
+        <TextView
+            android:id="@+id/tv_mini_lyrics_current"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/on_surface"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/tv_mini_lyrics_next"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
     </LinearLayout>
 
