@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Speaker body -->
+    <group
+        android:translateX="25"
+        android:translateY="6">
+        <path
+            android:fillColor="#4C4C4C"
+            android:pathData="M0,0 C1.65,0 3.3,0 5,0 C5,11.88 5,23.76 5,36 C0,36 0,36 -1.949,34.504 C-2.523,33.863 -3.096,33.223 -3.688,32.563 C-8.081,27.741 -11.167,27.747 -17.566,27.281 C-20,27 -20,27 -21,26 C-21.1,23.323 -21.139,20.677 -21.125,18 C-21.129,17.25 -21.133,16.5 -21.137,15.727 C-21.127,10.127 -21.127,10.127 -20,9 C-18.313,8.947 -16.625,8.908 -14.938,8.875 C-8.468,8.386 -5.272,5.66 -1,1 C-0.67,0.67 -0.34,0.34 0,0 Z" />
+    </group>
+    <!-- Sound wave 1 -->
+    <group
+        android:translateX="38"
+        android:translateY="11">
+        <path
+            android:fillColor="#4B4B4B"
+            android:pathData="M0,0 C0.99,0 1.98,0 3,0 C5.601,4.514 6.409,7.802 6.375,13 C6.383,14.176 6.39,15.351 6.398,16.563 C5.966,20.297 4.865,22.763 3,26 C1.68,25.67 0.36,25.34 -1,25 C-0.67,24.051 -0.34,23.103 0,22.125 C2.037,14.937 1.429,7.982 -1,1 C-0.67,0.67 -0.34,0.34 0,0 Z" />
+    </group>
+    <!-- Sound wave 2 -->
+    <group
+        android:translateX="33"
+        android:translateY="16">
+        <path
+            android:fillColor="#4D4D4D"
+            android:pathData="M0,0 C1.32,0 2.64,0 4,0 C5.365,2.731 5.132,4.956 5.125,8 C5.128,9.073 5.13,10.145 5.133,11.25 C5,14 5,14 4,16 C2.68,16 1.36,16 0,16 C0,10.72 0,5.44 0,0 Z" />
+    </group>
+</vector>

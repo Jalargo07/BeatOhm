@@ -327,23 +327,15 @@ class SettingsFragment : Fragment() {
         val chipGroupIcon = binding.chipGroupIconPack
         // Pre-select current icon pack
         when (ThemeManager.currentIconPack) {
-            "outline" -> chipGroupIcon.check(R.id.chip_icon_outline)
-            "filled" -> chipGroupIcon.check(R.id.chip_icon_filled)
-            "mainstage" -> chipGroupIcon.check(R.id.chip_icon_minimal)
             "darknova" -> chipGroupIcon.check(R.id.chip_icon_bold)
-            "mononoki" -> chipGroupIcon.check(R.id.chip_icon_neon)
-            "boowop" -> chipGroupIcon.check(R.id.chip_icon_boowop)
+            "heroic" -> chipGroupIcon.check(R.id.chip_icon_heroic)
             else -> chipGroupIcon.check(R.id.chip_icon_material)
         }
         chipGroupIcon.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val packId = when (checkedIds.first()) {
-                R.id.chip_icon_outline -> "outline"
-                R.id.chip_icon_filled -> "filled"
-                R.id.chip_icon_minimal -> "mainstage"
                 R.id.chip_icon_bold -> "darknova"
-                R.id.chip_icon_neon -> "mononoki"
-                R.id.chip_icon_boowop -> "boowop"
+                R.id.chip_icon_heroic -> "heroic"
                 else -> "default"
             }
             val current = ThemeManager.activeTheme ?: return@setOnCheckedStateChangeListener

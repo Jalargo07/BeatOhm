@@ -59,12 +59,8 @@ object IconPackManager {
 
     init {
         allPacks.add(defaultPack())
-        allPacks.add(outlinePack())
-        allPacks.add(filledPack())
-        allPacks.add(boowopPack())
         allPacks.add(darknovaPack())
-        allPacks.add(mononokiPack())
-        allPacks.add(mainstagePack())
+        allPacks.add(heroicPack())
     }
 
     fun getAllPacks(): List<IconPack> = allPacks.toList()
@@ -234,37 +230,37 @@ object IconPackManager {
 
     // ── Filled Pack ──────────────────────────────────────────────
 
-    private fun filledPack() = IconPack(
-        id = "filled",
-        displayName = "Filled",
+    private fun heroicPack() = IconPack(
+        id = "heroic",
+        displayName = "Heroic",
         icons = mapOf(
-            ICON_PLAY to R.drawable.ic_play,
-            ICON_PAUSE to R.drawable.ic_pause,
-            ICON_NEXT to R.drawable.ic_next,
-            ICON_PREV to R.drawable.ic_prev,
-            ICON_SHUFFLE to R.drawable.ic_shuffle,
-            ICON_REPEAT to R.drawable.ic_repeat,
-            ICON_REPEAT_ONE to R.drawable.ic_repeat_one,
-            ICON_HEART to R.drawable.ic_favorite,
-            ICON_HEART_BORDER to R.drawable.ic_bookmark_border,
-            ICON_SEARCH to R.drawable.ic_search,
-            ICON_SETTINGS to R.drawable.ic_settings,
-            ICON_VOLUME to R.drawable.ic_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_equalizer,
-            ICON_QUEUE to R.drawable.ic_queue_music,
-            ICON_LYRICS to R.drawable.ic_lyrics,
+            ICON_PLAY to R.drawable.ic_heroic_play,
+            ICON_PAUSE to R.drawable.ic_heroic_pause,
+            ICON_NEXT to R.drawable.ic_heroic_next,
+            ICON_PREV to R.drawable.ic_heroic_prev,
+            ICON_SHUFFLE to R.drawable.ic_heroic_shuffle,
+            ICON_REPEAT to R.drawable.ic_heroic_repeat,
+            ICON_REPEAT_ONE to R.drawable.ic_heroic_repeat_one,
+            ICON_HEART to R.drawable.ic_heroic_heart,
+            ICON_HEART_BORDER to R.drawable.ic_heroic_heart_border,
+            ICON_SEARCH to R.drawable.ic_heroic_search,
+            ICON_SETTINGS to R.drawable.ic_heroic_settings,
+            ICON_VOLUME to R.drawable.ic_heroic_volume,
+            ICON_PLAYLIST_ADD to R.drawable.ic_heroic_playlist_add,
+            ICON_EQUALIZER to R.drawable.ic_heroic_equalizer,
+            ICON_QUEUE to R.drawable.ic_heroic_queue,
+            ICON_LYRICS to R.drawable.ic_heroic_lyrics,
             ICON_MUSIC_NOTE to R.drawable.ic_music_note,
-            ICON_BACK to R.drawable.ic_back,
-            ICON_PLAYER to R.drawable.ic_player,
-            ICON_LIBRARY to R.drawable.ic_library,
-            ICON_DOWNLOADS to R.drawable.ic_downloads,
-            ICON_MIC to R.drawable.ic_mic,
-            ICON_GENRES to R.drawable.ic_genres,
-            ICON_ALBUM to R.drawable.ic_album,
-            ICON_PLAYLIST to R.drawable.ic_playlist,
-            ICON_TRENDING to R.drawable.ic_trending_up,
-            ICON_FOLDER to R.drawable.ic_folder,
+            ICON_BACK to R.drawable.ic_heroic_back,
+            ICON_PLAYER to R.drawable.ic_heroic_player,
+            ICON_LIBRARY to R.drawable.ic_heroic_library,
+            ICON_DOWNLOADS to R.drawable.ic_heroic_downloads,
+            ICON_MIC to R.drawable.ic_heroic_mic,
+            ICON_GENRES to R.drawable.ic_heroic_genres,
+            ICON_ALBUM to R.drawable.ic_heroic_album,
+            ICON_PLAYLIST to R.drawable.ic_heroic_playlist,
+            ICON_TRENDING to R.drawable.ic_heroic_trending,
+            ICON_FOLDER to R.drawable.ic_heroic_folder,
         )
     )
 

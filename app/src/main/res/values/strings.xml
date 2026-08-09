@@ -180,8 +180,7 @@
     <string name="settings_icon_pack_filled">Filled</string>
     <string name="settings_icon_pack_boowop">BooWop</string>
     <string name="settings_icon_pack_darknova">DarkNova</string>
-    <string name="settings_icon_pack_mononoki">Mononoki</string>
-    <string name="settings_icon_pack_mainstage">Mainstage</string>
+    <string name="settings_icon_pack_heroic">Heroic</string>
 
     <!-- Player layout settings -->
     <string name="settings_player_layout">Estilo del reproductor</string>

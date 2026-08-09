@@ -407,27 +407,6 @@
                         android:text="@string/settings_icon_pack_default" />
 
                     <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_outline"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_outline" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_filled"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_filled" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_minimal"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_mainstage" />
-
-                    <com.google.android.material.chip.Chip
                         android:id="@+id/chip_icon_bold"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
@@ -435,18 +414,11 @@
                         android:text="@string/settings_icon_pack_darknova" />
 
                     <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_neon"
+                        android:id="@+id/chip_icon_heroic"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_mononoki" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_boowop"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_boowop" />
+                        android:text="@string/settings_icon_pack_heroic" />
 
                 </com.google.android.material.chip.ChipGroup>
 
