@@ -28,7 +28,6 @@ class DynamicGradientDrawable(
     private var animator: ValueAnimator? = null
 
     var currentPhase: Float = 0f
-    private var phaseDirection = 1f
     private var energyModulator = 0f
     private var targetEnergy = 0f
 
@@ -168,20 +167,14 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        // 2. FASE EN PING-PONG (Ida y Vuelta sin saltos)
+        // 2. FASE EN OSCILACIÓN SINUSOIDAL (rebote natural)
         val isMoving = energyModulator > 0f && targetEnergy > 0f
         if (isMoving) {
-            val step = 0.006f + (energyModulator * 0.008f)
-            currentPhase += step * phaseDirection
-
-            if (currentPhase >= Math.PI * 2) {
-                currentPhase = (Math.PI * 2).toFloat()
-                phaseDirection = -1f
-            } else if (currentPhase <= 0f) {
-                currentPhase = 0f
-                phaseDirection = 1f
-            }
+            currentPhase += 0.006f + (energyModulator * 0.008f)
         }
+
+        val travel = (kotlin.math.sin(currentPhase.toDouble()) + 1f).toFloat() / 2f
+        val waveCenter = travel * Math.PI
 
         // 3. PARÁMETROS DE ALTURA
         val midScreenY = h * 0.55f
@@ -194,15 +187,14 @@ class DynamicGradientDrawable(
 
         var maxPeakY = baseY
 
-        // 4. MUESTREO: 3 ONDAS SIN CANCELACIÓN
+        // 4. MUESTREO CON PICO VIAJERO
         for (x in 0..w.toInt() step 3) {
             val fraction = x / w
 
-            val w1 = sin(fraction * Math.PI * 1.2f + currentPhase).toFloat() * 0.45f
-            val w4 = sin(fraction * Math.PI * 2.4f + currentPhase * 0.5f).toFloat() * 0.20f
-            val w8 = sin(fraction * Math.PI * 3.6f + currentPhase * 1.5f).toFloat() * 0.10f
+            val w1 = sin(fraction * Math.PI - waveCenter).toFloat() * 0.45f
+            val w4 = sin(fraction * Math.PI * 2.0f - waveCenter * 1.5f).toFloat() * 0.20f
 
-            val combinedWave = (w1 + w4 + w8) * energyModulator
+            val combinedWave = (w1 + w4) * energyModulator
             val calculatedY = baseY - (combinedWave * maxClimbHeight)
             val y = calculatedY.coerceAtMost(floorLimitY)
 
