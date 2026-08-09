@@ -14,37 +14,12 @@ import com.musicdownloader.databinding.ItemSearchResultBinding
 import com.musicdownloader.model.SearchResult
 
 class SearchResultAdapter(
-    private val onDownload: (SearchResult) -> Unit,
-    private val onPlay: ((SearchResult) -> Unit)? = null
+    private val onDownload: (SearchResult) -> Unit
 ) : ListAdapter<SearchResult, SearchResultAdapter.ViewHolder>(DiffCallback()) {
 
     enum class ButtonState { IDLE, DOWNLOADING, COMPLETED }
 
     private val states = mutableMapOf<String, ButtonState>()
-    private val playingIds = mutableSetOf<String>()
-    private val loadingIds = mutableSetOf<String>()
-
-    fun setPlaying(videoId: String) {
-        playingIds.clear()
-        playingIds.add(videoId)
-        loadingIds.remove(videoId)
-        notifyDataSetChanged()
-    }
-
-    fun setLoading(videoId: String) {
-        loadingIds.add(videoId)
-        notifyDataSetChanged()
-    }
-
-    fun clearLoading(videoId: String) {
-        loadingIds.remove(videoId)
-        notifyDataSetChanged()
-    }
-
-    fun clearPlaying() {
-        playingIds.clear()
-        notifyDataSetChanged()
-    }
 
     fun setDownloading(videoId: String) {
         states[videoId] = ButtonState.DOWNLOADING
@@ -82,25 +57,22 @@ class SearchResultAdapter(
         val binding = ItemSearchResultBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
-        return ViewHolder(binding, onDownload, onPlay)
+        return ViewHolder(binding, onDownload)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        val isPlaying = playingIds.contains(item.videoId)
-        val isLoading = loadingIds.contains(item.videoId)
-        holder.bind(item, states[item.videoId] ?: ButtonState.IDLE, isPlaying, isLoading)
+        holder.bind(item, states[item.videoId] ?: ButtonState.IDLE)
     }
 
     class ViewHolder(
         private val binding: ItemSearchResultBinding,
-        private val onDownload: (SearchResult) -> Unit,
-        private val onPlay: ((SearchResult) -> Unit)? = null
+        private val onDownload: (SearchResult) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private var lastState: ButtonState? = null
 
-        fun bind(result: SearchResult, state: ButtonState, isPlaying: Boolean = false, isLoading: Boolean = false) {
+        fun bind(result: SearchResult, state: ButtonState) {
             binding.tvTitle.text = result.title
             binding.tvChannel.text = result.channelName
             binding.tvDuration.text = result.durationText
@@ -108,18 +80,6 @@ class SearchResultAdapter(
                 placeholder(R.drawable.ic_music_note)
                 error(R.drawable.ic_music_note)
             }
-            if (isLoading) {
-                binding.btnPlay.isEnabled = false
-                binding.btnPlay.setIconResource(R.drawable.ic_pause)
-                binding.btnPlay.alpha = 0.5f
-            } else {
-                binding.btnPlay.isEnabled = true
-                binding.btnPlay.alpha = 1f
-                binding.btnPlay.setIconResource(
-                    if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-                )
-            }
-            binding.btnPlay.setOnClickListener { if (!isLoading) onPlay?.invoke(result) }
             binding.btnDownload.setOnClickListener { onDownload(result) }
             applyState(state)
         }
