@@ -215,8 +215,10 @@
     <!-- Tutorial - Player -->
     <string name="tutorial_player_play">Play / Pause</string>
     <string name="tutorial_player_play_desc">Tap to play or pause the current song</string>
-    <string name="tutorial_player_prev_next">Previous / Next</string>
-    <string name="tutorial_player_prev_next_desc">Navigate through the songs in the queue</string>
+    <string name="tutorial_player_prev">Previous</string>
+    <string name="tutorial_player_prev_desc">Go to the previous song</string>
+    <string name="tutorial_player_next">Next</string>
+    <string name="tutorial_player_next_desc">Go to the next song</string>
     <string name="tutorial_player_shuffle">Shuffle</string>
     <string name="tutorial_player_shuffle_desc">Shuffle the playback order</string>
     <string name="tutorial_player_repeat">Repeat</string>

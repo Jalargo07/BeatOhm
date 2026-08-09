@@ -209,8 +209,10 @@
     <!-- Tutorial - Reprodutor -->
     <string name="tutorial_player_play">Reproduzir / Pausar</string>
     <string name="tutorial_player_play_desc">Toque para reproduzir ou pausar a música atual</string>
-    <string name="tutorial_player_prev_next">Anterior / Próxima</string>
-    <string name="tutorial_player_prev_next_desc">Navegue entre as músicas da fila</string>
+    <string name="tutorial_player_prev">Anterior</string>
+    <string name="tutorial_player_prev_desc">Vá para a música anterior</string>
+    <string name="tutorial_player_next">Próxima</string>
+    <string name="tutorial_player_next_desc">Vá para a próxima música</string>
     <string name="tutorial_player_shuffle">Aleatório</string>
     <string name="tutorial_player_shuffle_desc">Embaralha a ordem de reprodução</string>
     <string name="tutorial_player_repeat">Repetir</string>

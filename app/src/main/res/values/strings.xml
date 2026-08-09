@@ -215,8 +215,10 @@
     <!-- Tutorial - Reproductor -->
     <string name="tutorial_player_play">Reproducir / Pausar</string>
     <string name="tutorial_player_play_desc">Toca para reproducir o pausar la canción actual</string>
-    <string name="tutorial_player_prev_next">Anterior / Siguiente</string>
-    <string name="tutorial_player_prev_next_desc">Navega entre las canciones de la cola</string>
+    <string name="tutorial_player_prev">Anterior</string>
+    <string name="tutorial_player_prev_desc">Ve a la canción anterior</string>
+    <string name="tutorial_player_next">Siguiente</string>
+    <string name="tutorial_player_next_desc">Ve a la siguiente canción</string>
     <string name="tutorial_player_shuffle">Aleatorio</string>
     <string name="tutorial_player_shuffle_desc">Mezcla el orden de reproducción</string>
     <string name="tutorial_player_repeat">Repetir</string>

@@ -138,7 +138,8 @@ class PlayerFragment : Fragment() {
             "player",
             listOf(
                 TutorialManager.TooltipStep({ binding.btnPlayPause }, getString(R.string.tutorial_player_play), getString(R.string.tutorial_player_play_desc)),
-                TutorialManager.TooltipStep({ binding.btnPrev }, getString(R.string.tutorial_player_prev_next), getString(R.string.tutorial_player_prev_next_desc)),
+                TutorialManager.TooltipStep({ binding.btnPrev }, getString(R.string.tutorial_player_prev), getString(R.string.tutorial_player_prev_desc)),
+                TutorialManager.TooltipStep({ binding.btnNext }, getString(R.string.tutorial_player_next), getString(R.string.tutorial_player_next_desc)),
                 TutorialManager.TooltipStep({ binding.btnShuffle }, getString(R.string.tutorial_player_shuffle), getString(R.string.tutorial_player_shuffle_desc)),
                 TutorialManager.TooltipStep({ binding.btnRepeat }, getString(R.string.tutorial_player_repeat), getString(R.string.tutorial_player_repeat_desc)),
                 TutorialManager.TooltipStep({ binding.btnQueue }, getString(R.string.tutorial_player_queue), getString(R.string.tutorial_player_queue_desc)),
