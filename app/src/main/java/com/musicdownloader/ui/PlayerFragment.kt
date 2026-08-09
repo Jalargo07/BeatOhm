@@ -241,6 +241,7 @@ class PlayerFragment : Fragment() {
                 animateCoverPlaying()
                 PlayerLayoutManager.startVinylRotation(binding.root)
             } else {
+                dynamicGradient.modulateByEnergy(0f)
                 stopCoverBreathe()
                 PlayerLayoutManager.stopVinylRotation(binding.root)
             }

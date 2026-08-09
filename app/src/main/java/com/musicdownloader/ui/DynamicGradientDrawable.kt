@@ -142,13 +142,9 @@ class DynamicGradientDrawable(
 
         canvas.drawColor(BASE_COLOR)
 
-        // 1. INTERPOLACIÓN DE ENERGÍA Y CONTROL DE MOVIMIENTO
+        // 1. INTERPOLACIÓN SUAVE DE ENERGÍA
         energyModulator += (targetEnergy - energyModulator) * 0.10f
-
-        if (energyModulator > 0.01f) {
-            currentPhase += 0.01f + (energyModulator * 0.03f)
-            if (currentPhase > 2 * Math.PI) currentPhase -= (2 * Math.PI).toFloat()
-        }
+        if (energyModulator < 0.005f) energyModulator = 0f
 
         val factor = 0.7f + 0.3f * energyModulator
         topColor = blend(BASE_COLOR, baseTop, 0.55f * factor)
@@ -157,34 +153,37 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        // 2. LÍMITES Y RANGOS DE ALTURA ESTRICTOS
+        // 2. AVANCE DE FASE SOLO SI HAY ENERGÍA ACTIVA
+        val isPlaying = energyModulator > 0f
+        if (isPlaying) {
+            currentPhase += 0.015f + (energyModulator * 0.025f)
+            if (currentPhase > 2 * Math.PI) currentPhase -= (2 * Math.PI).toFloat()
+        }
+
+        // 3. PARÁMETROS DE ALTURA Y LÍMITES
         val midScreenY = h * 0.50f
         val floorLimitY = h * 0.60f
-        val maxClimbHeight = h * 0.45f * energyModulator
-
-        val restingBaseY = midScreenY + (h * 0.05f * (1f - energyModulator))
-        val baseY = restingBaseY.coerceAtMost(floorLimitY)
+        val maxClimbHeight = h * 0.40f * energyModulator
+        val baseY = (midScreenY + (h * 0.05f * (1f - energyModulator))).coerceAtMost(floorLimitY)
 
         wavePath.rewind()
         wavePath.moveTo(0f, h)
 
         var maxPeakY = baseY
 
-        // 3. MATEMÁTICA MULTI-ARMÓNICA CON AMBIENTE REPOSADO
-        for (x in 0..w.toInt() step 4) {
+        // 4. MUESTREO MÁS FLUIDO (STEP 2)
+        for (x in 0..w.toInt() step 2) {
             val fraction = x / w
 
-            val wave1 = sin(fraction * Math.PI + currentPhase).toFloat() * (0.15f + 0.85f * energyModulator)
-            val wave2 = sin(fraction * Math.PI * 2.5f - currentPhase * 1.5f).toFloat() * 0.25f * energyModulator
-            val wave3 = sin(fraction * Math.PI * 5f + currentPhase * 3f).toFloat() * 0.10f * energyModulator
+            val wave1 = sin(fraction * Math.PI + currentPhase).toFloat() * (0.05f + 0.95f * energyModulator)
+            val wave2 = sin(fraction * Math.PI * 2.5f - currentPhase * 1.5f).toFloat() * 0.20f * energyModulator
+            val wave3 = sin(fraction * Math.PI * 5f + currentPhase * 3f).toFloat() * 0.08f * energyModulator
 
             val combinedWave = wave1 + wave2 + wave3
             val calculatedY = baseY - (combinedWave * maxClimbHeight)
             val y = calculatedY.coerceAtMost(floorLimitY)
 
-            if (y < maxPeakY) {
-                maxPeakY = y
-            }
+            if (y < maxPeakY) maxPeakY = y
             wavePath.lineTo(x.toFloat(), y)
         }
 
@@ -193,19 +192,20 @@ class DynamicGradientDrawable(
 
         canvas.drawPath(wavePath, wavePaint!!)
 
-        // 4. BRILLO Y GLOW RESPONSIVO AL PICO
+        // 5. GLOW RESPONSIVO
         val peakAmplitude = (baseY - maxPeakY).coerceAtLeast(0f)
         val normalizedPeak = (peakAmplitude / (h * 0.40f)).coerceIn(0f, 1f)
 
-        val blurRadius = (20f + (normalizedPeak * 60f)).coerceAtLeast(1f)
-        glowPaint?.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+        if (normalizedPeak > 0.01f && isPlaying) {
+            val blurRadius = (20f + (normalizedPeak * 60f)).coerceAtLeast(1f)
+            glowPaint?.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+            val glowAlpha = (normalizedPeak * 255 * (0.4f + 0.6f * energyModulator)).toInt().coerceIn(0, 255)
+            glowPaint?.alpha = glowAlpha
+            canvas.drawPath(wavePath, glowPaint!!)
+        }
 
-        val glowAlpha = (normalizedPeak * 255 * (0.4f + 0.6f * energyModulator)).toInt().coerceIn(0, 255)
-        glowPaint?.alpha = glowAlpha
-
-        canvas.drawPath(wavePath, glowPaint!!)
-
-        if (kotlin.math.abs(targetEnergy - energyModulator) > 0.001f || energyModulator > 0.01f) {
+        // 6. CONTROL DEL BUCLE DE ANIMACIÓN
+        if (isPlaying || kotlin.math.abs(targetEnergy - energyModulator) > 0.001f) {
             invalidateSelf()
         }
     }
