@@ -206,4 +206,8 @@
     <string name="theme_copied">Tema copiado al portapapeles</string>
     <string name="theme_pasted">Tema pegado desde el portapapeles</string>
     <string name="theme_share_error">Error al compartir</string>
+
+    <!-- Tutorial / Tooltips -->
+    <string name="tutorial_got_it">Entendido</string>
+    <string name="tutorial_skip">Saltar tutorial</string>
 </resources>
