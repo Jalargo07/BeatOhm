@@ -81,6 +81,11 @@ class SettingsFragment : Fragment() {
 
         setupAppearance()
         setupLanguageChips()
+
+        binding.btnResetTutorial.setOnClickListener {
+            TutorialManager.resetAll(requireContext())
+            Toast.makeText(requireContext(), R.string.reset_tutorial, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setupAppearance() {

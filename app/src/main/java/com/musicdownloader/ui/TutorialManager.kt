@@ -104,16 +104,19 @@ object TutorialManager {
             showStep(activity, steps, index + 1, section, onFinished)
         }
 
-        val location = IntArray(2)
-        target.getLocationOnScreen(location)
-        val targetY = location[1]
-        val targetHeight = target.height
-
         popup.width = (activity.resources.displayMetrics.widthPixels * 0.85).toInt()
 
         popup.setOnDismissListener { highlightView(target) }
 
-        popup.showAtLocation(target, Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, targetY + targetHeight + 16)
+        target.post {
+            try {
+                val loc = IntArray(2)
+                target.getLocationOnScreen(loc)
+                popup.showAtLocation(target, Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, loc[1] + target.height + 16)
+            } catch (_: Exception) {
+                try { popup.dismiss() } catch (_: Exception) {}
+            }
+        }
 
         highlightView(target)
     }

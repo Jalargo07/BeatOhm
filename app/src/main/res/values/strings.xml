@@ -154,6 +154,7 @@
     <string name="settings_section_player">Reproductor</string>
     <string name="settings_section_about">Acerca de</string>
     <string name="settings_section_language">IDIOMA</string>
+    <string name="reset_tutorial">Reiniciar tutorial</string>
     <string name="settings_about_version">Music Downloader v%1$s</string>
     <string name="settings_primary_color">Color primario</string>
     <string name="settings_accent_color">Color de acento</string>
