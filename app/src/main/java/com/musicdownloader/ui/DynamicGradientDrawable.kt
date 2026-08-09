@@ -129,6 +129,17 @@ class DynamicGradientDrawable(
             null, Shader.TileMode.CLAMP
         )
         wavePaint?.shader = waveGradient
+
+        // Glow gradient: bright colors for the glow effect
+        val brightTop = blend(0xFFFFFFFF.toInt(), baseTop, 0.7f)
+        val brightMid = blend(0xFFFFFFFF.toInt(), baseMid, 0.6f)
+        val brightBottom = blend(0xFFFFFFFF.toInt(), baseBottom, 0.5f)
+        glowGradient = LinearGradient(
+            0f, 0f, 0f, height.toFloat(),
+            intArrayOf(brightTop, brightMid, brightBottom, brightTop),
+            null, Shader.TileMode.CLAMP
+        )
+        glowPaint?.shader = glowGradient
     }
 
     override fun draw(canvas: Canvas) {
@@ -140,7 +151,7 @@ class DynamicGradientDrawable(
         if (wavePaint == null || cachedWaveWidth != w.toInt() || cachedWaveHeight != h.toInt()) {
             wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
             glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                maskFilter = android.graphics.BlurMaskFilter(20f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                maskFilter = android.graphics.BlurMaskFilter(40f, android.graphics.BlurMaskFilter.Blur.NORMAL)
             }
             rebuildWaveGradient(h.toInt())
             cachedWaveWidth = w.toInt()
@@ -177,10 +188,9 @@ class DynamicGradientDrawable(
         // Draw main wave
         canvas.drawPath(wavePath, wavePaint!!)
 
-        // Draw glow effect with dynamic brightness (40% at low energy, 100% at peaks)
-        val glowAlpha = (0.4f + 0.6f * energyModulator).toInt()
+        // Draw glow effect with dynamic brightness (follows energy like the wave)
+        val glowAlpha = (energyModulator * 255).toInt()
         glowPaint?.apply {
-            shader = waveGradient
             alpha = glowAlpha
         }
         canvas.drawPath(wavePath, glowPaint!!)

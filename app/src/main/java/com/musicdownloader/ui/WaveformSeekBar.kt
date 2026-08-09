@@ -320,7 +320,7 @@ class WaveformSeekBar @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 if (isDragging) {
-                    val deltaX = event.x - lastTouchX
+                    val deltaX = (event.x - lastTouchX) * 7f
                     lastTouchX = event.x
                     // Invert: drag right-to-left (negative deltaX) = advance (positive progress)
                     val deltaProgress = (-deltaX / totalWaveformWidth * max).toInt()
