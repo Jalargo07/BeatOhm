@@ -222,4 +222,22 @@
     <string name="tutorial_player_favorito_desc">Salve a música nos seus favoritos</string>
     <string name="tutorial_player_waveform">Waveform</string>
     <string name="tutorial_player_waveform_desc">Arraste para avançar ou voltar na música</string>
+
+    <!-- Tutorial - Biblioteca -->
+    <string name="tutorial_lib_search">Buscar</string>
+    <string name="tutorial_lib_search_desc">Digite o nome de uma música, artista ou álbum</string>
+    <string name="tutorial_lib_categories">Categorias</string>
+    <string name="tutorial_lib_categories_desc">Explore sua música por artista, álbum, gênero e mais</string>
+    <string name="tutorial_lib_enrich"> Enriquecer</string>
+    <string name="tutorial_lib_enrich_desc">Busque metadata, capas e letras automaticamente</string>
+    <string name="tutorial_lib_folders">Pastas</string>
+    <string name="tutorial_lib_folders_desc">Adicione pastas com sua música baixada</string>
+
+    <!-- Tutorial - Letras -->
+    <string name="tutorial_lyrics_close">Fechar letras</string>
+    <string name="tutorial_lyrics_close_desc">Toque X para voltar ao reprodutor</string>
+    <string name="tutorial_lyrics_scroll">Scroll manual</string>
+    <string name="tutorial_lyrics_scroll_desc">Deslize para navegar a letra manualmente</string>
+    <string name="tutorial_lyrics_sync">Auto-sync</string>
+    <string name="tutorial_lyrics_sync_desc">Toque \"Sync\" para voltar ao acompanhamento automático</string>
 </resources>

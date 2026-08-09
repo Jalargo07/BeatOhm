@@ -228,4 +228,22 @@
     <string name="tutorial_player_favorito_desc">Guarda la canción en tus favoritos</string>
     <string name="tutorial_player_waveform">Waveform</string>
     <string name="tutorial_player_waveform_desc">Arrastra para avanzar o retroceder en la canción</string>
+
+    <!-- Tutorial - Biblioteca -->
+    <string name="tutorial_lib_search">Buscar</string>
+    <string name="tutorial_lib_search_desc">Escribí el nombre de una canción, artista o álbum</string>
+    <string name="tutorial_lib_categories">Categorías</string>
+    <string name="tutorial_lib_categories_desc">Explora tu música por artista, álbum, género y más</string>
+    <string name="tutorial_lib_enrich"> Enriquecer</string>
+    <string name="tutorial_lib_enrich_desc">Busca metadata, carátulas y letras automáticamente</string>
+    <string name="tutorial_lib_folders">Carpetas</string>
+    <string name="tutorial_lib_folders_desc">Agrega carpetas con tu música descargada</string>
+
+    <!-- Tutorial - Letras -->
+    <string name="tutorial_lyrics_close">Cerrar letras</string>
+    <string name="tutorial_lyrics_close_desc">Toca X para volver al reproductor</string>
+    <string name="tutorial_lyrics_scroll">Scroll manual</string>
+    <string name="tutorial_lyrics_scroll_desc">Desliza para navegar la letra manualmente</string>
+    <string name="tutorial_lyrics_sync">Auto-sync</string>
+    <string name="tutorial_lyrics_sync_desc">Toca \"Sync\" para volver al seguimiento automático</string>
 </resources>

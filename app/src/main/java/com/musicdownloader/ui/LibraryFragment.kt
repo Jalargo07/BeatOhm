@@ -73,6 +73,16 @@ class LibraryFragment : Fragment() {
             LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
         binding.rvLibraryFavorites.adapter = favoriteAdapter
 
+        TutorialManager.showTutorial(
+            requireActivity(),
+            "library",
+            listOf(
+                TutorialManager.TooltipStep({ binding.etLibrarySearch }, getString(R.string.tutorial_lib_search), getString(R.string.tutorial_lib_search_desc)),
+                TutorialManager.TooltipStep({ binding.rvLibraryCategories }, getString(R.string.tutorial_lib_categories), getString(R.string.tutorial_lib_categories_desc)),
+                TutorialManager.TooltipStep({ binding.btnEnrichManual }, getString(R.string.tutorial_lib_enrich), getString(R.string.tutorial_lib_enrich_desc))
+            )
+        )
+
         libraryViewModel.folders.observe(viewLifecycleOwner) { submitLibraryItems() }
 
         libraryViewModel.isScanning.observe(viewLifecycleOwner) { scanning ->
