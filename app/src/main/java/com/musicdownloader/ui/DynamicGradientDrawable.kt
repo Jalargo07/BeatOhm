@@ -165,13 +165,13 @@ class DynamicGradientDrawable(
             var barIndex = 0
             for (x in 0..w.toInt() step 4) {
                 val barAmp = waveData[barIndex.coerceIn(0, waveData.size - 1)]
-                val y = baseY + sin((x / (w * 0.5f)) * 2 * Math.PI + currentPhase).toFloat() * waveHeight * (0.5f + barAmp * 0.5f)
+                val y = baseY + sin((x / (w * 0.5f)) * 2 * Math.PI).toFloat() * waveHeight * (0.5f + barAmp * 0.5f)
                 wavePath.lineTo(x.toFloat(), y)
                 barIndex = (barIndex + barStep).coerceAtMost(waveData.size - 1)
             }
         } else {
             for (x in 0..w.toInt() step 4) {
-                val y = baseY + sin((x / (w * 0.8f)) * 2 * Math.PI + currentPhase).toFloat() * waveHeight
+                val y = baseY + sin((x / (w * 0.8f)) * 2 * Math.PI).toFloat() * waveHeight
                 wavePath.lineTo(x.toFloat(), y)
             }
         }
