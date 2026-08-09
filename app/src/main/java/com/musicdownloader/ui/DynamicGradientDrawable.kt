@@ -46,6 +46,7 @@ class DynamicGradientDrawable(
     private var baseBottom = DEFAULT_BOTTOM
     private var baseDarkVibrant = DEFAULT_DARK_VIBRANT
     private var energyModulator = 0f
+    private var targetEnergy = 0f
 
     fun setColors(
         dominant: Int,
@@ -114,15 +115,7 @@ class DynamicGradientDrawable(
     }
 
     fun modulateByEnergy(energy: Float) {
-        val e = energy.coerceIn(0f, 1f)
-        if (kotlin.math.abs(e - energyModulator) < 0.05f) return
-        energyModulator = e
-        val factor = 0.7f + 0.3f * e
-        topColor = blend(BASE_COLOR, baseTop, 0.55f * factor)
-        midColor = blend(BASE_COLOR, baseMid, 0.45f * factor)
-        bottomColor = blend(BASE_COLOR, baseBottom, 0.35f * factor)
-        darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
-        rebuildWaveGradient(cachedWaveHeight)
+        targetEnergy = energy.coerceIn(0f, 1f)
         invalidateSelf()
     }
 
@@ -150,6 +143,16 @@ class DynamicGradientDrawable(
         }
 
         canvas.drawColor(BASE_COLOR)
+
+        energyModulator += (targetEnergy - energyModulator) * 0.15f
+        if (kotlin.math.abs(targetEnergy - energyModulator) > 0.001f) invalidateSelf()
+
+        val factor = 0.7f + 0.3f * energyModulator
+        topColor = blend(BASE_COLOR, baseTop, 0.55f * factor)
+        midColor = blend(BASE_COLOR, baseMid, 0.45f * factor)
+        bottomColor = blend(BASE_COLOR, baseBottom, 0.35f * factor)
+        darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
+        rebuildWaveGradient(cachedWaveHeight)
 
         val waveHeight = h * 0.3f * (0.3f + energyModulator * 0.7f)
         val baseY = h * 0.45f
