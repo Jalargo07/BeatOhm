@@ -40,9 +40,6 @@ class DynamicGradientDrawable(
     private var cachedWaveHeight = 0
     private val wavePath = Path()
 
-    // Waveform data from audio bars
-    var waveData: FloatArray = floatArrayOf()
-
     // Base colors for energy modulation
     private var baseTop = DEFAULT_TOP
     private var baseMid = DEFAULT_MID
@@ -154,26 +151,16 @@ class DynamicGradientDrawable(
 
         canvas.drawColor(BASE_COLOR)
 
-        val waveHeight = h * 0.15f * (0.5f + energyModulator * 0.5f)
-        val baseY = h * 0.5f
+        val waveHeight = h * 0.3f * (0.3f + energyModulator * 0.7f)
+        val baseY = h * 0.45f
 
         wavePath.rewind()
         wavePath.moveTo(0f, h)
 
-        if (waveData.isNotEmpty()) {
-            val barStep = (waveData.size / (w / 4f).toInt().coerceAtLeast(1)).coerceAtLeast(1)
-            var barIndex = 0
-            for (x in 0..w.toInt() step 4) {
-                val barAmp = waveData[barIndex.coerceIn(0, waveData.size - 1)]
-                val y = baseY + sin((x / (w * 0.5f)) * 2 * Math.PI).toFloat() * waveHeight * (0.5f + barAmp * 0.5f)
-                wavePath.lineTo(x.toFloat(), y)
-                barIndex = (barIndex + barStep).coerceAtMost(waveData.size - 1)
-            }
-        } else {
-            for (x in 0..w.toInt() step 4) {
-                val y = baseY + sin((x / (w * 0.8f)) * 2 * Math.PI).toFloat() * waveHeight
-                wavePath.lineTo(x.toFloat(), y)
-            }
+        for (x in 0..w.toInt() step 2) {
+            val fraction = x / w
+            val y = baseY - sin(fraction * Math.PI).toFloat() * waveHeight
+            wavePath.lineTo(x.toFloat(), y)
         }
 
         wavePath.lineTo(w, h)
