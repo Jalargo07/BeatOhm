@@ -35,7 +35,9 @@ class DynamicGradientDrawable(
 
     // Cached drawing objects
     private var wavePaint: Paint? = null
+    private var glowPaint: Paint? = null
     private var waveGradient: LinearGradient? = null
+    private var glowGradient: LinearGradient? = null
     private var cachedWaveWidth = 0
     private var cachedWaveHeight = 0
     private val wavePath = Path()
@@ -137,6 +139,9 @@ class DynamicGradientDrawable(
 
         if (wavePaint == null || cachedWaveWidth != w.toInt() || cachedWaveHeight != h.toInt()) {
             wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                maskFilter = android.graphics.BlurMaskFilter(20f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
             rebuildWaveGradient(h.toInt())
             cachedWaveWidth = w.toInt()
             cachedWaveHeight = h.toInt()
@@ -169,7 +174,16 @@ class DynamicGradientDrawable(
         wavePath.lineTo(w, h)
         wavePath.close()
 
+        // Draw main wave
         canvas.drawPath(wavePath, wavePaint!!)
+
+        // Draw glow effect with dynamic brightness (40% at low energy, 100% at peaks)
+        val glowAlpha = (0.4f + 0.6f * energyModulator).toInt()
+        glowPaint?.apply {
+            shader = waveGradient
+            alpha = glowAlpha
+        }
+        canvas.drawPath(wavePath, glowPaint!!)
     }
 
     override fun setAlpha(alpha: Int) {
