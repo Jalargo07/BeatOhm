@@ -162,17 +162,11 @@ class SyncedLyricsView @JvmOverloads constructor(
         val newIndex = findCurrentLine(positionMs)
         if (newIndex != currentIndex) {
             currentIndex = newIndex
-            Log.d("LyricsScroll", "updatePosition: line=$currentIndex, autoScroll=$autoScrollEnabled, scrollOffset=$scrollOffset")
-            // ALWAYS invalidate to update highlight, regardless of auto-scroll
             invalidate()
-            // Auto-scroll only if enabled
             if (autoScrollEnabled) {
                 val heights = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
                 targetScrollOffset = heights + height / 2f - height / 3f
-                Log.d("LyricsScroll", "  → AUTO-SCROLL to target=$targetScrollOffset (1/3 rest)")
                 animateScroll()
-            } else {
-                Log.d("LyricsScroll", "  → NO SCROLL (auto-scroll disabled, but highlight updated)")
             }
         }
     }
@@ -221,8 +215,12 @@ class SyncedLyricsView @JvmOverloads constructor(
     }
 
     private fun getMaxScroll(): Float {
-        if (cumulativeHeights.isNotEmpty()) {
+        if (isSynced && cumulativeHeights.isNotEmpty()) {
             return cumulativeHeights.last().coerceAtLeast(0f)
+        }
+        if (!isSynced && plainText.isNotEmpty()) {
+            val totalHeight = plainText.lines().size * lineSpacing
+            return (totalHeight - height / 2f).coerceAtLeast(0f)
         }
         return ((lines.size - 1) * lineSpacing).coerceAtLeast(0f)
     }
@@ -294,7 +292,6 @@ class SyncedLyricsView @JvmOverloads constructor(
     // ── Touch ──────────────────────────────────────────────────────────
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (!isSynced || lines.isEmpty()) return super.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 Log.d("LyricsScroll", "ACTION_DOWN: y=${event.y}, scrollOffset=$scrollOffset, autoScroll=$autoScrollEnabled")
@@ -347,8 +344,7 @@ class SyncedLyricsView @JvmOverloads constructor(
                     Log.d("LyricsScroll", "SWIPE-DOWN detected (long press + drag)")
                 } else if (absDY > scrollTouchSlop && absDY > absDX) {
                     isUserScrolling = true
-                    scrollOffset = dragStartOffset - deltaY
-                    Log.d("LyricsScroll", "SCROLL: deltaY=$deltaY, scrollOffset=$scrollOffset, velocity=$velocity")
+                    scrollOffset = (dragStartOffset - deltaY).coerceIn(-getMaxScroll(), getMaxScroll())
                     invalidate()
                 }
                 return true
@@ -436,11 +432,11 @@ class SyncedLyricsView @JvmOverloads constructor(
     private fun drawPlainText(canvas: Canvas, centerX: Float, centerY: Float, maxTextWidth: Float) {
         val allLines = plainText.lines()
         normalPaint.alpha = 170
-        val startY = centerY - totalContentHeight / 2f
+        val totalHeight = allLines.size * lineSpacing
+        val startY = centerY - totalHeight / 2f + scrollOffset
         for (i in allLines.indices) {
-            val y = startY + cumulativeHeights.getOrElse(i) { i * lineSpacing }
-            val blockBottom = startY + cumulativeHeights.getOrElse(i + 1) { (i + 1) * lineSpacing }
-            if (blockBottom < 0 || y > height) continue
+            val y = startY + i * lineSpacing
+            if (y + lineSpacing < 0 || y > height) continue
             drawCenteredText(canvas, allLines[i].trim(), centerX, y, normalPaint, maxTextWidth)
         }
     }
