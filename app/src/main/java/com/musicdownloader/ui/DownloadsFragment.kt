@@ -85,6 +85,16 @@ class DownloadsFragment : Fragment() {
 
         binding.btnSearch.setOnClickListener { startSearch() }
 
+        TutorialManager.showTutorial(
+            requireActivity(),
+            "downloads",
+            listOf(
+                TutorialManager.TooltipStep({ binding.etUrl }, getString(R.string.tutorial_dl_url), getString(R.string.tutorial_dl_url_desc)),
+                TutorialManager.TooltipStep({ binding.btnSearch }, getString(R.string.tutorial_dl_search), getString(R.string.tutorial_dl_search_desc)),
+                TutorialManager.TooltipStep({ binding.rvSearchResults }, getString(R.string.tutorial_dl_results), getString(R.string.tutorial_dl_results_desc))
+            )
+        )
+
         viewModel.downloads.observe(viewLifecycleOwner) { list ->
             adapter.submitList(list)
             updateEmptyVisibility()

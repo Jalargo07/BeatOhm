@@ -233,6 +233,14 @@
     <string name="tutorial_lib_folders">Carpetas</string>
     <string name="tutorial_lib_folders_desc">Agrega carpetas con tu música descargada</string>
 
+    <!-- Tutorial - Descargas -->
+    <string name="tutorial_dl_url">URL de YouTube</string>
+    <string name="tutorial_dl_url_desc">Pegá un link de video o playlist de YouTube</string>
+    <string name="tutorial_dl_search">Buscar</string>
+    <string name="tutorial_dl_search_desc">Buscá el nombre de una canción para encontrarla</string>
+    <string name="tutorial_dl_results">Resultados</string>
+    <string name="tutorial_dl_results_desc">Reproducí un preview o descargá directamente</string>
+
     <!-- Tutorial - Letras -->
     <string name="tutorial_lyrics_close">Cerrar letras</string>
     <string name="tutorial_lyrics_close_desc">Toca X para volver al reproductor</string>

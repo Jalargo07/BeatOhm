@@ -233,6 +233,14 @@
     <string name="tutorial_lib_folders">Pastas</string>
     <string name="tutorial_lib_folders_desc">Adicione pastas com sua música baixada</string>
 
+    <!-- Tutorial - Downloads -->
+    <string name="tutorial_dl_url">URL do YouTube</string>
+    <string name="tutorial_dl_url_desc">Cole um link de vídeo ou playlist do YouTube</string>
+    <string name="tutorial_dl_search">Buscar</string>
+    <string name="tutorial_dl_search_desc">Procure pelo nome de uma música para encontrá-la</string>
+    <string name="tutorial_dl_results">Resultados</string>
+    <string name="tutorial_dl_results_desc">Ouça um preview ou baixe diretamente</string>
+
     <!-- Tutorial - Letras -->
     <string name="tutorial_lyrics_close">Fechar letras</string>
     <string name="tutorial_lyrics_close_desc">Toque X para voltar ao reprodutor</string>
