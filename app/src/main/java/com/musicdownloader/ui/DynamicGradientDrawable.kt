@@ -28,6 +28,7 @@ class DynamicGradientDrawable(
     private var animator: ValueAnimator? = null
 
     var currentPhase: Float = 0f
+    private var phaseDirection = 1f
     private var energyModulator = 0f
     private var targetEnergy = 0f
 
@@ -167,17 +168,25 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        // 2. FASE CONGELADA EN PAUSA
+        // 2. FASE EN PING-PONG (Ida y Vuelta sin saltos)
         val isMoving = energyModulator > 0f && targetEnergy > 0f
         if (isMoving) {
-            currentPhase += 0.006f + (energyModulator * 0.008f)
-            if (currentPhase > 2 * Math.PI) currentPhase -= (2 * Math.PI).toFloat()
+            val step = 0.006f + (energyModulator * 0.008f)
+            currentPhase += step * phaseDirection
+
+            if (currentPhase >= Math.PI * 2) {
+                currentPhase = (Math.PI * 2).toFloat()
+                phaseDirection = -1f
+            } else if (currentPhase <= 0f) {
+                currentPhase = 0f
+                phaseDirection = 1f
+            }
         }
 
         // 3. PARÁMETROS DE ALTURA
         val midScreenY = h * 0.55f
         val floorLimitY = h * 0.65f
-        val maxClimbHeight = h * 0.20f * energyModulator
+        val maxClimbHeight = h * 0.25f * energyModulator
         val baseY = (midScreenY + (h * 0.05f * (1f - energyModulator))).coerceAtMost(floorLimitY)
 
         wavePath.rewind()
@@ -185,13 +194,13 @@ class DynamicGradientDrawable(
 
         var maxPeakY = baseY
 
-        // 4. MUESTREO HÍBRIDO: 3 SENOS + 5 DERIVADOS
+        // 4. MUESTREO SINCRO (Fase con multiplicadores enteros)
         for (x in 0..w.toInt() step 3) {
             val fraction = x / w
 
-            val w1 = sin(fraction * Math.PI * 1.2f + currentPhase).toFloat() * 0.35f
-            val w4 = sin(fraction * Math.PI * 2.1f - currentPhase * 0.7f).toFloat() * 0.20f
-            val w8 = sin(fraction * Math.PI * 3.5f + currentPhase * 1.1f).toFloat() * 0.08f
+            val w1 = sin(fraction * Math.PI * 1.2f + currentPhase).toFloat() * 0.40f
+            val w4 = sin(fraction * Math.PI * 2.0f - currentPhase).toFloat() * 0.25f
+            val w8 = sin(fraction * Math.PI * 3.0f + currentPhase * 2f).toFloat() * 0.10f
 
             val w2 = (w1 + w4) * 0.5f
             val w3 = w1 * 0.6f + w4 * 0.4f
@@ -199,7 +208,7 @@ class DynamicGradientDrawable(
             val w6 = w4 * 0.7f - w8 * 0.3f
             val w7 = w8 * 0.5f
 
-            val combinedWave = (w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8) * energyModulator * 0.5f
+            val combinedWave = (w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8) * energyModulator * 0.6f
             val calculatedY = baseY - (combinedWave * maxClimbHeight)
             val y = calculatedY.coerceAtMost(floorLimitY)
 
@@ -212,12 +221,12 @@ class DynamicGradientDrawable(
 
         canvas.drawPath(wavePath, wavePaint!!)
 
-        // 5. GLOW CON CACHE
+        // 5. GLOW OPTIMIZADO Y MÁS INTENSO
         val peakAmplitude = (baseY - maxPeakY).coerceAtLeast(0f)
-        val normalizedPeak = (peakAmplitude / (h * 0.20f)).coerceIn(0f, 1f)
+        val normalizedPeak = (peakAmplitude / (h * 0.12f)).coerceIn(0f, 1f)
 
-        if (normalizedPeak > 0.01f && isMoving) {
-            val targetRadius = (15f + (normalizedPeak * 35f)).coerceAtLeast(1f)
+        if (normalizedPeak > 0.01f) {
+            val targetRadius = (20f + (normalizedPeak * 45f)).coerceAtLeast(1f)
             val roundedRadius = kotlin.math.round(targetRadius)
 
             if (roundedRadius != lastBlurRadius) {
@@ -226,7 +235,7 @@ class DynamicGradientDrawable(
                 glowPaint?.maskFilter = cachedGlowPaintFilter
             }
 
-            val glowAlpha = (normalizedPeak * 180 * (0.3f + 0.7f * energyModulator)).toInt().coerceIn(0, 255)
+            val glowAlpha = (100 + (normalizedPeak * 155 * (0.5f + 0.5f * energyModulator))).toInt().coerceIn(0, 255)
             glowPaint?.alpha = glowAlpha
             canvas.drawPath(wavePath, glowPaint!!)
         } else {
