@@ -167,14 +167,11 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        // 2. FASE EN OSCILACIÓN SINUSOIDAL (rebote natural)
+        // 2. FASE CONTINUA (sin ping-pong, solo avanza)
         val isMoving = energyModulator > 0f && targetEnergy > 0f
         if (isMoving) {
-            currentPhase += 0.006f + (energyModulator * 0.008f)
+            currentPhase += 0.008f + (energyModulator * 0.010f)
         }
-
-        val travel = (kotlin.math.sin(currentPhase.toDouble()) + 1f).toFloat() / 2f
-        val waveCenter = travel * Math.PI
 
         // 3. PARÁMETROS DE ALTURA
         val midScreenY = h * 0.55f
@@ -187,14 +184,12 @@ class DynamicGradientDrawable(
 
         var maxPeakY = baseY
 
-        // 4. MUESTREO CON PICO VIAJERO
+        // 4. MUESTREO: ola viajera continua
         for (x in 0..w.toInt() step 3) {
             val fraction = x / w
+            val angle = (fraction * Math.PI * 1.8) - currentPhase
 
-            val w1 = sin(fraction * Math.PI - waveCenter).toFloat() * 0.45f
-            val w4 = sin(fraction * Math.PI * 2.0f - waveCenter * 1.5f).toFloat() * 0.20f
-
-            val combinedWave = (w1 + w4) * energyModulator
+            val combinedWave = sin(angle).toFloat() * energyModulator
             val calculatedY = baseY - (combinedWave * maxClimbHeight)
             val y = calculatedY.coerceAtMost(floorLimitY)
 
