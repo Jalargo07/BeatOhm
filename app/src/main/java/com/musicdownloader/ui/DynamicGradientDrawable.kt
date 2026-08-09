@@ -142,9 +142,13 @@ class DynamicGradientDrawable(
 
         canvas.drawColor(BASE_COLOR)
 
-        // Interpolación de energía
-        energyModulator += (targetEnergy - energyModulator) * 0.15f
-        if (kotlin.math.abs(targetEnergy - energyModulator) > 0.001f) invalidateSelf()
+        // 1. INTERPOLACIÓN DE ENERGÍA Y CONTROL DE MOVIMIENTO
+        energyModulator += (targetEnergy - energyModulator) * 0.10f
+
+        if (energyModulator > 0.01f) {
+            currentPhase += 0.01f + (energyModulator * 0.03f)
+            if (currentPhase > 2 * Math.PI) currentPhase -= (2 * Math.PI).toFloat()
+        }
 
         val factor = 0.7f + 0.3f * energyModulator
         topColor = blend(BASE_COLOR, baseTop, 0.55f * factor)
@@ -153,43 +157,40 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
-        // 1. AVANCE DE FASE CONTINUO (Fluidez horizontal)
-        currentPhase += 0.02f + (energyModulator * 0.03f)
-        if (currentPhase > 2 * Math.PI) currentPhase -= (2 * Math.PI).toFloat()
+        // 2. LÍMITES Y RANGOS DE ALTURA ESTRICTOS
+        val midScreenY = h * 0.50f
+        val floorLimitY = h * 0.60f
+        val maxClimbHeight = h * 0.45f * energyModulator
 
-        // 2. PARÁMETROS DE POSICIÓN Y ALTURA
-        val baseY = h * 0.52f
-        val baseWaveHeight = h * 0.15f
-        val dynamicHeight = h * 0.25f * energyModulator
-        val totalHeight = baseWaveHeight + dynamicHeight
+        val restingBaseY = midScreenY + (h * 0.05f * (1f - energyModulator))
+        val baseY = restingBaseY.coerceAtMost(floorLimitY)
 
         wavePath.rewind()
         wavePath.moveTo(0f, h)
 
         var maxPeakY = baseY
 
-        // 3. MATEMÁTICA MULTI-ARMÓNICA
+        // 3. MATEMÁTICA MULTI-ARMÓNICA CON AMBIENTE REPOSADO
         for (x in 0..w.toInt() step 4) {
             val fraction = x / w
 
-            val wave1 = sin(fraction * Math.PI + currentPhase).toFloat()
-            val wave2 = sin(fraction * Math.PI * 2.5f - currentPhase * 1.5f).toFloat() * 0.3f
-            val wave3 = sin(fraction * Math.PI * 5f + currentPhase * 3f).toFloat() * 0.1f * energyModulator
+            val wave1 = sin(fraction * Math.PI + currentPhase).toFloat() * (0.15f + 0.85f * energyModulator)
+            val wave2 = sin(fraction * Math.PI * 2.5f - currentPhase * 1.5f).toFloat() * 0.25f * energyModulator
+            val wave3 = sin(fraction * Math.PI * 5f + currentPhase * 3f).toFloat() * 0.10f * energyModulator
 
             val combinedWave = wave1 + wave2 + wave3
-            val y = baseY - (combinedWave * totalHeight)
+            val calculatedY = baseY - (combinedWave * maxClimbHeight)
+            val y = calculatedY.coerceAtMost(floorLimitY)
 
             if (y < maxPeakY) {
                 maxPeakY = y
             }
-
             wavePath.lineTo(x.toFloat(), y)
         }
 
         wavePath.lineTo(w, h)
         wavePath.close()
 
-        // Dibujar cuerpo de la ola
         canvas.drawPath(wavePath, wavePaint!!)
 
         // 4. BRILLO Y GLOW RESPONSIVO AL PICO
@@ -204,8 +205,9 @@ class DynamicGradientDrawable(
 
         canvas.drawPath(wavePath, glowPaint!!)
 
-        // Mantener la animación fluyendo continuamente
-        invalidateSelf()
+        if (kotlin.math.abs(targetEnergy - energyModulator) > 0.001f || energyModulator > 0.01f) {
+            invalidateSelf()
+        }
     }
 
     override fun setAlpha(alpha: Int) { paint.alpha = alpha; invalidateSelf() }
