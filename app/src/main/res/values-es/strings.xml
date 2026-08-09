@@ -243,12 +243,10 @@
     <string name="tutorial_dl_results_desc">Reproducí un preview o descargá directamente</string>
 
     <!-- Tutorial - Letras -->
-    <string name="tutorial_lyrics_close">Cerrar letras</string>
-    <string name="tutorial_lyrics_close_desc">Toca X para volver al reproductor</string>
-    <string name="tutorial_lyrics_scroll">Scroll manual</string>
-    <string name="tutorial_lyrics_scroll_desc">Desliza para navegar la letra manualmente</string>
-    <string name="tutorial_lyrics_sync">Auto-sync</string>
-    <string name="tutorial_lyrics_sync_desc">Toca \"Sync\" para volver al seguimiento automático</string>
+    <string name="tutorial_lyrics_tap">Saltar a posición</string>
+    <string name="tutorial_lyrics_tap_desc">Toca una línea para saltar a esa parte de la canción</string>
+    <string name="tutorial_lyrics_swipe">Cerrar panel</string>
+    <string name="tutorial_lyrics_swipe_desc">Desliza hacia abajo para volver al reproductor</string>
 
     <!-- Player -->
     <string name="sin_playlists">Sin playlists</string>

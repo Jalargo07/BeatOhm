@@ -129,6 +129,10 @@ class PlayerFragment : Fragment() {
         setupLyricsSwipe()
         applyIconPack()
 
+        if (viewModel.currentSong.value == null) {
+            binding.waveformSeekbar.setPlaceholder()
+        }
+
         TutorialManager.showTutorial(
             requireActivity(),
             "player",
@@ -140,10 +144,7 @@ class PlayerFragment : Fragment() {
                 TutorialManager.TooltipStep({ binding.btnQueue }, getString(R.string.tutorial_player_queue), getString(R.string.tutorial_player_queue_desc)),
                 TutorialManager.TooltipStep({ binding.btnLyrics }, getString(R.string.tutorial_player_lyrics), getString(R.string.tutorial_player_lyrics_desc)),
                 TutorialManager.TooltipStep({ binding.btnFavorite }, getString(R.string.tutorial_player_favorito), getString(R.string.tutorial_player_favorito_desc)),
-                TutorialManager.TooltipStep({ binding.waveformSeekbar }, getString(R.string.tutorial_player_waveform), getString(R.string.tutorial_player_waveform_desc)),
-                TutorialManager.TooltipStep({ binding.btnLyrics }, getString(R.string.tutorial_lyrics_close), getString(R.string.tutorial_lyrics_close_desc)),
-                TutorialManager.TooltipStep({ binding.waveformSeekbar }, getString(R.string.tutorial_lyrics_scroll), getString(R.string.tutorial_lyrics_scroll_desc)),
-                TutorialManager.TooltipStep({ binding.waveformSeekbar }, getString(R.string.tutorial_lyrics_sync), getString(R.string.tutorial_lyrics_sync_desc))
+                TutorialManager.TooltipStep({ binding.waveformSeekbar }, getString(R.string.tutorial_player_waveform), getString(R.string.tutorial_player_waveform_desc))
             )
         )
     }
@@ -924,6 +925,15 @@ class PlayerFragment : Fragment() {
             applyLyricsBlur(true)
             val pos = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.getCurrentPosition() ?: 0L
             binding.syncedLyricsView.updatePosition(pos)
+
+            TutorialManager.showTutorial(
+                requireActivity(),
+                "lyrics",
+                listOf(
+                    TutorialManager.TooltipStep({ binding.syncedLyricsView }, getString(R.string.tutorial_lyrics_tap), getString(R.string.tutorial_lyrics_tap_desc)),
+                    TutorialManager.TooltipStep({ binding.syncedLyricsView }, getString(R.string.tutorial_lyrics_swipe), getString(R.string.tutorial_lyrics_swipe_desc))
+                )
+            )
         } else {
             closeLyrics()
         }

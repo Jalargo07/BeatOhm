@@ -105,10 +105,36 @@ class WaveformSeekBar @JvmOverloads constructor(
     fun setWaveformData(data: FloatArray) {
         bars = data
         barCount = data.size
+        isPlaceholder = false
         playedPath.reset()
         unplayedPath.reset()
         scroller.forceFinished(true)
         isFlinging = false
+        invalidate()
+    }
+
+    private var isPlaceholder = false
+
+    fun setPlaceholder(numBars: Int = 120) {
+        if (barCount > 0 && !isPlaceholder) return
+        isPlaceholder = true
+        val random = java.util.Random(42)
+        bars = FloatArray(numBars) {
+            0.15f + random.nextFloat() * 0.7f
+        }
+        barCount = numBars
+        playedPath.reset()
+        unplayedPath.reset()
+        invalidate()
+    }
+
+    fun clearPlaceholder() {
+        if (!isPlaceholder) return
+        isPlaceholder = false
+        bars = floatArrayOf()
+        barCount = 0
+        playedPath.reset()
+        unplayedPath.reset()
         invalidate()
     }
 
