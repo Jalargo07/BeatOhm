@@ -156,10 +156,30 @@ class DynamicGradientDrawable(
     }
 
     companion object {
-        private const val BASE_COLOR = 0xFF0B0910.toInt()
-        private const val DEFAULT_TOP = 0xFF241033.toInt()
-        private const val DEFAULT_MID = 0xFF150D1E.toInt()
-        private const val DEFAULT_BOTTOM = 0xFF0B0910.toInt()
-        private const val DEFAULT_DARK_VIBRANT = 0xFF120D1C.toInt()
+        private const val BASE_COLOR_DARK = 0xFF0B0910.toInt()
+        private const val DEFAULT_TOP_DARK = 0xFF241033.toInt()
+        private const val DEFAULT_MID_DARK = 0xFF150D1E.toInt()
+        private const val DEFAULT_BOTTOM_DARK = 0xFF0B0910.toInt()
+        private const val DEFAULT_DARK_VIBRANT_DARK = 0xFF120D1C.toInt()
+
+        private const val BASE_COLOR_LIGHT = 0xFFF5F3F7.toInt()
+        private const val DEFAULT_TOP_LIGHT = 0xFFE8D5F5.toInt()
+        private const val DEFAULT_MID_LIGHT = 0xFFF0E6FA.toInt()
+        private const val DEFAULT_BOTTOM_LIGHT = 0xFFF5F3F7.toInt()
+        private const val DEFAULT_DARK_VIBRANT_LIGHT = 0xFFE0D0F0.toInt()
+
+        private var BASE_COLOR = BASE_COLOR_DARK
+        private var DEFAULT_TOP = DEFAULT_TOP_DARK
+        private var DEFAULT_MID = DEFAULT_MID_DARK
+        private var DEFAULT_BOTTOM = DEFAULT_BOTTOM_DARK
+        private var DEFAULT_DARK_VIBRANT = DEFAULT_DARK_VIBRANT_DARK
+
+        fun setThemeMode(isDark: Boolean) {
+            BASE_COLOR = if (isDark) BASE_COLOR_DARK else BASE_COLOR_LIGHT
+            DEFAULT_TOP = if (isDark) DEFAULT_TOP_DARK else DEFAULT_TOP_LIGHT
+            DEFAULT_MID = if (isDark) DEFAULT_MID_DARK else DEFAULT_MID_LIGHT
+            DEFAULT_BOTTOM = if (isDark) DEFAULT_BOTTOM_DARK else DEFAULT_BOTTOM_LIGHT
+            DEFAULT_DARK_VIBRANT = if (isDark) DEFAULT_DARK_VIBRANT_DARK else DEFAULT_DARK_VIBRANT_LIGHT
+        }
     }
 }

@@ -314,6 +314,8 @@ object ThemeManager {
             2 -> AppCompatDelegate.MODE_NIGHT_YES
             else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
+        val isDark = nightMode == 2
+        DynamicGradientDrawable.setThemeMode(isDark)
         AppCompatDelegate.setDefaultNightMode(mode)
     }
 

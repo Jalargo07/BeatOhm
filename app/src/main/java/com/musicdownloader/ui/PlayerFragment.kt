@@ -116,6 +116,9 @@ class PlayerFragment : Fragment() {
         primaryColor = ThemeManager.primaryColor
         requireActivity().volumeControlStream = AudioManager.STREAM_MUSIC
 
+        val isDark = requireContext().resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        DynamicGradientDrawable.setThemeMode(isDark)
         binding.root.background = dynamicGradient
         binding.ivGlow.background = glowDrawable
 
