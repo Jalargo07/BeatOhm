@@ -55,6 +55,7 @@ class LibraryMenuAdapter(
                 val category = item.category
                 vh.binding.tvGridName.text = vh.binding.root.context.getString(category.labelRes)
                 vh.binding.ivGridIcon.setImageResource(category.iconRes)
+                vh.binding.root.tag = category.id
                 if (category.count > 0) {
                     vh.binding.tvGridCount.visibility = android.view.View.VISIBLE
                     vh.binding.tvGridCount.text = formatCount(category.count)

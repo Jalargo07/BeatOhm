@@ -292,4 +292,9 @@
     <string name="status_escribiendo_tags">Escribiendo tags\u2026</string>
     <string name="status_completado">\u2713</string>
     <string name="status_error">\u2717</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_player">Reproductor</string>
+    <string name="nav_library">Biblioteca</string>
+    <string name="nav_downloads">Descargas</string>
 </resources>

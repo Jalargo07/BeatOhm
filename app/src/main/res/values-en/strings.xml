@@ -149,11 +149,11 @@
     <string name="widget_description">Quick music control</string>
 
     <!-- Phase 9: Theme settings -->
-    <string name="settings_section_appearance">APPEARANCE</string>
-    <string name="settings_section_downloads">DOWNLOADS</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_downloads">Downloads</string>
     <string name="settings_section_player">Player</string>
     <string name="settings_section_about">About</string>
-    <string name="settings_section_language">LANGUAGE</string>
+    <string name="settings_section_language">Language</string>
     <string name="reset_tutorial">Reset tutorial</string>
     <string name="settings_about_version">Music Downloader v%1$s</string>
     <string name="settings_primary_color">Primary color</string>
@@ -298,4 +298,9 @@
     <string name="status_escribiendo_tags">Writing tags\u2026</string>
     <string name="status_completado">\u2713</string>
     <string name="status_error">\u2717</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_player">Player</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_downloads">Downloads</string>
 </resources>
