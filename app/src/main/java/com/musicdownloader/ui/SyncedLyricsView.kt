@@ -171,6 +171,16 @@ class SyncedLyricsView @JvmOverloads constructor(
         }
     }
 
+    fun scrollToCurrentPosition(positionMs: Long) {
+        if (!isSynced || lines.isEmpty()) return
+        currentIndex = findCurrentLine(positionMs)
+        autoScrollEnabled = true
+        val heights = cumulativeHeights.getOrElse(currentIndex) { currentIndex * lineSpacing }
+        targetScrollOffset = heights + height / 2f - height / 3f
+        scrollOffset = targetScrollOffset
+        invalidate()
+    }
+
     private fun findCurrentLine(positionMs: Long): Int {
         var result = -1
         for (i in lines.indices) {

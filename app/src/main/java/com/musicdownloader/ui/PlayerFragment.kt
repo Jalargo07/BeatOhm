@@ -198,6 +198,13 @@ class PlayerFragment : Fragment() {
                 animateSongChange(song, path)
                 updateFavoriteIcon(path)
                 loadWaveform(path, song.duration)
+                // Parse lyrics for mini preview
+                var songLyrics = song.lyrics.orEmpty()
+                if (songLyrics.isBlank() && path.isNotBlank()) {
+                    songLyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
+                }
+                miniLrcLines = LrcParser.parse(songLyrics)
+                binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty() && !isLyricsVisible) View.VISIBLE else View.GONE
             } else {
                 currentSongFilePath = null
                 binding.emptyPlayerState.visibility = View.VISIBLE
@@ -905,10 +912,8 @@ class PlayerFragment : Fragment() {
             }
             loadLyricsBackground(song)
             miniLrcLines = LrcParser.parse(lyrics)
-            updateMiniLyrics()
-            binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty()) View.VISIBLE else View.GONE
-            binding.ivLyricsBackground.visibility = View.VISIBLE
             binding.lyricsPanel.visibility = View.VISIBLE
+            binding.ivLyricsBackground.visibility = View.VISIBLE
             binding.coverContainer.visibility = View.INVISIBLE
             binding.ivCover.visibility = View.INVISIBLE
             binding.ivGlow.visibility = View.INVISIBLE
@@ -917,6 +922,7 @@ class PlayerFragment : Fragment() {
             binding.timeRow.visibility = View.INVISIBLE
             binding.controlsContainer.visibility = View.INVISIBLE
             binding.bottomActions.visibility = View.INVISIBLE
+            binding.miniLyricsContainer.visibility = View.GONE
 
             binding.lyricsPanel.alpha = 0f
             binding.lyricsPanel.scaleX = 0.97f
@@ -931,7 +937,7 @@ class PlayerFragment : Fragment() {
 
             applyLyricsBlur(true)
             val pos = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.getCurrentPosition() ?: 0L
-            binding.syncedLyricsView.updatePosition(pos)
+            binding.syncedLyricsView.scrollToCurrentPosition(pos)
 
             TutorialManager.showTutorial(
                 requireActivity(),
@@ -983,8 +989,8 @@ class PlayerFragment : Fragment() {
 
     private fun closeLyrics() {
         isLyricsVisible = false
-        binding.miniLyricsContainer.visibility = View.GONE
-        miniLrcLines = emptyList()
+        binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty()) View.VISIBLE else View.GONE
+        updateMiniLyrics()
         applyLyricsBlur(false)
         val panelHeight = binding.lyricsPanel.height.toFloat()
         binding.lyricsPanel.animate()
