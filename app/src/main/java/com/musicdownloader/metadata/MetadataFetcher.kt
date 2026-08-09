@@ -128,7 +128,13 @@ class MetadataFetcher {
             }
 
             Log.e(TAG, "fetchFullMetadata SIN RESULTADO para '${song.artist}' - '${song.title}'")
-            Result.success(song)
+            // Apply cleaning even when no metadata found — cleans channel names, playlists, etc.
+            val cleanedSong = song.copy(
+                artist = cleanArtist(cleanChannelName(song.artist)),
+                title = cleanTitle(song.title)
+            )
+            Log.e(TAG, "fetchFullMetadata cleaned fallback: '${cleanedSong.artist}' - '${cleanedSong.title}'")
+            Result.success(cleanedSong)
         } catch (e: Exception) {
             Log.e(TAG, "fetchFullMetadata ERROR: ${e.message}", e)
             Result.success(song)
