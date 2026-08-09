@@ -33,6 +33,13 @@ class DynamicGradientDrawable(
     private var lastBoundsWidth = 0
     private var lastBoundsHeight = 0
 
+    // Base colors for energy modulation
+    private var baseTop = DEFAULT_TOP
+    private var baseMid = DEFAULT_MID
+    private var baseBottom = DEFAULT_BOTTOM
+    private var baseDarkVibrant = DEFAULT_DARK_VIBRANT
+    private var energyModulator = 0f
+
     fun setColors(
         dominant: Int,
         vibrant: Int,
@@ -69,6 +76,10 @@ class DynamicGradientDrawable(
     private fun animateTo(top: Int, mid: Int, bottom: Int, darkVibrant: Int, durationMs: Long) {
         if (top == topColor && mid == midColor && bottom == bottomColor && darkVibrant == darkVibrantColor) return
         animator?.cancel()
+        baseTop = top
+        baseMid = mid
+        baseBottom = bottom
+        baseDarkVibrant = darkVibrant
         val startTop = topColor
         val startMid = midColor
         val startBottom = bottomColor
@@ -93,6 +104,19 @@ class DynamicGradientDrawable(
         val g = (Color.green(base) * (1f - fraction) + Color.green(overlay) * fraction).roundToInt()
         val b = (Color.blue(base) * (1f - fraction) + Color.blue(overlay) * fraction).roundToInt()
         return Color.rgb(r, g, b)
+    }
+
+    fun modulateByEnergy(energy: Float) {
+        val e = energy.coerceIn(0f, 1f)
+        if (kotlin.math.abs(e - energyModulator) < 0.05f) return
+        energyModulator = e
+        val factor = 0.7f + 0.3f * e
+        topColor = blend(BASE_COLOR, baseTop, 0.55f * factor)
+        midColor = blend(BASE_COLOR, baseMid, 0.45f * factor)
+        bottomColor = blend(BASE_COLOR, baseBottom, 0.35f * factor)
+        darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
+        cachedGradient = null
+        invalidateSelf()
     }
 
     override fun draw(canvas: Canvas) {

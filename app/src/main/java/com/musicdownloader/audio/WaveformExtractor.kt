@@ -19,7 +19,7 @@ object WaveformExtractor {
      */
     fun barsForDuration(durationMs: Long): Int {
         val durationSec = durationMs / 1000.0
-        val bars = (durationSec / 1.2).toInt().coerceIn(20, 300)
+        val bars = (durationSec / 0.5).toInt().coerceIn(20, 500)
         Log.d(TAG, "barsForDuration: durationMs=$durationMs → durationSec=${"%.1f".format(durationSec)} → bars=$bars")
         return bars
     }

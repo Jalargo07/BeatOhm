@@ -68,6 +68,21 @@ class WaveformSeekBar @JvmOverloads constructor(
     private var bars: FloatArray = floatArrayOf()
     private var barCount = 0
 
+    fun getEnergyAtProgress(progress: Int): Float {
+        if (bars.isEmpty() || max == 0) return 0f
+        val barIndex = ((progress.toFloat() / max) * (bars.size - 1)).toInt().coerceIn(0, bars.size - 1)
+        val sampleRange = 5
+        var sum = 0f
+        var count = 0
+        for (i in (barIndex - sampleRange)..(barIndex + sampleRange)) {
+            if (i in bars.indices) {
+                sum += bars[i]
+                count++
+            }
+        }
+        return if (count > 0) sum / count else 0f
+    }
+
     // Total waveform width in pixels
     private val totalWaveformWidth: Float
         get() = barCount * (barWidth + barSpacing)

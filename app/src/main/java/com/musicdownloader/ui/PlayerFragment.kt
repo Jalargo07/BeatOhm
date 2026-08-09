@@ -1036,6 +1036,11 @@ class PlayerFragment : Fragment() {
         }
     }
 
+    private fun updateGradientFromWaveform(progress: Int) {
+        val energy = binding.waveformSeekbar.getEnergyAtProgress(progress)
+        dynamicGradient.modulateByEnergy(energy)
+    }
+
     private fun applyLyricsBlur(blur: Boolean) {
         // Blur effect removed - not critical for functionality
         // Can be re-implemented later with compatible API
@@ -1090,6 +1095,7 @@ class PlayerFragment : Fragment() {
                     b.tvCurrentTime.text = formatTime(pos)
                     viewModel.setPosition(pos)
                     updateMiniLyrics()
+                    updateGradientFromWaveform(progress)
                     if (isLyricsVisible) {
                         b.syncedLyricsView.updatePosition(pos)
                     }
