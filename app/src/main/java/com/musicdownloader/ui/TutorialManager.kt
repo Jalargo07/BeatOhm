@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.content.edit
@@ -17,6 +18,7 @@ object TutorialManager {
 
     private const val PREFS = "tutorial_prefs"
     private const val KEY_PREFIX = "shown_"
+    private var highlightAnimator: Runnable? = null
 
     data class TooltipStep(
         val targetView: () -> View?,
@@ -106,7 +108,7 @@ object TutorialManager {
 
         popup.width = (activity.resources.displayMetrics.widthPixels * 0.85).toInt()
 
-        popup.setOnDismissListener { highlightView(target) }
+        popup.setOnDismissListener { stopHighlightLoop(target) }
 
         target.post {
             try {
@@ -118,22 +120,42 @@ object TutorialManager {
             }
         }
 
-        highlightView(target)
+        startHighlightLoop(target)
     }
 
-    private fun highlightView(view: View) {
-        view.animate()
-            .scaleX(1.05f)
-            .scaleY(1.05f)
-            .setDuration(300)
-            .withEndAction {
+    private fun startHighlightLoop(view: View) {
+        stopHighlightLoop(view)
+        var expanding = true
+        val scaleUp = 1.08f
+        val scaleDown = 1f
+        val duration = 400L
+
+        highlightAnimator = object : Runnable {
+            override fun run() {
+                val target = if (expanding) scaleUp else scaleDown
                 view.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(300)
+                    .scaleX(target)
+                    .scaleY(target)
+                    .setDuration(duration)
+                    .setInterpolator(DecelerateInterpolator())
+                    .withEndAction {
+                        expanding = !expanding
+                        view.post(this)
+                    }
                     .start()
             }
-            .start()
+        }
+        view.post(highlightAnimator)
+    }
+
+    private fun stopHighlightLoop(view: View) {
+        highlightAnimator?.let {
+            view.removeCallbacks(it)
+            view.animate().cancel()
+        }
+        highlightAnimator = null
+        view.scaleX = 1f
+        view.scaleY = 1f
     }
 
     fun resetAll(context: Context) {
