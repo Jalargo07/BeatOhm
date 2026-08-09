@@ -95,23 +95,23 @@ class ThemeSelectionFragment : Fragment() {
         val theme = ThemeManager.activeTheme ?: return
         ThemeExporter.copyToClipboard(requireContext(), theme)
         ThemeExporter.shareTheme(requireContext(), theme)
-        Toast.makeText(requireContext(), "Tema copiado y listo para compartir", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), getString(R.string.tema_copiado), Toast.LENGTH_SHORT).show()
     }
 
     private fun importThemeFromClipboard() {
         val userTheme = ThemeExporter.pasteFromClipboard(requireContext())
         if (userTheme == null) {
-            Toast.makeText(requireContext(), "No hay tema válido en el portapapeles", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.no_tema_valido), Toast.LENGTH_SHORT).show()
             return
         }
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Importar tema")
-            .setMessage("¿Importar el tema \"${userTheme.name}\"?")
+            .setTitle(getString(R.string.importar_tema))
+            .setMessage(getString(R.string.importar_tema_pregunta, userTheme.name))
             .setPositiveButton("Importar") { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     ThemeManager.createCustomTheme(userTheme)
                     ThemeManager.setActiveTheme(userTheme)
-                    Toast.makeText(requireContext(), "Tema importado y activado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.tema_importado), Toast.LENGTH_SHORT).show()
                     loadThemes()
                 }
             }

@@ -52,7 +52,7 @@ class PlaylistsFragment : Fragment() {
         binding.fabAddPlaylist.setOnClickListener {
             val input = EditText(requireContext())
             AlertDialog.Builder(requireContext())
-                .setTitle("Nueva Playlist")
+                .setTitle(getString(R.string.nueva_playlist))
                 .setView(input)
                 .setPositiveButton("Crear") { _, _ ->
                     val name = input.text.toString().trim()
@@ -96,7 +96,7 @@ class PlaylistAdapter(private val onClick: (Playlist) -> Unit) :
         val p = getItem(position)
         holder.icon.text = p.name.take(1).uppercase()
         holder.title.text = p.name
-        holder.subtitle.text = "${p.songCount} canciones"
+        holder.subtitle.text = holder.itemView.context.getString(R.string.canciones_count, p.songCount)
         holder.itemView.setOnClickListener { onClick(p) }
     }
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {

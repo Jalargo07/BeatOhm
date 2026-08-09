@@ -63,7 +63,7 @@ class SongListFragment : Fragment() {
         repository.regenProgress.observe(viewLifecycleOwner) { progress ->
             if (progress != null) {
                 binding.llProgress.visibility = View.VISIBLE
-                binding.tvProgress.text = "Regenerando ${progress.first}/${progress.second}..."
+                binding.tvProgress.text = getString(R.string.regenerando, progress.first, progress.second)
             } else {
                 binding.llProgress.visibility = View.GONE
             }
@@ -85,14 +85,14 @@ class SongListFragment : Fragment() {
             },
                     onLongClick = { song ->
                 com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                    .setTitle("Reset Waveform")
-                    .setMessage("Regenerar waveform de '${song.title}'?")
+                    .setTitle(getString(R.string.reset_waveform))
+                    .setMessage(getString(R.string.regenerar_waveform, song.title))
                     .setPositiveButton("Reset") { _, _ ->
                         lifecycleScope.launch {
                             withContext(Dispatchers.IO) {
                                 repository.resetWaveform(song)
                             }
-                            android.widget.Toast.makeText(requireContext(), "Waveform regenerado", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(requireContext(), getString(R.string.waveform_regenerado), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
                     .setNegativeButton("Cancelar", null)
@@ -106,7 +106,7 @@ class SongListFragment : Fragment() {
         adapter.onSelectionChanged = { count ->
             if (adapter.isMultiSelectMode && count > 0) {
                 binding.llMultiSelectBar.visibility = View.VISIBLE
-                binding.tvSelectedCount.text = "$count seleccionada${if (count > 1) "s" else ""}"
+                binding.tvSelectedCount.text = if (count > 1) getString(R.string.seleccionadas, count) else getString(R.string.seleccionada, count)
             } else {
                 binding.llMultiSelectBar.visibility = View.GONE
             }
@@ -242,15 +242,15 @@ class SongListFragment : Fragment() {
             val list = withContext(Dispatchers.IO) { db.playlistDao().getAllPlaylists().first() }
             if (list.isEmpty()) {
                 MaterialAlertDialogBuilder(requireContext())
-                    .setTitle("Sin playlists")
-                    .setMessage("Crea una playlist primero desde la pestaña Playlists.")
+                    .setTitle(getString(R.string.sin_playlists))
+                    .setMessage(getString(R.string.crea_playlist_primero))
                     .setPositiveButton("OK", null)
                     .show()
                 return@launch
             }
             val names = list.map { it.name }.toTypedArray()
             MaterialAlertDialogBuilder(requireContext())
-                .setTitle("Agregar ${songs.size} cancione${if (songs.size > 1) "s" else ""} a playlist")
+                .setTitle(getString(R.string.agregar_canciones_a_playlist, songs.size, if (songs.size > 1) "s" else ""))
                 .setItems(names) { _, which ->
                     val playlist = list[which]
                     lifecycleScope.launch {
@@ -276,8 +276,8 @@ class SongListFragment : Fragment() {
 
     private fun regenerateMetadata(songs: List<LocalSong>) {
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Regenerar metadata")
-            .setMessage("Re-buscar metadata, artwork y letras de ${songs.size} cancione${if (songs.size > 1) "s" else ""}?")
+            .setTitle(getString(R.string.regenerar_metadata))
+            .setMessage(getString(R.string.rebuscar_metadata, songs.size, if (songs.size > 1) "s" else ""))
             .setPositiveButton("Regenerar") { _, _ ->
                 adapter.deselectAll()
                 lifecycleScope.launch {
@@ -292,7 +292,7 @@ class SongListFragment : Fragment() {
                     }
                     android.widget.Toast.makeText(
                         requireContext(),
-                        "Metadata regenerada (${songs.size}/${songs.size})",
+                        getString(R.string.metadata_regenerada, songs.size, songs.size),
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
                 }

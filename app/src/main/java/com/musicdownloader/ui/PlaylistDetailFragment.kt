@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.musicdownloader.data.AppDatabase
 import com.musicdownloader.data.PlaylistSong
 import com.musicdownloader.data.toSong
+import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentPlaylistDetailBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -62,12 +63,12 @@ class PlaylistDetailFragment : Fragment() {
             },
             onItemLongClick = { song ->
                 AlertDialog.Builder(requireContext())
-                    .setTitle("Quitar de playlist")
-                    .setMessage("¿Quitar ${song.title} de esta playlist?")
+                    .setTitle(getString(R.string.quitar_de_playlist))
+                    .setMessage(getString(R.string.quitar_cancion_de_playlist, song.title))
                     .setPositiveButton("Si") { _, _ ->
                         lifecycleScope.launch {
                             db.playlistDao().removeSongFromPlaylist(PlaylistSong(playlistId, song.filePath, 0))
-                            Toast.makeText(requireContext(), "Canción quitada", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), getString(R.string.cancion_quitada), Toast.LENGTH_SHORT).show()
                         }
                     }
                     .setNegativeButton("No", null)

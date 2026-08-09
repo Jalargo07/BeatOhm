@@ -85,19 +85,19 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
                 DownloadStatus.QUEUED -> {
                     binding.progressBar.isIndeterminate = true
                     binding.progressBar.visibility = View.VISIBLE
-                    binding.tvStatus.text = "En cola..."
+                    binding.tvStatus.text = binding.root.context.getString(R.string.status_en_cola)
                     binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.text_secondary))
                 }
                 DownloadStatus.EXTRACTING -> {
                     binding.progressBar.isIndeterminate = true
                     binding.progressBar.visibility = View.VISIBLE
-                    binding.tvStatus.text = "Extrayendo..."
+                    binding.tvStatus.text = binding.root.context.getString(R.string.status_extrayendo)
                     binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.text_secondary))
                 }
                 DownloadStatus.FETCHING_METADATA -> {
                     binding.progressBar.isIndeterminate = true
                     binding.progressBar.visibility = View.VISIBLE
-                    binding.tvStatus.text = "Metadata..."
+                    binding.tvStatus.text = binding.root.context.getString(R.string.status_metadata)
                     binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.text_secondary))
                 }
                 DownloadStatus.DOWNLOADING -> {
@@ -110,7 +110,7 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
                 DownloadStatus.TAGGING -> {
                     binding.progressBar.isIndeterminate = true
                     binding.progressBar.visibility = View.VISIBLE
-                    binding.tvStatus.text = "Escribiendo tags..."
+                    binding.tvStatus.text = binding.root.context.getString(R.string.status_escribiendo_tags)
                     binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.text_secondary))
                 }
                 DownloadStatus.COMPLETED -> showCompleted(lastStatus != DownloadStatus.COMPLETED)
@@ -131,7 +131,7 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
                         binding.progressBar.alpha = 1f
                     }
                     .start()
-                binding.tvStatus.text = "✓"
+                binding.tvStatus.text = binding.root.context.getString(R.string.status_completado)
                 binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.success))
                 binding.tvStatus.scaleX = 0.3f
                 binding.tvStatus.scaleY = 0.3f
@@ -144,7 +144,7 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
             } else {
                 binding.progressBar.visibility = View.GONE
                 binding.progressBar.alpha = 1f
-                binding.tvStatus.text = "✓"
+                binding.tvStatus.text = binding.root.context.getString(R.string.status_completado)
                 binding.tvStatus.setTextColor(binding.root.context.getColor(R.color.success))
                 binding.tvStatus.scaleX = 1f
                 binding.tvStatus.scaleY = 1f
@@ -156,7 +156,7 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
             binding.tvStatus.animate().cancel()
             binding.progressBar.visibility = View.GONE
             binding.progressBar.alpha = 1f
-            binding.tvStatus.text = "✗"
+            binding.tvStatus.text = binding.root.context.getString(R.string.status_error)
             binding.tvStatus.setTextColor(binding.root.context.getColor(android.R.color.holo_red_light))
             binding.tvStatus.scaleX = 1f
             binding.tvStatus.scaleY = 1f

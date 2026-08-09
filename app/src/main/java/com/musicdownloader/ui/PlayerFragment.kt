@@ -1006,15 +1006,15 @@ class PlayerFragment : Fragment() {
             val list = db.playlistDao().getAllPlaylists().first()
             if (list.isEmpty()) {
                 AlertDialog.Builder(requireContext())
-                    .setTitle("Sin playlists")
-                    .setMessage("Crea una playlist primero desde la pestaña Playlists.")
+                    .setTitle(getString(R.string.sin_playlists))
+                    .setMessage(getString(R.string.crea_playlist_primero))
                     .setPositiveButton("OK", null)
                     .show()
                 return@launch
             }
             val names = list.map { it.name }.toTypedArray()
             AlertDialog.Builder(requireContext())
-                .setTitle("Agregar a playlist")
+                .setTitle(getString(R.string.agregar_a_playlist))
                 .setItems(names) { _, which ->
                     val playlist = list[which]
                     lifecycleScope.launch {

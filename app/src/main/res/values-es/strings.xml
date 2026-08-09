@@ -248,4 +248,47 @@
     <string name="tutorial_lyrics_scroll_desc">Desliza para navegar la letra manualmente</string>
     <string name="tutorial_lyrics_sync">Auto-sync</string>
     <string name="tutorial_lyrics_sync_desc">Toca \"Sync\" para volver al seguimiento automático</string>
+
+    <!-- Player -->
+    <string name="sin_playlists">Sin playlists</string>
+    <string name="crea_playlist_primero">Crea una playlist primero desde la pestaña Playlists.</string>
+    <string name="agregar_a_playlist">Agregar a playlist</string>
+
+    <!-- Playlists -->
+    <string name="nueva_playlist">Nueva Playlist</string>
+    <string name="canciones_count">%d canciones</string>
+
+    <!-- Playlist Detail / Song List -->
+    <string name="quitar_de_playlist">Quitar de playlist</string>
+    <string name="quitar_cancion_de_playlist">¿Quitar %1$s de esta playlist?</string>
+    <string name="cancion_quitada">Canción quitada</string>
+
+    <!-- Song List - Multi-select -->
+    <string name="seleccionada">%1$d seleccionada</string>
+    <string name="seleccionadas">%1$d seleccionadas</string>
+
+    <!-- Song List - Regenerate -->
+    <string name="regenerando">Regenerando %1$d/%2$d\u2026</string>
+    <string name="reset_waveform">Reset Waveform</string>
+    <string name="regenerar_waveform">Regenerar waveform de \'%1$s\'?</string>
+    <string name="waveform_regenerado">Waveform regenerado</string>
+    <string name="agregar_canciones_a_playlist">Agregar %1$d cancione%2$s a playlist</string>
+    <string name="regenerar_metadata">Regenerar metadata</string>
+    <string name="rebuscar_metadata">Re-buscar metadata, artwork y letras de %1$d cancione%2$s?</string>
+    <string name="metadata_regenerada">Metadata regenerada (%1$d/%2$d)</string>
+
+    <!-- Theme Selection -->
+    <string name="tema_copiado">Tema copiado y listo para compartir</string>
+    <string name="no_tema_valido">No hay tema válido en el portapapeles</string>
+    <string name="importar_tema">Importar tema</string>
+    <string name="importar_tema_pregunta">¿Importar el tema \"%1$s\"?</string>
+    <string name="tema_importado">Tema importado y activado</string>
+
+    <!-- Download Status -->
+    <string name="status_en_cola">En cola\u2026</string>
+    <string name="status_extrayendo">Extrayendo\u2026</string>
+    <string name="status_metadata">Metadata\u2026</string>
+    <string name="status_escribiendo_tags">Escribiendo tags\u2026</string>
+    <string name="status_completado">\u2713</string>
+    <string name="status_error">\u2717</string>
 </resources>
