@@ -21,6 +21,18 @@ class SearchResultAdapter(
     enum class ButtonState { IDLE, DOWNLOADING, COMPLETED }
 
     private val states = mutableMapOf<String, ButtonState>()
+    private val playingIds = mutableSetOf<String>()
+
+    fun setPlaying(videoId: String) {
+        playingIds.clear()
+        playingIds.add(videoId)
+        notifyDataSetChanged()
+    }
+
+    fun clearPlaying() {
+        playingIds.clear()
+        notifyDataSetChanged()
+    }
 
     fun setDownloading(videoId: String) {
         states[videoId] = ButtonState.DOWNLOADING
@@ -62,7 +74,9 @@ class SearchResultAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(getItem(position), states[getItem(position).videoId] ?: ButtonState.IDLE)
+        val item = getItem(position)
+        val isPlaying = playingIds.contains(item.videoId)
+        holder.bind(item, states[item.videoId] ?: ButtonState.IDLE, isPlaying)
     }
 
     class ViewHolder(
@@ -73,7 +87,7 @@ class SearchResultAdapter(
 
         private var lastState: ButtonState? = null
 
-        fun bind(result: SearchResult, state: ButtonState) {
+        fun bind(result: SearchResult, state: ButtonState, isPlaying: Boolean = false) {
             binding.tvTitle.text = result.title
             binding.tvChannel.text = result.channelName
             binding.tvDuration.text = result.durationText
@@ -81,8 +95,11 @@ class SearchResultAdapter(
                 placeholder(R.drawable.ic_music_note)
                 error(R.drawable.ic_music_note)
             }
-            binding.btnDownload.setOnClickListener { onDownload(result) }
+            binding.btnPlay.setIconResource(
+                if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+            )
             binding.btnPlay.setOnClickListener { onPlay?.invoke(result) }
+            binding.btnDownload.setOnClickListener { onDownload(result) }
             applyState(state)
         }
 

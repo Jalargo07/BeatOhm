@@ -1,17 +1,29 @@
 package com.musicdownloader.ui
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.snackbar.Snackbar
 import com.musicdownloader.R
 import com.musicdownloader.databinding.FragmentDownloadsBinding
+import com.musicdownloader.extractor.YouTubeExtractor
 import com.musicdownloader.model.DownloadStatus
+import com.musicdownloader.model.SearchResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class DownloadsFragment : Fragment() {
 
@@ -21,6 +33,9 @@ class DownloadsFragment : Fragment() {
     private lateinit var adapter: DownloadAdapter
     private lateinit var searchAdapter: SearchResultAdapter
     private val seenErrorIds = mutableSetOf<String>()
+    private var previewPlayer: ExoPlayer? = null
+    private var currentPreviewVideoId: String? = null
+    private val previewHandler = Handler(Looper.getMainLooper())
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentDownloadsBinding.inflate(inflater, container, false)
@@ -31,10 +46,26 @@ class DownloadsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
         adapter = DownloadAdapter()
-        searchAdapter = SearchResultAdapter(onDownload = { result ->
-            searchAdapter.setDownloading(result.videoId)
-            viewModel.downloadFromSearch(result)
-        })
+
+        previewPlayer = ExoPlayer.Builder(requireContext()).build().apply {
+            addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_ENDED) {
+                        stopPreview()
+                    }
+                }
+            })
+        }
+
+        searchAdapter = SearchResultAdapter(
+            onDownload = { result ->
+                searchAdapter.setDownloading(result.videoId)
+                viewModel.downloadFromSearch(result)
+            },
+            onPlay = { result ->
+                togglePreview(result)
+            }
+        )
 
         binding.rvDownloads.layoutManager = LinearLayoutManager(requireContext())
         binding.rvDownloads.adapter = adapter
@@ -127,7 +158,53 @@ class DownloadsFragment : Fragment() {
         binding.etUrl.text?.clear()
     }
 
+    private fun togglePreview(result: SearchResult) {
+        val player = previewPlayer ?: return
+        if (currentPreviewVideoId == result.videoId) {
+            stopPreview()
+            return
+        }
+        stopPreview()
+        currentPreviewVideoId = result.videoId
+        searchAdapter.setPlaying(result.videoId)
+
+        lifecycleScope.launch {
+            try {
+                val extractor = YouTubeExtractor()
+                val audioResult = withContext(Dispatchers.IO) {
+                    extractor.getBestAudioStream(result.youtubeUrl)
+                }
+                if (audioResult.isSuccess) {
+                    val audio = audioResult.getOrThrow()
+                    val mediaItem = MediaItem.fromUri(audio.url)
+                    player.setMediaItem(mediaItem)
+                    player.prepare()
+                    player.play()
+                    player.seekTo(0)
+                    previewHandler.postDelayed({ stopPreview() }, 40_000)
+                } else {
+                    stopPreview()
+                    Toast.makeText(requireContext(), R.string.error_stream, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                stopPreview()
+                Toast.makeText(requireContext(), R.string.error_stream, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun stopPreview() {
+        previewHandler.removeCallbacksAndMessages(null)
+        previewPlayer?.stop()
+        previewPlayer?.clearMediaItems()
+        currentPreviewVideoId?.let { searchAdapter.setIdle(it) }
+        currentPreviewVideoId = null
+    }
+
     override fun onDestroyView() {
+        previewHandler.removeCallbacksAndMessages(null)
+        previewPlayer?.release()
+        previewPlayer = null
         _binding = null
         super.onDestroyView()
     }

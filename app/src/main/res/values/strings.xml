@@ -145,6 +145,7 @@
     <string name="library_empty_hint">Agrega carpetas en Biblioteca &gt; Carpetas</string>
     <string name="error_no_internet">Conectate a internet para buscar</string>
     <string name="error_download_generic">Error al descargar. Intenta de nuevo.</string>
+    <string name="error_stream">Error al obtener stream de audio</string>
     <string name="widget_description">Control de música rápido</string>
 
     <!-- Phase 9: Theme settings -->
