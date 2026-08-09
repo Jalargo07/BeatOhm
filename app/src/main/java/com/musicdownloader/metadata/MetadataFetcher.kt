@@ -41,6 +41,10 @@ class MetadataFetcher {
         clean = clean.replace(Regex("\\s+(?:MV|M/V)$"), "")
         // Remover year al final si es "(2024)" o "[2024]"
         clean = clean.replace(Regex("\\s*[\\(\\[]\\d{4}[\\)\\]]$"), "")
+        // Remover texto después de "|" (pipe de canales: "Song | The Cypher Effect")
+        clean = clean.replace(Regex("\\s*\\|.*$"), "")
+        // Remover nombres de canales/series conocidos
+        clean = clean.replace(Regex("\\s*(?:The\\s+)?(?:Cypher\\s+Effect|Mic\\s+Check\\s+Session|Freestyle|Batalla|Red\\s+Bull|Audiomack|SoundCloud).*", RegexOption.IGNORE_CASE), "")
         return clean.trim()
     }
 
@@ -59,6 +63,8 @@ class MetadataFetcher {
     suspend fun fetchFullMetadata(song: Song): Result<Song> = withContext(Dispatchers.IO) {
         try {
             Log.e(TAG, "fetchFullMetadata INICIO: '${song.artist}' - '${song.title}'")
+
+            // Attempt 1: artist + title (cleaned)
             val metadata = searchItunes(song.artist, song.title)
             if (metadata != null) {
                 val cleaned = song.copy(
@@ -73,8 +79,9 @@ class MetadataFetcher {
                 Log.e(TAG, "fetchFullMetadata iTunes OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
                 return@withContext Result.success(cleaned)
             }
-            Log.e(TAG, "fetchFullMetadata iTunes sin resultado, intentando MusicBrainz...")
 
+            // Attempt 2: MusicBrainz with artist + title
+            Log.e(TAG, "fetchFullMetadata iTunes sin resultado, intentando MusicBrainz...")
             val mbMetadata = searchMusicBrainz(song.artist, song.title)
             if (mbMetadata != null) {
                 val cleaned = song.copy(
@@ -87,8 +94,25 @@ class MetadataFetcher {
                 Log.e(TAG, "fetchFullMetadata MusicBrainz OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
                 return@withContext Result.success(cleaned)
             }
-            Log.e(TAG, "fetchFullMetadata SIN RESULTADO para '${song.artist}' - '${song.title}'")
 
+            // Attempt 3: iTunes with ONLY title (no artist) — fallback cuando el artista es basura del canal
+            Log.e(TAG, "fetchFullMetadata ambos fallaron, intentando iTunes solo con título...")
+            val titleOnlyResult = searchItunes("", song.title)
+            if (titleOnlyResult != null) {
+                val cleaned = song.copy(
+                    title = cleanTitle(titleOnlyResult.trackName ?: song.title),
+                    artist = cleanArtist(titleOnlyResult.artistName ?: song.artist),
+                    album = titleOnlyResult.collectionName ?: "",
+                    genre = titleOnlyResult.primaryGenreName ?: "",
+                    year = extractYear(titleOnlyResult.releaseDate ?: ""),
+                    trackNumber = titleOnlyResult.trackNumber ?: 0,
+                    thumbnailUrl = titleOnlyResult.artworkUrl ?: song.thumbnailUrl
+                )
+                Log.e(TAG, "fetchFullMetadata iTunes (title-only) OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
+                return@withContext Result.success(cleaned)
+            }
+
+            Log.e(TAG, "fetchFullMetadata SIN RESULTADO para '${song.artist}' - '${song.title}'")
             Result.success(song)
         } catch (e: Exception) {
             Log.e(TAG, "fetchFullMetadata ERROR: ${e.message}", e)
@@ -100,8 +124,12 @@ class MetadataFetcher {
         try {
             val cleanArtist = cleanChannelName(artist)
             val cleanTitle = title.replace(Regex("\\s*\\(.*?\\)$"), "").replace(Regex("\\s*\\[.*?\\]$"), "").trim()
-            val query = URLEncoder.encode("$cleanArtist $cleanTitle", "UTF-8")
-            Log.e(TAG, "searchItunes query: '$cleanArtist $cleanTitle'")
+            val query = if (cleanArtist.isNotBlank()) {
+                URLEncoder.encode("$cleanArtist $cleanTitle", "UTF-8")
+            } else {
+                URLEncoder.encode(cleanTitle, "UTF-8")
+            }
+            Log.e(TAG, "searchItunes query: '$query'")
             val url = "https://itunes.apple.com/search?term=$query&entity=song&limit=3"
             val request = Request.Builder().url(url).get().build()
             val response = client.newCall(request).execute()
@@ -201,8 +229,10 @@ class MetadataFetcher {
         var clean = artist
         // Remover paréntesis/corchetes con contenido: "(Oficial)", "[Official]", etc.
         clean = clean.replace(Regex("\\s*[\\(\\[].*?[\\)\\]]"), "")
+        // Remover "En Español", "En vivo", "En Directo", "En Concierto" al final
+        clean = clean.replace(Regex("\\s+En\\s+(?:Español|Espanol|Vivo|Directo|Concierto)$", RegexOption.IGNORE_CASE), "")
         // Remover sufijos comunes de canales
-        clean = clean.replace(Regex("\\s+(?:Oficial|Official|VEVO|Music|Videos|Audio|HD|4K|Latino|Realidad)$", RegexOption.IGNORE_CASE), "")
+        clean = clean.replace(Regex("\\s+(?:Oficial|Official|VEVO|Music|Videos|Audio|HD|4K|Latino|Realidad|Records|Entertainment|Productions|Studios)$", RegexOption.IGNORE_CASE), "")
         // Remover "TV" al final (BersuitTV, NickyJamTV, etc.)
         clean = clean.replace(Regex("TV$"), "")
         // Remover prefijos de canales concatenados: "elvecindariocalle13", "lamoscatsetsé"
