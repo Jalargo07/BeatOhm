@@ -268,6 +268,13 @@
     <string name="seleccionada">%1$d selecionada</string>
     <string name="seleccionadas">%1$d selecionadas</string>
 
+    <!-- Song List - Delete -->
+    <string name="delete_songs">Excluir</string>
+    <string name="delete_songs_title">Excluir músicas</string>
+    <string name="delete_songs_message">Excluir %1$d músicas%2$s e o arquivo do disco?</string>
+    <string name="delete_confirm">Excluir</string>
+    <string name="delete_songs_done">%1$d músicas%2$s excluída%2$s</string>
+
     <!-- Song List - Regenerate -->
     <string name="regenerando">Regenerando %1$d/%2$d\u2026</string>
     <string name="reset_waveform">Reset Waveform</string>

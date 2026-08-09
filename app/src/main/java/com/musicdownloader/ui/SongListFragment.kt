@@ -136,6 +136,12 @@ class SongListFragment : Fragment() {
             regenerateMetadata(selected)
         }
 
+        binding.btnDeleteSongs.setOnClickListener {
+            val selected = adapter.getSelectedSongs()
+            if (selected.isEmpty()) return@setOnClickListener
+            confirmDelete(selected)
+        }
+
         if (folderPath.isNotBlank()) {
             binding.spinnerSort.visibility = View.GONE
             binding.tvListTitle.text =
@@ -298,6 +304,36 @@ class SongListFragment : Fragment() {
                 }
             }
             .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun confirmDelete(songs: List<LocalSong>) {
+        val suffix = if (songs.size > 1) "s" else ""
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.delete_songs_title))
+            .setMessage(getString(R.string.delete_songs_message, songs.size, suffix))
+            .setPositiveButton(getString(R.string.delete_confirm)) { _, _ ->
+                lifecycleScope.launch {
+                    var deleted = 0
+                    for (song in songs) {
+                        withContext(Dispatchers.IO) {
+                            try {
+                                val file = File(song.filePath)
+                                if (file.exists()) file.delete()
+                            } catch (_: Exception) {}
+                            repository.deleteSong(song)
+                        }
+                        deleted++
+                    }
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        getString(R.string.delete_songs_done, deleted, suffix),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    adapter.deselectAll()
+                }
+            }
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
