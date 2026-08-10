@@ -56,6 +56,7 @@ import com.musicdownloader.data.toSong
 import com.musicdownloader.databinding.FragmentPlayerBinding
 import com.musicdownloader.ui.player.PlayerLayoutManager
 import com.musicdownloader.model.Song
+import com.musicdownloader.util.FolderPatternParser
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -207,6 +208,16 @@ class PlayerFragment : Fragment() {
                 animateSongChange(song, path)
                 updateFavoriteIcon(path)
                 loadWaveform(path, song.duration)
+
+                // Load dominant color from DB for waveform coloring
+                val waveEnabled = requireContext()
+                    .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
+                    .getBoolean("show_wave_animation", true)
+                if (!waveEnabled && song.dominantColor != 0) {
+                    binding.waveformSeekbar.setDominantColor(song.dominantColor)
+                    dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
+                }
+
                 // Parse lyrics for mini preview
                 var songLyrics = song.lyrics.orEmpty()
                 if (songLyrics.isBlank() && path.isNotBlank()) {
@@ -547,6 +558,18 @@ class PlayerFragment : Fragment() {
                     )
                     glowDrawable.setColor(dominant, PALETTE_DURATION)
                     applyThemeFont()
+
+                    // Save dominant color to DB
+                    val path = currentSongFilePath
+                    if (path != null) {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val db = AppDatabase.getInstance(requireContext())
+                            val songId = db.songDao().getIdByPath(path)
+                            if (songId != null) {
+                                db.songDao().updateDominantColor(songId, dominant)
+                            }
+                        }
+                    }
                 } catch (e: Exception) {
                     // Palette generation failed, use defaults
                     dynamicGradient.resetToDefault(PALETTE_DURATION)
@@ -1047,8 +1070,16 @@ class PlayerFragment : Fragment() {
     }
 
     private fun updateGradientFromWaveform(progress: Int) {
-        val energy = binding.waveformSeekbar.getEnergyAtProgress(progress)
-        dynamicGradient.modulateByEnergy(energy)
+        val waveEnabled = requireContext()
+            .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean("show_wave_animation", true)
+
+        if (waveEnabled) {
+            val energy = binding.waveformSeekbar.getEnergyAtProgress(progress)
+            dynamicGradient.modulateByEnergy(energy)
+        } else {
+            dynamicGradient.modulateByEnergy(0f)
+        }
     }
 
     private fun applyLyricsBlur(blur: Boolean) {

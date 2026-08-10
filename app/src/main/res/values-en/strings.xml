@@ -187,6 +187,7 @@
     <string name="settings_player_layout_classic">Classic</string>
     <string name="settings_player_layout_compact">Compact</string>
     <string name="settings_player_layout_vinyl">Vinyl</string>
+    <string name="settings_wave_animation">Wave animation on player</string>
 
     <!-- Theme selector -->
     <string name="theme_selector_title">Theme Selector</string>

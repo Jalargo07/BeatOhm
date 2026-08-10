@@ -348,6 +348,13 @@ class SettingsFragment : Fragment() {
                 }
             }
         }
+
+        // Wave animation toggle
+        val switchWave = binding.switchWaveAnimation
+        switchWave.isChecked = prefs().getBoolean("show_wave_animation", true)
+        switchWave.setOnCheckedChangeListener { _, isChecked ->
+            prefs().edit().putBoolean("show_wave_animation", isChecked).apply()
+        }
     }
 
     private fun currentPattern(): String {

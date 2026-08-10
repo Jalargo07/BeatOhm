@@ -65,6 +65,12 @@ class WaveformSeekBar @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setDominantColor(color: Int) {
+        playedGradient = null
+        playedColor = color
+        invalidate()
+    }
+
     // Paths (rebuilt each frame for scrolling)
     private val playedPath = Path()
     private val unplayedPath = Path()
@@ -73,6 +79,7 @@ class WaveformSeekBar @JvmOverloads constructor(
     private val primaryColor = ContextCompat.getColor(context, R.color.primary)
     private val accentEnd = ContextCompat.getColor(context, R.color.secondary)
     private var playedGradient: LinearGradient? = null
+    private var playedColor = primaryColor
 
     private var bars: FloatArray = floatArrayOf()
     private var barCount = 0
@@ -234,7 +241,7 @@ class WaveformSeekBar @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         playedGradient = LinearGradient(
             0f, 0f, w.toFloat(), 0f,
-            intArrayOf(primaryColor, accentEnd),
+            intArrayOf(playedColor, accentEnd),
             null,
             Shader.TileMode.CLAMP
         )

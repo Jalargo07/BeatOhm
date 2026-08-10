@@ -19,7 +19,8 @@ data class LocalSong(
     val lyrics: String = "",
     val isFavorite: Boolean = false,
     val playCount: Int = 0,
-    val waveformData: String = ""
+    val waveformData: String = "",
+    val dominantColor: Int = 0
 )
 
 fun LocalSong.toSong(): Song = Song(
@@ -34,5 +35,6 @@ fun LocalSong.toSong(): Song = Song(
     filePath = filePath,
     youtubeUrl = "",
     youtubeId = "",
-    lyrics = lyrics
+    lyrics = lyrics,
+    dominantColor = dominantColor
 )

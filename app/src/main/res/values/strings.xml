@@ -187,6 +187,7 @@
     <string name="settings_player_layout_classic">Clásico</string>
     <string name="settings_player_layout_compact">Compacto</string>
     <string name="settings_player_layout_vinyl">Vinilo</string>
+    <string name="settings_wave_animation">Ola animada en el reproductor</string>
 
     <!-- Theme selector -->
     <string name="theme_selector_title">Selector de Temas</string>

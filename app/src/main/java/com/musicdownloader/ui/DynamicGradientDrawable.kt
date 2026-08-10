@@ -169,6 +169,12 @@ class DynamicGradientDrawable(
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
+        // Si no hay energía, solo dibujar fondo (sin ola ni cálculos)
+        if (energyModulator <= 0f && targetEnergy <= 0f) {
+            canvas.drawColor(BASE_COLOR)
+            return
+        }
+
         // 2. FASE CONTINUA (sin ping-pong, solo avanza)
         val isMoving = energyModulator > 0f && targetEnergy > 0f
         if (isMoving) {

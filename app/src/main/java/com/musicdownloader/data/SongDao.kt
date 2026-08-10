@@ -108,6 +108,12 @@ interface SongDao {
 
     @Query("UPDATE songs SET waveformData = ''")
     suspend fun clearAllWaveforms()
+
+    @Query("UPDATE songs SET dominantColor = :color WHERE id = :songId")
+    suspend fun updateDominantColor(songId: String, color: Int)
+
+    @Query("SELECT id FROM songs WHERE filePath = :path LIMIT 1")
+    suspend fun getIdByPath(path: String): String?
 }
 
 data class AlbumWithCover(val name: String, val coverPath: String)
