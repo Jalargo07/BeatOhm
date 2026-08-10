@@ -6,7 +6,7 @@
 
 **Descargá, organizá y escuchá tu música favorita directo desde YouTube — con metadata impecable, letras multi-fuente y un reproductor premium con visualizador de onda de audio real.**
 
-[![Version](https://img.shields.io/badge/version-2.7-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.8-blue.svg)]()
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-34-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
@@ -167,6 +167,24 @@ app/src/main/java/com/musicdownloader/
 ---
 
 ## Changelog
+
+### v2.8-stable
+
+**Ecualizador**
+- Ecualizador de 5 bandas (60 / 230 / 910 / 3600 / 14000 Hz) procesado en tiempo real con filtros biquad
+- Presets (Flat, Bass Boost, Voz, Clásico, Pop, Rock) con persistencia entre sesiones
+- Bottom sheet moderno con sliders verticales y guardado automático
+
+**Reproductor premium**
+- Ola con momentum al pausar: la ola sigue viajando y se hunde suavemente (amplitud lineal, decaimiento más lento)
+- Geometría tipo agua: crestas más bajas y valle descomprimido (se ve agua, no una montaña)
+- Glow de carátula/vinilo a pantalla completa, fundido al color de fondo del tema (claro/oscuro) sin corte brusco
+- Mini lyrics agrandadas 1.5x con caja más amplia
+
+**Fixes**
+- Fix: el halo del cover ya no queda encerrado en el contenedor (transición suave a pantalla completa)
+
+---
 
 ### v2.7-nightly.260809
 

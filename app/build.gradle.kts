@@ -19,8 +19,8 @@ android {
         applicationId = "com.musicdownloader"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2260809
-        versionName = "2.7-nightly.260809"
+        versionCode = 2260810
+        versionName = "2.8"
 
         buildConfigField("String", "GENIUS_ACCESS_TOKEN", "\"${secrets.getProperty("GENIUS_ACCESS_TOKEN", "")}\"")
     }
@@ -28,6 +28,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
