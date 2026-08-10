@@ -502,6 +502,20 @@ class PlayerFragment : Fragment() {
     }
 
     private fun applyPalette(bitmap: Bitmap?) {
+        // Si hay dominantColor en la DB, usarlo SIEMPRE para el gradiente
+        val currentSong = viewModel.currentSong.value
+        if (currentSong != null && currentSong.dominantColor != 0) {
+            Log.d("PlayerFragment", "applyPalette: OVERRIDE with dominantColor=#${Integer.toHexString(currentSong.dominantColor)}")
+            dynamicGradient.setPrimaryGradient(currentSong.dominantColor, PALETTE_DURATION)
+            glowDrawable.setColor(currentSong.dominantColor, PALETTE_DURATION)
+            titleTextColor = textColor()
+            bodyTextColor = secondaryTextColor()
+            binding.tvTitle.setTextColor(titleTextColor)
+            binding.tvArtist.setTextColor(bodyTextColor)
+            applyThemeFont()
+            return
+        }
+
         val gradientMode = ThemeManager.playerGradient
         if (bitmap == null || gradientMode == 1) {
             dynamicGradient.resetToDefault(PALETTE_DURATION)
