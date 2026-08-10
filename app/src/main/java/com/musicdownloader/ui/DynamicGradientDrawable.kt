@@ -49,7 +49,8 @@ class DynamicGradientDrawable(
 
     fun setColors(
         dominant: Int, vibrant: Int, muted: Int,
-        darkVibrant: Int, darkMuted: Int, lightVibrant: Int,
+        darkVibrant: Int, @Suppress("UNUSED_PARAMETER") darkMuted: Int,
+        @Suppress("UNUSED_PARAMETER") lightVibrant: Int,
         durationMs: Long
     ) {
         animateTo(
@@ -122,12 +123,13 @@ class DynamicGradientDrawable(
         )
         wavePaint?.shader = waveGradient
 
-        val brightTop = blend(0xFFFFFFFF.toInt(), baseTop, 0.7f)
-        val brightMid = blend(0xFFFFFFFF.toInt(), baseMid, 0.6f)
-        val brightBottom = blend(0xFFFFFFFF.toInt(), baseBottom, 0.5f)
+        // Glow gradient: colores del tema con más brillo (no blanco)
+        val glowTop = blend(baseTop, 0xFFFFFFFF.toInt(), 0.3f)
+        val glowMid = blend(baseMid, 0xFFFFFFFF.toInt(), 0.2f)
+        val glowBottom = blend(baseBottom, 0xFFFFFFFF.toInt(), 0.15f)
         glowGradient = LinearGradient(
             0f, 0f, 0f, height.toFloat(),
-            intArrayOf(brightTop, brightMid, brightBottom, brightTop),
+            intArrayOf(glowTop, glowMid, glowBottom, glowTop),
             null, Shader.TileMode.CLAMP
         )
         glowPaint?.shader = glowGradient
@@ -226,7 +228,11 @@ class DynamicGradientDrawable(
         }
 
         // 6. CONTROL DEL BUCLE
-        if (targetEnergy > 0f || energyModulator > 0f) {
+        // Solo renderizar si hay energía activa o si la interpolación está en transición
+        val needsRender = energyModulator > 0f || 
+            (targetEnergy == 0f && energyModulator > 0f) ||
+            kotlin.math.abs(targetEnergy - energyModulator) > 0.001f
+        if (needsRender) {
             invalidateSelf()
         }
     }
