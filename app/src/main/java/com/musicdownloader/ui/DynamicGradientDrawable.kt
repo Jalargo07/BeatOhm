@@ -63,10 +63,10 @@ class DynamicGradientDrawable(
     }
 
     fun setPrimaryGradient(primaryColor: Int, durationMs: Long) {
-        val top = blend(BASE_COLOR, primaryColor, 0.45f)
-        val mid = blend(BASE_COLOR, primaryColor, 0.25f)
-        val bottom = BASE_COLOR
-        animateTo(top, mid, bottom, blend(BASE_COLOR, primaryColor, 0.30f), durationMs)
+        val top = blend(BASE_COLOR, primaryColor, 0.80f)
+        val mid = blend(BASE_COLOR, primaryColor, 0.70f)
+        val bottom = blend(BASE_COLOR, primaryColor, 0.60f)
+        animateTo(top, mid, bottom, blend(BASE_COLOR, primaryColor, 0.75f), durationMs)
     }
 
     fun setNeutralDark(durationMs: Long) {
@@ -163,10 +163,10 @@ class DynamicGradientDrawable(
         }
 
         val factor = 0.7f + 0.3f * energyModulator
-        topColor = blend(BASE_COLOR, baseTop, 0.55f * factor)
-        midColor = blend(BASE_COLOR, baseMid, 0.45f * factor)
-        bottomColor = blend(BASE_COLOR, baseBottom, 0.35f * factor)
-        darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.40f * factor)
+        topColor = blend(BASE_COLOR, baseTop, 0.85f * factor)
+        midColor = blend(BASE_COLOR, baseMid, 0.75f * factor)
+        bottomColor = blend(BASE_COLOR, baseBottom, 0.65f * factor)
+        darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.80f * factor)
         rebuildWaveGradient(cachedWaveHeight)
 
         // Si no hay energía, solo dibujar fondo (sin ola ni cálculos)
@@ -209,6 +209,20 @@ class DynamicGradientDrawable(
         wavePath.close()
 
         canvas.drawPath(wavePath, wavePaint!!)
+
+        // 5. GLOW SUTIL EN BORDE SUPERIOR
+        val peakAmplitude = (baseY - maxPeakY).coerceAtLeast(0f)
+        val normalizedPeak = (peakAmplitude / (h * 0.12f)).coerceIn(0f, 1f)
+
+        if (normalizedPeak > 0.01f && energyModulator > 0f) {
+            // Glow sutil: solo borde superior, alpha bajo
+            val glowAlpha = (30 + (normalizedPeak * 50 * energyModulator)).toInt().coerceIn(0, 80)
+            glowPaint?.apply {
+                alpha = glowAlpha
+                maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+            }
+            canvas.drawPath(wavePath, glowPaint!!)
+        }
 
         // 6. CONTROL DEL BUCLE
         // Solo renderizar si hay energía activa o si la interpolación está en transición
