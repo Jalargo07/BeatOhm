@@ -286,7 +286,7 @@ class SongListFragment : Fragment() {
             .setMessage(getString(R.string.rebuscar_metadata, songs.size, if (songs.size > 1) "s" else ""))
             .setPositiveButton("Regenerar") { _, _ ->
                 adapter.deselectAll()
-                lifecycleScope.launch {
+                requireActivity().lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
                         repository.startRegenProgress(songs.size)
                         for ((index, song) in songs.withIndex()) {
@@ -313,7 +313,7 @@ class SongListFragment : Fragment() {
             .setTitle(getString(R.string.delete_songs_title))
             .setMessage(getString(R.string.delete_songs_message, songs.size, suffix))
             .setPositiveButton(getString(R.string.delete_confirm)) { _, _ ->
-                lifecycleScope.launch {
+                requireActivity().lifecycleScope.launch {
                     var deleted = 0
                     for (song in songs) {
                         withContext(Dispatchers.IO) {
