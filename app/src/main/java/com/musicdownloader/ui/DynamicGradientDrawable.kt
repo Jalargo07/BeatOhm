@@ -123,10 +123,10 @@ class DynamicGradientDrawable(
         )
         wavePaint?.shader = waveGradient
 
-        // Glow gradient: colores del tema con más brillo (no blanco)
-        val glowTop = blend(baseTop, 0xFFFFFFFF.toInt(), 0.3f)
-        val glowMid = blend(baseMid, 0xFFFFFFFF.toInt(), 0.2f)
-        val glowBottom = blend(baseBottom, 0xFFFFFFFF.toInt(), 0.15f)
+        // Glow gradient: mismos colores que la ola, solo más brillantes
+        val glowTop = blend(topColor, 0xFFFFFFFF.toInt(), 0.15f)
+        val glowMid = blend(midColor, 0xFFFFFFFF.toInt(), 0.10f)
+        val glowBottom = blend(bottomColor, 0xFFFFFFFF.toInt(), 0.08f)
         glowGradient = LinearGradient(
             0f, 0f, 0f, height.toFloat(),
             intArrayOf(glowTop, glowMid, glowBottom, glowTop),
