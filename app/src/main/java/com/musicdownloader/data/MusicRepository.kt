@@ -36,8 +36,8 @@ class MusicRepository(private val context: Context) {
     private val metadataFetcher = MetadataFetcher()
     private val lyricsFetcher = LyricsFetcher()
 
-    private val _regenProgress = MutableLiveData<Pair<Int, Int>?>()
-    val regenProgress: LiveData<Pair<Int, Int>?> = _regenProgress
+    private val _regenProgress = _regenProgressStatic
+    val regenProgress: LiveData<Pair<Int, Int>?> = _regenProgressStatic
 
     suspend fun getAllSongsNow(): List<LocalSong> = dao.getAllSongsNow()
 
@@ -555,6 +555,10 @@ class MusicRepository(private val context: Context) {
         private const val ALBUM_COVERS_PREFS = "album_covers"
         private const val MAX_SCAN_DEPTH = 4
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav")
+
+        // Static regen progress - survives across MusicRepository instances
+        private val _regenProgressStatic = MutableLiveData<Pair<Int, Int>?>()
+        val regenProgressStatic: LiveData<Pair<Int, Int>?> = _regenProgressStatic
 
         /**
          * Detecta y repara doble encoding UTF-8 (mojibake).
