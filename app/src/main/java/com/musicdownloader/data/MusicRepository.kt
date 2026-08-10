@@ -399,104 +399,97 @@ class MusicRepository(private val context: Context) {
         }
     }
 
-    suspend fun enrichSong(
-        song: LocalSong,
-        skipTagWrite: Boolean = false,
-        fetchLyrics: Boolean = false
-    ): LocalSong {
-        Log.e("MusicRepository", "enrichSong INICIO: '${song.artist}' - '${song.title}' fetchLyrics=$fetchLyrics")
-        val existing = dao.getSongById(song.id)?.let {
-            it.copy(
-                title = fixMojibake(it.title),
-                artist = fixMojibake(it.artist),
-                album = fixMojibake(it.album)
-            )
-        } ?: song
-        val enriched = metadataFetcher.fetchFullMetadata(song.toSong()).getOrNull() ?: song.toSong()
-        Log.e("MusicRepository", "enrichSong metadata: '${enriched.artist}' - '${enriched.title}' [${enriched.album}]")
+    // === Funciones con responsabilidad única ===
 
-        var thumbnailUrl = enriched.thumbnailUrl
-        if (thumbnailUrl.startsWith("http")) {
-            val dest = File(getAlbumArtCacheDir(), "${song.id.hashCode()}.jpg")
-            downloadArtwork(thumbnailUrl, dest)
-            if (dest.exists()) thumbnailUrl = dest.absolutePath
-        }
-
-        var updated = LocalSong(
-            id = song.id,
+    suspend fun fetchMetadata(song: LocalSong): LocalSong {
+        val existing = dao.getSongById(song.id) ?: return song
+        val enriched = metadataFetcher.fetchFullMetadata(song.toSong()).getOrNull() ?: return song
+        Log.d("MusicRepository", "fetchMetadata: '${enriched.artist}' - '${enriched.title}'")
+        return existing.copy(
             title = bestValue(existing.title, enriched.title),
             artist = bestValue(existing.artist, enriched.artist),
             album = bestValue(existing.album, enriched.album),
             genre = bestValue(existing.genre, enriched.genre),
             year = bestValue(existing.year, enriched.year),
-            trackNumber = if (enriched.trackNumber > 0) enriched.trackNumber else song.trackNumber,
-            duration = song.duration,
-            filePath = song.filePath,
-            thumbnailUrl = thumbnailUrl.ifBlank { existing.thumbnailUrl },
-            lyrics = existing.lyrics,
-            isFavorite = existing.isFavorite,
-            playCount = existing.playCount,
-            dominantColor = existing.dominantColor
+            trackNumber = if (enriched.trackNumber > 0) enriched.trackNumber else existing.trackNumber
         )
+    }
 
-        // Extract dominant color from artwork if we have a thumbnail
-        if (updated.thumbnailUrl.isNotBlank() && updated.dominantColor == 0) {
-            try {
-                val bitmap = android.graphics.BitmapFactory.decodeFile(updated.thumbnailUrl)
-                if (bitmap != null) {
-                    val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
-                    val dominant = palette.getDominantColor(0)
-                    Log.d("MusicRepository", "enrichSong DOMINANT: raw=#${Integer.toHexString(dominant)} from='${updated.thumbnailUrl}'")
-                    if (dominant != 0) {
-                        updated = updated.copy(dominantColor = dominant)
-                        Log.d("MusicRepository", "enrichSong DOMINANT: SAVED dominantColor=#${Integer.toHexString(dominant)} for '${updated.title}'")
-                    } else {
-                        Log.w("MusicRepository", "enrichSong DOMINANT: dominantColor=0 (Palette returned default)")
-                    }
-                    bitmap.recycle()
-                } else {
-                    Log.w("MusicRepository", "enrichSong DOMINANT: bitmap=null for '${updated.thumbnailUrl}'")
-                }
-            } catch (e: Exception) {
-                Log.e("MusicRepository", "enrichSong DOMINANT: FAILED ${e.message}")
+    suspend fun downloadArtworkForSong(song: LocalSong): LocalSong {
+        val thumbnailUrl = song.thumbnailUrl
+        if (thumbnailUrl.isBlank() || !thumbnailUrl.startsWith("http")) return song
+        val dest = File(getAlbumArtCacheDir(), "${song.id.hashCode()}.jpg")
+        downloadArtwork(thumbnailUrl, dest)
+        return if (dest.exists()) song.copy(thumbnailUrl = dest.absolutePath) else song
+    }
+
+    suspend fun extractDominantColor(song: LocalSong): LocalSong {
+        val thumbnailUrl = song.thumbnailUrl
+        if (thumbnailUrl.isBlank()) return song
+        try {
+            val bitmap = android.graphics.BitmapFactory.decodeFile(thumbnailUrl)
+            if (bitmap != null) {
+                val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
+                val dominant = palette.getDominantColor(0)
+                Log.d("MusicRepository", "extractDominantColor: #${Integer.toHexString(dominant)} for '${song.title}'")
+                bitmap.recycle()
+                if (dominant != 0) return song.copy(dominantColor = dominant)
             }
-        } else {
-            Log.d("MusicRepository", "enrichSong DOMINANT: SKIPPED thumb='${updated.thumbnailUrl}' existingColor=${updated.dominantColor}")
+        } catch (e: Exception) {
+            Log.e("MusicRepository", "extractDominantColor: FAILED ${e.message}")
         }
+        return song
+    }
 
-        if (fetchLyrics && updated.lyrics.isBlank()) {
-            try {
-                val lyricsResult = lyricsFetcher.fetchLyrics(updated.artist, updated.title)
-                if (lyricsResult.isSuccess) {
-                    val result = lyricsResult.getOrNull()
-                    val lyrics = (result?.syncedLrc ?: result?.plainText).orEmpty()
-                    if (lyrics.isNotBlank()) {
-                        updated = updated.copy(lyrics = lyrics)
-                    }
+    suspend fun fetchLyricsForSong(song: LocalSong): LocalSong {
+        if (song.lyrics.isNotBlank()) return song
+        try {
+            val result = lyricsFetcher.fetchLyrics(song.artist, song.title)
+            if (result.isSuccess) {
+                val lyrics = (result.getOrNull()?.syncedLrc ?: result.getOrNull()?.plainText).orEmpty()
+                if (lyrics.isNotBlank()) {
+                    Log.d("MusicRepository", "fetchLyricsForSong: found lyrics for '${song.title}'")
+                    return song.copy(lyrics = lyrics)
                 }
-            } catch (_: Exception) {}
-        }
+            }
+        } catch (_: Exception) {}
+        return song
+    }
 
+    fun renameSongFile(song: LocalSong): LocalSong {
+        val oldFile = File(song.filePath)
+        if (!oldFile.exists()) return song
+        val newFileName = "${fixMojibake(song.artist)} - ${fixMojibake(song.title)}".replace(Regex("[/\\\\:*?\"<>|]"), "_")
+        val newFile = File(oldFile.parent, "${newFileName}.${oldFile.extension}")
+        if (newFile.absolutePath == oldFile.absolutePath || newFile.exists()) return song
+        return if (oldFile.renameTo(newFile)) {
+            val oldId = song.id
+            val updated = song.copy(id = newFile.absolutePath, filePath = newFile.absolutePath)
+            Log.d("MusicRepository", "renameSongFile: '${oldFile.name}' → '${newFile.name}'")
+            updated
+        } else song
+    }
+
+    suspend fun saveSong(song: LocalSong) {
+        dao.insertSong(song)
+    }
+
+    // === Composición: enriquecer canción completa ===
+
+    suspend fun enrichSong(
+        song: LocalSong,
+        skipTagWrite: Boolean = false,
+        fetchLyrics: Boolean = false
+    ): LocalSong {
+        var updated = song
+        updated = fetchMetadata(updated)
+        updated = downloadArtworkForSong(updated)
+        updated = extractDominantColor(updated)
+        if (fetchLyrics) updated = fetchLyricsForSong(updated)
         dao.insertSong(updated)
-
-        // Renombrar archivo si cambió artista o título
         if (!skipTagWrite) {
-            val oldFile = File(song.filePath)
-            if (oldFile.exists()) {
-                val newFileName = "${fixMojibake(updated.artist)} - ${fixMojibake(updated.title)}".replace(Regex("[/\\\\:*?\"<>|]"), "_")
-                val newFile = File(oldFile.parent, "${newFileName}.${oldFile.extension}")
-                if (newFile.absolutePath != oldFile.absolutePath && !newFile.exists()) {
-                    if (oldFile.renameTo(newFile)) {
-                        val oldId = updated.id
-                        updated = updated.copy(id = newFile.absolutePath, filePath = newFile.absolutePath)
-                        dao.insertSong(updated)
-                        if (oldId != updated.id) {
-                            dao.deleteSongById(oldId)
-                        }
-                        Log.e("MusicRepository", "Archivo renombrado: ${oldFile.name} → ${newFile.name}")
-                    }
-                }
-            }
+            updated = renameSongFile(updated)
+            if (updated.filePath != song.filePath) dao.insertSong(updated)
             AudioTagWriter.writeTags(File(updated.filePath), updated)
         }
         return updated

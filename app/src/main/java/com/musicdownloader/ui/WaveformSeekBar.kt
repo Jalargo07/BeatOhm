@@ -68,6 +68,19 @@ class WaveformSeekBar @JvmOverloads constructor(
     fun setDominantColor(color: Int) {
         playedGradient = null
         playedColor = color
+        // Create gradient: dark version → dominant color
+        val darkColor = android.graphics.Color.rgb(
+            android.graphics.Color.red(color) / 3,
+            android.graphics.Color.green(color) / 3,
+            android.graphics.Color.blue(color) / 3
+        )
+        playedGradient = LinearGradient(
+            0f, 0f, width.toFloat(), 0f,
+            intArrayOf(darkColor, color),
+            null,
+            Shader.TileMode.CLAMP
+        )
+        playedPaint.shader = playedGradient
         invalidate()
     }
 

@@ -312,9 +312,14 @@ class SongListFragment : Fragment() {
                         repository.startRegenProgress(songs.size)
                         for ((index, song) in songs.withIndex()) {
                             repository.updateRegenProgress(index + 1, songs.size)
-                            if (doWaveform) repository.resetWaveform(song)
+                            var updated = song
+                            if (doWaveform) repository.resetWaveform(updated)
+                            if (doMetadata) updated = repository.fetchMetadata(updated)
+                            if (doArtwork) updated = repository.downloadArtworkForSong(updated)
+                            if (doColor) updated = repository.extractDominantColor(updated)
+                            if (doLyrics) updated = repository.fetchLyricsForSong(updated)
                             if (doMetadata || doLyrics || doArtwork || doColor) {
-                                repository.enrichSong(song, skipTagWrite = !doMetadata, fetchLyrics = doLyrics)
+                                repository.saveSong(updated)
                             }
                         }
                         repository.finishRegenProgress()
