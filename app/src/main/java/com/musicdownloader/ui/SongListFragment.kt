@@ -69,6 +69,12 @@ class SongListFragment : Fragment() {
             }
         }
 
+        // Restore progress if regen is still running (survives navigation)
+        repository.regenProgress.value?.let { progress ->
+            binding.llProgress.visibility = View.VISIBLE
+            binding.tvProgress.text = getString(R.string.regenerando, progress.first, progress.second)
+        }
+
         adapter = SongItemAdapter(
             onItemClick = { song ->
                 val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@SongItemAdapter
