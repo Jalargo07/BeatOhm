@@ -15,16 +15,51 @@ Solo:
 - Revisa los resultados
 - Construye y testea
 
-## REGLA #2: Build NO coje la pala
-El orquestador NO ejecuta builds directamente. Delega al code agent.
+## REGLA #2: Build lo ejecuta el orquestador
+El orquestador SÍ ejecuta el build, pero SOLO después de que `review` apruebe el código.
+Nunca antes. Si review encuentra fallos, primero `code` corrige y se re-revisa.
 
 ## Flujo correcto:
-1. Analizar (orquestador)
-2. Planificar (orquestador)
-3. Delegar implementación → `task(subagent_type="code")`
-4. Review código → `task(subagent_type="review")`
-5. Build → delegar al code agent
-6. Test en dispositivo → orquestador revisa logs
+
+```
+Usuario → Orquestador → [Planning → Code → Review → Build] → Usuario testea
+```
+
+1. **Usuario** dice qué quiere
+2. **Orquestador** analiza:
+   - Si es **complejo** → delega a `planning` para generar plan
+   - Si es **simple** → salta al paso 4
+3. **Planning** responde con el plan de implementación
+4. **Orquestador** toma el plan y delega a `code`
+5. **Code** implementa y responde
+6. **Orquestador** habla con `review` para que revise el código de code
+7. **Review** aprueba o encuentra fallos:
+   - ✅ **Aprueba** → orquestador buildea y avisa al usuario para testear
+   - ❌ **Falla** → orquestador le pasa los fallos a `code` para que corrija (vuelve al paso 5)
+
+## REGLA #3: Delegación por tareas (planes grandes)
+
+Si el plan es demasiado grande, el orquestador NO le pasa todo de una vez a `code`
+(el coder se satura de contexto, empieza a divagar y se le olvidan cosas). En su lugar:
+
+1. **Umbral**: el plan se implementa por tareas si tiene más de ~4 tareas, toca más de
+   ~4 archivos nuevos, o incluye 1+ tarea de alcance M/L (según PLAN.md).
+2. **Una tarea por delegación**: cada delegación a `code` es UNA tarea del PLAN.md, en
+   sesión fresca. El prompt incluye SOLO: el extracto de esa tarea, los archivos exactos
+   a tocar, los criterios de aceptación y la instrucción de actualizar PROJECT_INDEX.json.
+   Contexto acotado = coder enfocado = nada se queda en el tintero.
+3. **Compila antes de avanzar**: `code` deja cada slice compilando (build scoped por
+   cuenta propia) antes de reportar. El orquestador NO avanza a la siguiente tarea hasta
+   que la anterior terminó y compila. Si falla, `code` corrige esa tarea y la re-entrega.
+4. **Checklist del orquestador**: el orquestador mantiene la lista de tareas del plan,
+   marca completas las que cierran bien y reenvía las que fallan. Al final debe cuadrar
+   TODAS las tareas del PLAN.md; ninguna se queda sin implementar.
+5. **Review al finalizar el plan**: `review` se ejecuta UNA sola vez cuando TODAS las
+   tareas están completas y compilando. NO se revisa por tarea. Excepción: si el primer
+   slice define un patrón que el resto copiará (DSP, arquitectura, wiring), el orquestador
+   puede pedir un review rápido de ese slice para detectar desvíos sistémicos temprano.
+6. **Build final**: tras aprobación de review, el orquestador buildea y avisa al usuario
+   para testear (REGLA #2).
 
 ## Subagentes disponibles:
 - `code`: Implementa features, escribe código
@@ -56,7 +91,7 @@ Reglas:
 - El orquestador NO sustituye un skill: delega la tarea al subagente y le indica qué skill cargar.
 - Los subagentes de implementación (`code`) usan los skills de build/verify; los de `review` usan `code-review-and-quality`.
 
-## REGLA #3: Convención de Releases y Tags
+## REGLA #4: Convención de Releases y Tags
 
 ### Formato de Tags
 
@@ -131,3 +166,42 @@ gh release create nightly-260810 --title "nightly-260810" --notes "Resumen..." -
 | v2.2-night | Nightly | Archived | 2026-08-02 |
 | v2.1 | Stable | Archived | 2026-08-01 |
 | v2.0 | Stable | Archived | 2026-08-01 |
+
+## REGLA #5: Buenas Prácticas de Desarrollo
+
+El proyecto implementa las siguientes prácticas. `code` DEBE cumplirlas y `review` DEBE
+verificarlas en cada revisión:
+
+### 1. SRP (Single Responsibility Principle)
+- Cada clase, función o módulo tiene UNA sola responsabilidad clara.
+- Las funciones largas (>~50 líneas) se dividen en helpers con nombre descriptivo.
+- Un archivo hace UNA cosa bien; si mezcla responsabilidades, se separa.
+
+### 2. Clean Architecture
+- Separación por capas: **data** (repositorios, bases de datos, red) / **domain**
+  (modelos, lógica de negocio) / **presentation** (UI: fragments, adapters, views).
+- La UI NO contiene lógica de negocio ni acceso directo a datos.
+- El `Repository` es la ÚNICA puerta de acceso a datos para la UI.
+- Las ViewModels/UI observan estados; no hacen I/O.
+
+### 3. DRY (Don't Repeat Yourself)
+- No duplicar lógica: extraer helpers, constantes y funciones reutilizables.
+- Cada regla de negocio tiene UN solo lugar de verdad.
+- Si se copia el mismo bloque 2+ veces, se extrae.
+
+### 4. Naming claro y consistente
+- Nombres descriptivos: variables, funciones, clases, layouts, strings.
+- Convenciones del proyecto: verbos para acciones (`fetchMetadata`, `parseLyrics`),
+  sustantivos para datos (`Song`, `LocalSong`), prefijos de UI (`dialog_`, `item_`).
+- Strings visibles al usuario van en `strings.xml`, NUNCA hardcodeados.
+
+### 5. YAGNI (You Ain't Gonna Need It)
+- No agregar código especulativo "por si acaso".
+- Solo lo que la feature actual necesita. Si se agrega, se justifica en la tarea.
+- Código muerto o sin uso se elimina (o se marca claramente).
+
+### 6. Dependency Inversion
+- Depender de interfaces/abstracciones, no de implementaciones concretas.
+- Las capas altas (UI) no dependen de detalles de bajo nivel (SQL, red).
+- El `Repository` se define como interfaz; la implementación concreta se inyecta.
+- Facilita testeo (mocks) y cambios de fuente de datos.

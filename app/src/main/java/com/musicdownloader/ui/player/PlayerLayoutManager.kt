@@ -122,8 +122,8 @@ object PlayerLayoutManager {
 
         root.findViewById<View>(R.id.iv_glow)?.let { glow ->
             glow.alpha = 0.35f
-            glow.scaleX = 0.8f
-            glow.scaleY = 0.8f
+            glow.scaleX = 1f
+            glow.scaleY = 1f
         }
 
         root.findViewById<View>(R.id.controls_container)?.let { controls ->
@@ -170,8 +170,8 @@ object PlayerLayoutManager {
 
         root.findViewById<View>(R.id.iv_glow)?.let { glow ->
             glow.alpha = 0.5f
-            glow.scaleX = 1.1f
-            glow.scaleY = 1.1f
+            glow.scaleX = 1f
+            glow.scaleY = 1f
         }
 
         root.findViewById<View>(R.id.controls_container)?.let { controls ->

@@ -20,9 +20,14 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.musicdownloader.audio.EqualizerEffect
+import com.musicdownloader.data.EqualizerRepository
 import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.model.Song
 import com.musicdownloader.ui.PlayerViewModel
@@ -42,6 +47,7 @@ class MusicPlaybackService : MediaSessionService() {
 
     private val binder = LocalBinder()
     private lateinit var player: ExoPlayer
+    private lateinit var equalizerEffect: EqualizerEffect
     private var mediaSession: MediaSession? = null
     private var playerViewModel: PlayerViewModel? = null
     private val playbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -54,7 +60,23 @@ class MusicPlaybackService : MediaSessionService() {
         createNotificationChannel()
         val audioManager = getSystemService(AudioManager::class.java)
         val sessionId = audioManager.generateAudioSessionId()
-        player = ExoPlayer.Builder(this).build()
+
+        equalizerEffect = EqualizerEffect()
+        val eqRepository = EqualizerRepository(this)
+        val savedGains = eqRepository.getBandGains()
+        equalizerEffect.setGains(savedGains)
+
+        val audioSink = DefaultAudioSink.Builder(this)
+            .setAudioProcessors(arrayOf<AudioProcessor>(equalizerEffect))
+            .build()
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ) = audioSink
+        }
+        player = ExoPlayer.Builder(this, renderersFactory).build()
         player.setAudioSessionId(sessionId)
         player.setAudioAttributes(
             AudioAttributes.Builder()
@@ -321,6 +343,7 @@ class MusicPlaybackService : MediaSessionService() {
     fun getDuration(): Long = player.duration
     fun getPlayer(): ExoPlayer = player
     fun getAudioSessionId(): Int = player.audioSessionId
+    fun getEqualizerEffect(): EqualizerEffect = equalizerEffect
 
     fun onSongEnded() {
         val next = playerViewModel?.notifySongEnded() ?: return

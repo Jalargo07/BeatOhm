@@ -11,9 +11,13 @@ import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import kotlin.math.hypot
+import kotlin.math.max
 
 /**
- * Halo radial debajo del cover que matchea el color dominante del álbum.
+ * Halo radial a pantalla completa centrado en la posición de la carátula que
+ * matchea el color dominante del álbum y se difumina hasta transparente en
+ * los bordes de la pantalla.
  * Soporta transición animada entre colores al cambiar de canción.
  */
 class GlowDrawable(private var glowColor: Int = DEFAULT_GLOW) : Drawable() {
@@ -21,6 +25,22 @@ class GlowDrawable(private var glowColor: Int = DEFAULT_GLOW) : Drawable() {
     private val evaluator = ArgbEvaluator()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var animator: ValueAnimator? = null
+
+    private var centerXFrac = 0.5f
+    private var centerYFrac = 0.28f
+    private var endColor: Int = END_COLOR_DEFAULT
+
+    fun setCenter(centerXFrac: Float, centerYFrac: Float) {
+        this.centerXFrac = centerXFrac.coerceIn(0f, 1f)
+        this.centerYFrac = centerYFrac.coerceIn(0f, 1f)
+        invalidateSelf()
+    }
+
+    fun setEndColor(color: Int) {
+        if (color == endColor) return
+        endColor = color
+        invalidateSelf()
+    }
 
     fun setColor(color: Int, durationMs: Long) {
         if (color == glowColor) return
@@ -39,11 +59,21 @@ class GlowDrawable(private var glowColor: Int = DEFAULT_GLOW) : Drawable() {
     override fun draw(canvas: Canvas) {
         val bounds = bounds
         if (bounds.isEmpty) return
-        val cx = bounds.exactCenterX()
-        val cy = bounds.exactCenterY()
+        val cx = bounds.left + bounds.width() * centerXFrac
+        val cy = bounds.top + bounds.height() * centerYFrac
 
-        // Halo exterior: suave y amplio, envuelve el cover
-        val outerRadius = bounds.width() * OUTER_RADIUS
+        val farthest = max(
+            hypot((cx - bounds.left).toDouble(), (cy - bounds.top).toDouble()),
+            max(
+                hypot((bounds.right - cx).toDouble(), (cy - bounds.top).toDouble()),
+                max(
+                    hypot((cx - bounds.left).toDouble(), (bounds.bottom - cy).toDouble()),
+                    hypot((bounds.right - cx).toDouble(), (bounds.bottom - cy).toDouble())
+                )
+            )
+        ).toFloat()
+        val outerRadius = farthest * 1.05f
+
         paint.shader = RadialGradient(
             cx,
             cy,
@@ -51,15 +81,14 @@ class GlowDrawable(private var glowColor: Int = DEFAULT_GLOW) : Drawable() {
             intArrayOf(
                 withAlpha(glowColor, OUTER_CENTER_ALPHA),
                 withAlpha(glowColor, OUTER_MID_ALPHA),
-                withAlpha(glowColor, 0x00)
+                endColor
             ),
             floatArrayOf(0f, 0.5f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(cx, cy, outerRadius, paint)
 
-        // Glow interno: brillante y ajustado al cover
-        val innerRadius = bounds.width() * INNER_RADIUS
+        val innerRadius = bounds.height() * INNER_RADIUS
         paint.shader = RadialGradient(
             cx,
             cy,
@@ -99,16 +128,14 @@ class GlowDrawable(private var glowColor: Int = DEFAULT_GLOW) : Drawable() {
     companion object {
         private const val DEFAULT_GLOW = 0xFF9D35FF.toInt()
 
-        // Radios de las capas (fracción del ancho del cover)
-        private const val INNER_RADIUS = 0.55f
-        private const val OUTER_RADIUS = 0.72f
+        private const val INNER_RADIUS = 0.30f
 
-        // Alphas de la capa interna (brillante y ajustada)
-        private const val INNER_CENTER_ALPHA = 0x6D // 43%
-        private const val INNER_MID_ALPHA = 0x2E // 18%
+        private const val INNER_CENTER_ALPHA = 0x6D
+        private const val INNER_MID_ALPHA = 0x2E
 
-        // Alphas de la capa externa (suave y amplia)
-        private const val OUTER_CENTER_ALPHA = 0x3D // 24%
-        private const val OUTER_MID_ALPHA = 0x19 // 10%
+        private const val OUTER_CENTER_ALPHA = 0x3D
+        private const val OUTER_MID_ALPHA = 0x19
+
+        private const val END_COLOR_DEFAULT = 0xFF0B0910.toInt()
     }
 }

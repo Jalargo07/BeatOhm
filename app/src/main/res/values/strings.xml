@@ -316,4 +316,27 @@
     <string name="nav_player">Reproductor</string>
     <string name="nav_library">Biblioteca</string>
     <string name="nav_downloads">Descargas</string>
+
+    <!-- Equalizer -->
+    <string name="equalizer_title">Ecualizador</string>
+    <string name="equalizer_preset">Preset</string>
+    <string name="equalizer_custom">Personalizado</string>
+    <string name="equalizer_save">Guardar</string>
+    <string name="equalizer_reset">Restablecer</string>
+    <string name="equalizer_save_preset">Guardar preset</string>
+    <string name="equalizer_preset_name">Nombre del preset</string>
+    <string name="equalizer_preset_saved">Preset guardado</string>
+    <string name="equalizer_no_changes">Sin cambios que guardar</string>
+    <string name="equalizer_flat">Plano</string>
+    <string name="equalizer_pop">Pop</string>
+    <string name="equalizer_rock">Rock</string>
+    <string name="equalizer_reggaeton">Reggaeton</string>
+    <string name="equalizer_jazz">Jazz</string>
+    <string name="equalizer_classical">Clasica</string>
+    <string name="equalizer_dance">Dance</string>
+    <string name="equalizer_hiphop">Hip-Hop</string>
+    <string name="equalizer_bass_boost">Refuerzo de graves</string>
+    <string name="equalizer_treble_boost">Refuerzo de agudos</string>
+    <string name="equalizer_db_value">%+d dB</string>
+    <string name="equalizer_unsaved_changes">Cambios sin guardar</string>
 </resources>

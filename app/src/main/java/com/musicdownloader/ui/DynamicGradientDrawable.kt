@@ -13,6 +13,8 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -30,6 +32,7 @@ class DynamicGradientDrawable(
     var currentPhase: Float = 0f
     private var energyModulator = 0f
     private var targetEnergy = 0f
+    private var lastUpdateNanos = 0L
 
     private var wavePaint: Paint? = null
     private var glowPaint: Paint? = null
@@ -112,10 +115,17 @@ class DynamicGradientDrawable(
     // === Física de energía ===
 
     private fun updateEnergy() {
-        energyModulator += if (targetEnergy == 0f) {
-            (targetEnergy - energyModulator) * 0.3f
+        val now = System.nanoTime()
+        val dtMs = if (lastUpdateNanos == 0L) 0L
+        else min((now - lastUpdateNanos) / 1_000_000L, MAX_DT_MS)
+        lastUpdateNanos = now
+
+        if (targetEnergy == 0f) {
+            if (energyModulator > 0f && dtMs > 0L) {
+                energyModulator *= 0.5f.pow(dtMs.toFloat() / (DECAY_HALF_LIFE * 1000f))
+            }
         } else {
-            (targetEnergy - energyModulator) * 0.05f
+            energyModulator += (targetEnergy - energyModulator) * 0.05f
         }
         if (energyModulator < 0.001f && targetEnergy == 0f) energyModulator = 0f
     }
@@ -130,17 +140,21 @@ class DynamicGradientDrawable(
     }
 
     private fun updatePhase() {
-        if (energyModulator > 0f && targetEnergy > 0f) {
-            currentPhase += 0.008f + (energyModulator * 0.010f)
+        if (energyModulator <= 0f) return
+        val speed = if (targetEnergy > 0f) {
+            0.008f + (energyModulator * 0.010f)
+        } else {
+            PAUSE_CRUISE_SPEED
         }
+        currentPhase += speed
     }
 
     // === Geometría de la ola ===
 
     private fun sampleWavePath(w: Float, h: Float): Float {
         val midScreenY = h * 0.55f
-        val floorLimitY = h * 0.65f
-        val maxClimbHeight = h * 0.25f * energyModulator
+        val floorLimitY = h * 0.85f
+        val maxClimbHeight = h * 0.25f * 0.65f
         val baseY = (midScreenY + (h * 0.05f * (1f - energyModulator))).coerceAtMost(floorLimitY)
 
         wavePath.rewind()
@@ -274,6 +288,10 @@ class DynamicGradientDrawable(
         private var DEFAULT_BOTTOM = DEFAULT_BOTTOM_DARK
         private var DEFAULT_DARK_VIBRANT = DEFAULT_DARK_VIBRANT_DARK
 
+        private const val MAX_DT_MS = 100L
+        private const val DECAY_HALF_LIFE = 0.4f
+        private const val PAUSE_CRUISE_SPEED = 0.028f
+
         fun setThemeMode(isDark: Boolean) {
             BASE_COLOR = if (isDark) BASE_COLOR_DARK else BASE_COLOR_LIGHT
             DEFAULT_TOP = if (isDark) DEFAULT_TOP_DARK else DEFAULT_TOP_LIGHT
@@ -281,5 +299,7 @@ class DynamicGradientDrawable(
             DEFAULT_BOTTOM = if (isDark) DEFAULT_BOTTOM_DARK else DEFAULT_BOTTOM_LIGHT
             DEFAULT_DARK_VIBRANT = if (isDark) DEFAULT_DARK_VIBRANT_DARK else DEFAULT_DARK_VIBRANT_LIGHT
         }
+
+        fun currentBaseColor(): Int = BASE_COLOR
     }
 }

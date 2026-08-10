@@ -35,6 +35,7 @@ import android.view.animation.OvershootInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnLayout
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
@@ -129,14 +130,10 @@ class PlayerFragment : Fragment() {
         binding.waveformSeekbar.setThemeMode(isDark)
         binding.root.background = dynamicGradient
         binding.ivGlow.background = glowDrawable
-
-        if (Build.VERSION.SDK_INT >= 31) {
-            binding.ivGlow.setRenderEffect(
-                RenderEffect.createBlurEffect(40f, 40f, Shader.TileMode.CLAMP)
-            )
-        }
+        glowDrawable.setEndColor(DynamicGradientDrawable.currentBaseColor())
 
         PlayerLayoutManager.applyStyle(binding.root)
+        binding.root.doOnLayout { updateGlowCenter() }
         setupObservers()
         setupControls()
         setupSwipeGesture()
@@ -257,6 +254,15 @@ class PlayerFragment : Fragment() {
         }.start()
         stopCoverBreathe()
         applyPalette(null)
+    }
+
+    private fun updateGlowCenter() {
+        val root = binding.root
+        val cover = binding.coverContainer
+        if (root.width <= 0 || cover.width <= 0) return
+        val cx = (cover.x + cover.width / 2f) / root.width
+        val cy = (cover.y + cover.height / 2f) / root.height
+        glowDrawable.setCenter(cx.coerceIn(0f, 1f), cy.coerceIn(0f, 1f))
     }
 
     private fun observePlaybackState() {
@@ -720,9 +726,7 @@ class PlayerFragment : Fragment() {
         }
 
         binding.btnEqualizer.setOnClickListener {
-            val activity = requireActivity() as? com.musicdownloader.MainActivity ?: return@setOnClickListener
-            val service = activity.playbackService ?: return@setOnClickListener
-            EqualizerDialog(requireContext(), service.getAudioSessionId()).show()
+            EqualizerBottomSheet().show(childFragmentManager, EqualizerBottomSheet.TAG)
         }
 
         binding.btnLyrics.setOnClickListener {
@@ -1101,7 +1105,7 @@ class PlayerFragment : Fragment() {
             .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean("show_wave_animation", true)
 
-        if (waveEnabled) {
+        if (waveEnabled && viewModel.isPlaying.value == true) {
             val energy = binding.waveformSeekbar.getEnergyAtProgress(progress)
             dynamicGradient.modulateByEnergy(energy)
         } else {
