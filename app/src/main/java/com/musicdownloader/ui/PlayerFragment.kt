@@ -186,6 +186,13 @@ class PlayerFragment : Fragment() {
     }
 
     private fun setupObservers() {
+        observeCurrentSong()
+        observePlaybackState()
+        observeQueueState()
+        observeDuration()
+    }
+
+    private fun observeCurrentSong() {
         viewModel.currentSong.observe(viewLifecycleOwner) { song ->
             isLyricsVisible = false
             applyLyricsBlur(false)
@@ -209,48 +216,50 @@ class PlayerFragment : Fragment() {
                 animateSongChange(song, path)
                 updateFavoriteIcon(path)
                 loadWaveform(path, song.duration)
-
-                // Load dominant color from DB for waveform/wave coloring
-                val waveEnabled = requireContext()
-                    .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
-                    .getBoolean("show_wave_animation", true)
-                Log.d("PlayerFragment", "LOAD_SONG: waveEnabled=$waveEnabled song.dominantColor=${song.dominantColor} (#${Integer.toHexString(song.dominantColor)})")
-                if (song.dominantColor != 0) {
-                    Log.d("PlayerFragment", "LOAD_SONG: APPLYING dominantColor=#${Integer.toHexString(song.dominantColor)} waveEnabled=$waveEnabled")
-                    if (!waveEnabled) {
-                        binding.waveformSeekbar.setDominantColor(song.dominantColor)
-                        Log.d("PlayerFragment", "LOAD_SONG: waveformSeekbar.setDominantColor applied")
-                    }
-                    dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
-                    Log.d("PlayerFragment", "LOAD_SONG: dynamicGradient.setPrimaryGradient applied")
-                } else {
-                    Log.w("PlayerFragment", "LOAD_SONG: dominantColor=0 - will use theme primary color")
-                }
-
-                // Parse lyrics for mini preview
-                var songLyrics = song.lyrics.orEmpty()
-                if (songLyrics.isBlank() && path.isNotBlank()) {
-                    songLyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
-                }
-                miniLrcLines = LrcParser.parse(songLyrics)
-                binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty() && !isLyricsVisible) View.VISIBLE else View.GONE
+                applyDominantColor(song)
+                parseMiniLyrics(song, path)
             } else {
-                currentSongFilePath = null
-                binding.emptyPlayerState.visibility = View.VISIBLE
-                binding.tvTitle.text = getString(R.string.app_name)
-                binding.tvArtist.text = ""
-                binding.ivCover.setImageResource(R.drawable.ic_music_note)
-                binding.pbCover.visibility = View.GONE
-                binding.btnFavorite.setImageResource(R.drawable.ic_bookmark_border)
-                binding.btnFavorite.colorFilter = null
-                binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
-                    if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
-                }.start()
-                stopCoverBreathe()
-                applyPalette(null)
+                showEmptyState()
             }
         }
+    }
 
+    private fun applyDominantColor(song: Song) {
+        val waveEnabled = requireContext()
+            .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean("show_wave_animation", true)
+        if (song.dominantColor != 0) {
+            if (!waveEnabled) binding.waveformSeekbar.setDominantColor(song.dominantColor)
+            dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
+        }
+    }
+
+    private fun parseMiniLyrics(song: Song, path: String) {
+        var songLyrics = song.lyrics.orEmpty()
+        if (songLyrics.isBlank() && path.isNotBlank()) {
+            songLyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
+        }
+        miniLrcLines = LrcParser.parse(songLyrics)
+        binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty() && !isLyricsVisible) View.VISIBLE else View.GONE
+    }
+
+    private fun showEmptyState() {
+        currentSongFilePath = null
+        binding.emptyPlayerState.visibility = View.VISIBLE
+        binding.tvTitle.text = getString(R.string.app_name)
+        binding.tvArtist.text = ""
+        binding.ivCover.setImageResource(R.drawable.ic_music_note)
+        binding.pbCover.visibility = View.GONE
+        binding.btnFavorite.setImageResource(R.drawable.ic_bookmark_border)
+        binding.btnFavorite.colorFilter = null
+        binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
+            if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
+        }.start()
+        stopCoverBreathe()
+        applyPalette(null)
+    }
+
+    private fun observePlaybackState() {
         viewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
             val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
             binding.btnPlayPause.setImageResource(
@@ -266,7 +275,9 @@ class PlayerFragment : Fragment() {
                 PlayerLayoutManager.stopVinylRotation(binding.root)
             }
         }
+    }
 
+    private fun observeQueueState() {
         viewModel.isShuffle.observe(viewLifecycleOwner) { shuffle ->
             binding.btnShuffle.alpha = if (shuffle) 1f else 0.4f
         }
@@ -288,7 +299,9 @@ class PlayerFragment : Fragment() {
                 }
             }
         }
+    }
 
+    private fun observeDuration() {
         viewModel.duration.observe(viewLifecycleOwner) { dur ->
             binding.waveformSeekbar.max = MAX_SEEK
             binding.tvTotalTime.text = formatTime(dur)
@@ -502,55 +515,58 @@ class PlayerFragment : Fragment() {
     }
 
     private fun applyPalette(bitmap: Bitmap?) {
-        // Si hay dominantColor en la DB, usarlo SIEMPRE para el gradiente
         val currentSong = viewModel.currentSong.value
         if (currentSong != null && currentSong.dominantColor != 0) {
-            Log.d("PlayerFragment", "applyPalette: OVERRIDE with dominantColor=#${Integer.toHexString(currentSong.dominantColor)}")
-            dynamicGradient.setPrimaryGradient(currentSong.dominantColor, PALETTE_DURATION)
-            glowDrawable.setColor(currentSong.dominantColor, PALETTE_DURATION)
-            titleTextColor = textColor()
-            bodyTextColor = secondaryTextColor()
-            binding.tvTitle.setTextColor(titleTextColor)
-            binding.tvArtist.setTextColor(bodyTextColor)
-            applyThemeFont()
+            applyDominantColorOverride(currentSong.dominantColor)
             return
         }
 
         val gradientMode = ThemeManager.playerGradient
         if (bitmap == null || gradientMode == 1) {
-            dynamicGradient.resetToDefault(PALETTE_DURATION)
-            glowDrawable.setColor(primaryColor, PALETTE_DURATION)
-            titleTextColor = textColor()
-            bodyTextColor = secondaryTextColor()
-            binding.tvTitle.setTextColor(titleTextColor)
-            binding.tvArtist.setTextColor(bodyTextColor)
-            applyThemeFont()
+            applyDefaultColors()
             return
         }
         when (gradientMode) {
-            2 -> {
-                dynamicGradient.setPrimaryGradient(ThemeManager.primaryColor, PALETTE_DURATION)
-                glowDrawable.setColor(ThemeManager.primaryColor, PALETTE_DURATION)
-                titleTextColor = textColor()
-                bodyTextColor = secondaryTextColor()
-                binding.tvTitle.setTextColor(titleTextColor)
-                binding.tvArtist.setTextColor(bodyTextColor)
-                applyThemeFont()
-                return
-            }
-            3 -> {
-                dynamicGradient.setNeutralDark(PALETTE_DURATION)
-                glowDrawable.setColor(primaryColor, PALETTE_DURATION)
-                titleTextColor = textColor()
-                bodyTextColor = secondaryTextColor()
-                binding.tvTitle.setTextColor(titleTextColor)
-                binding.tvArtist.setTextColor(bodyTextColor)
-                applyThemeFont()
-                return
-            }
+            2 -> { applyThemePrimaryColors(); return }
+            3 -> { applyDarkNeutralColors(); return }
         }
+        extractAndApplyPaletteColors(bitmap)
+    }
+
+    private fun applyDominantColorOverride(color: Int) {
+        dynamicGradient.setPrimaryGradient(color, PALETTE_DURATION)
+        glowDrawable.setColor(color, PALETTE_DURATION)
+        applyTextColorDefaults()
+    }
+
+    private fun applyDefaultColors() {
+        dynamicGradient.resetToDefault(PALETTE_DURATION)
+        glowDrawable.setColor(primaryColor, PALETTE_DURATION)
+        applyTextColorDefaults()
+    }
+
+    private fun applyThemePrimaryColors() {
+        dynamicGradient.setPrimaryGradient(ThemeManager.primaryColor, PALETTE_DURATION)
+        glowDrawable.setColor(ThemeManager.primaryColor, PALETTE_DURATION)
+        applyTextColorDefaults()
+    }
+
+    private fun applyDarkNeutralColors() {
+        dynamicGradient.setNeutralDark(PALETTE_DURATION)
+        glowDrawable.setColor(primaryColor, PALETTE_DURATION)
+        applyTextColorDefaults()
+    }
+
+    private fun applyTextColorDefaults() {
+        titleTextColor = textColor()
+        bodyTextColor = secondaryTextColor()
+        binding.tvTitle.setTextColor(titleTextColor)
+        binding.tvArtist.setTextColor(bodyTextColor)
+        applyThemeFont()
+    }
+
+    private fun extractAndApplyPaletteColors(bitmap: Bitmap) {
         try {
-            // createScaledBitmap siempre devuelve un bitmap software (Palette no lee HARDWARE)
             val scale = min(1f, PALETTE_SIZE.toFloat() / maxOf(bitmap.width, bitmap.height))
             val w = (bitmap.width * scale).toInt().coerceAtLeast(1)
             val h = (bitmap.height * scale).toInt().coerceAtLeast(1)
@@ -559,56 +575,40 @@ class PlayerFragment : Fragment() {
                 try {
                     val palette = withContext(Dispatchers.Default) { Palette.from(small).generate() }
                     if (_binding == null) return@launch
-                    val dominant = palette.getDominantColor(primaryColor)
-                    val vibrant = palette.getVibrantColor(primaryColor)
-                    val muted = palette.getMutedColor(primaryColor)
-                    val darkVibrant = palette.getDarkVibrantColor(primaryColor)
-                    val darkMuted = palette.getDarkMutedColor(primaryColor)
-                    val lightVibrant = palette.getLightVibrantColor(primaryColor)
-                    val dominantSwatch = palette.dominantSwatch
-                    titleTextColor = dominantSwatch?.titleTextColor ?: textColor()
-                    bodyTextColor = dominantSwatch?.bodyTextColor ?: secondaryTextColor()
-                    binding.tvTitle.setTextColor(titleTextColor)
-                    binding.tvArtist.setTextColor(bodyTextColor)
-                    dynamicGradient.setColors(
-                        dominant,
-                        vibrant,
-                        muted,
-                        darkVibrant,
-                        darkMuted,
-                        lightVibrant,
-                        PALETTE_DURATION
-                    )
-                    glowDrawable.setColor(dominant, PALETTE_DURATION)
-                    applyThemeFont()
-
-                    // Save dominant color to DB
-                    val path = currentSongFilePath
-                    if (path != null) {
-                        Log.d("PlayerFragment", "APPLY_PALETTE: saving dominantColor=#${Integer.toHexString(dominant)} for path=$path")
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            val db = AppDatabase.getInstance(requireContext())
-                            val songId = db.songDao().getIdByPath(path)
-                            if (songId != null) {
-                                db.songDao().updateDominantColor(songId, dominant)
-                                Log.d("PlayerFragment", "APPLY_PALETTE: SAVED to DB songId=$songId color=#${Integer.toHexString(dominant)}")
-                            } else {
-                                Log.e("PlayerFragment", "APPLY_PALETTE: songId NOT FOUND for path=$path")
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Palette generation failed, use defaults
-                    dynamicGradient.resetToDefault(PALETTE_DURATION)
-                    glowDrawable.setColor(primaryColor, PALETTE_DURATION)
-                    applyThemeFont()
+                    applyPaletteToUI(palette)
+                    saveDominantColorToDb(palette.getDominantColor(primaryColor))
+                } catch (_: Exception) {
+                    applyDefaultColors()
                 }
             }
-        } catch (e: Exception) {
-            // Bitmap scaling failed, use defaults
-            dynamicGradient.resetToDefault(PALETTE_DURATION)
-            glowDrawable.setColor(primaryColor, PALETTE_DURATION)
-            applyThemeFont()
+        } catch (_: Exception) {
+            applyDefaultColors()
+        }
+    }
+
+    private fun applyPaletteToUI(palette: Palette) {
+        val dominant = palette.getDominantColor(primaryColor)
+        val vibrant = palette.getVibrantColor(primaryColor)
+        val muted = palette.getMutedColor(primaryColor)
+        val darkVibrant = palette.getDarkVibrantColor(primaryColor)
+        val darkMuted = palette.getDarkMutedColor(primaryColor)
+        val lightVibrant = palette.getLightVibrantColor(primaryColor)
+        val swatch = palette.dominantSwatch
+        titleTextColor = swatch?.titleTextColor ?: textColor()
+        bodyTextColor = swatch?.bodyTextColor ?: secondaryTextColor()
+        binding.tvTitle.setTextColor(titleTextColor)
+        binding.tvArtist.setTextColor(bodyTextColor)
+        dynamicGradient.setColors(dominant, vibrant, muted, darkVibrant, darkMuted, lightVibrant, PALETTE_DURATION)
+        glowDrawable.setColor(dominant, PALETTE_DURATION)
+        applyThemeFont()
+    }
+
+    private fun saveDominantColorToDb(color: Int) {
+        val path = currentSongFilePath ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.getInstance(requireContext())
+            val songId = db.songDao().getIdByPath(path)
+            if (songId != null) db.songDao().updateDominantColor(songId, color)
         }
     }
 

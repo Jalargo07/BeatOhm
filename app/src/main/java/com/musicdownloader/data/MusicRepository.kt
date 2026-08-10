@@ -76,19 +76,22 @@ class MusicRepository(private val context: Context) {
     }
 
     suspend fun resetWaveform(song: LocalSong) {
-        val meta = android.media.MediaMetadataRetriever()
-        val realDurationMs = try {
-            meta.setDataSource(song.filePath)
-            meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: song.duration
-        } catch (_: Exception) { song.duration } finally { meta.release() }
-        Log.d("MusicRepository", "resetWaveform: '${song.title}' dbDuration=${song.duration} realDurationMs=$realDurationMs filePath='${song.filePath.substringAfterLast("/")}'")
+        val realDurationMs = getRealDurationMs(song)
+        Log.d("MusicRepository", "resetWaveform: '${song.title}' dbDuration=${song.duration} realDurationMs=$realDurationMs")
         dao.clearWaveform(song.id)
         val numBars = WaveformExtractor.barsForDuration(realDurationMs)
-        Log.d("MusicRepository", "resetWaveform: extracting $numBars bars for ${realDurationMs}ms")
         val data = WaveformExtractor.extract(song.filePath, numBars)
         val json = Gson().toJson(data.toList())
         dao.updateWaveform(song.id, json)
         Log.d("MusicRepository", "resetWaveform: saved ${data.size} bars to DB")
+    }
+
+    private fun getRealDurationMs(song: LocalSong): Long {
+        val meta = android.media.MediaMetadataRetriever()
+        return try {
+            meta.setDataSource(song.filePath)
+            meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: song.duration
+        } catch (_: Exception) { song.duration } finally { meta.release() }
     }
 
     fun startRegenProgress(total: Int) {
@@ -156,9 +159,15 @@ class MusicRepository(private val context: Context) {
     suspend fun fastScan(): ScanResult = withContext(Dispatchers.IO) {
         cleanupDuplicates()
         val existing = dao.getAllSongsNow().associate { it.id to it }
+        val newSongs = discoverNewFiles(existing)
+        if (newSongs.isNotEmpty()) dao.insertSongs(newSongs)
+        val allSongs = dao.getAllSongsNow()
+        ScanResult(allSongs, allSongs.filter { isIncomplete(it) })
+    }
+
+    private fun discoverNewFiles(existing: Map<String, LocalSong>): List<LocalSong> {
         val newSongs = mutableListOf<LocalSong>()
         val processed = mutableSetOf<String>()
-
         for (folderPath in getLibraryFolders()) {
             val dir = File(folderPath)
             if (!dir.isDirectory) continue
@@ -166,27 +175,12 @@ class MusicRepository(private val context: Context) {
                 for (file in audioFilesIn(dir, MAX_SCAN_DEPTH)) {
                     val path = file.absolutePath
                     if (processed.add(path) && existing[path] == null) {
-                        newSongs.add(
-                            LocalSong(
-                                id = path,
-                                title = file.nameWithoutExtension,
-                                duration = 0L,
-                                filePath = path
-                            )
-                        )
+                        newSongs.add(LocalSong(id = path, title = file.nameWithoutExtension, duration = 0L, filePath = path))
                     }
                 }
             } catch (_: Exception) {}
         }
-
-        if (newSongs.isNotEmpty()) {
-            dao.insertSongs(newSongs)
-        }
-
-        val allSongs = dao.getAllSongsNow()
-        val incompleteSongs = allSongs.filter { isIncomplete(it) }
-
-        ScanResult(allSongs, incompleteSongs)
+        return newSongs
     }
 
     /**
@@ -286,74 +280,63 @@ class MusicRepository(private val context: Context) {
         return result
     }
 
-    private fun extractSong(
-        file: File,
-        artCacheDir: File,
-        existing: LocalSong?
-    ): LocalSong {
+    private fun extractSong(file: File, artCacheDir: File, existing: LocalSong?): LocalSong {
         val path = file.absolutePath
         return try {
             val meta = MediaMetadataRetriever()
             meta.setDataSource(path)
-            val title = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension)
-            val artist = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "")
-            val album = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: "")
-            val genre = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: "")
-            val year = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR) ?: ""
-            val track = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)?.toIntOrNull() ?: 0
-            val duration = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-
-            var thumbnailUrl = ""
-            try {
-                if (file.extension.lowercase() != "opus") {
-                    val art = meta.embeddedPicture
-                    if (art != null) {
-                        val artFile = File(artCacheDir, "${file.nameWithoutExtension}.jpg")
-                        if (!artFile.exists()) {
-                            val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                            if (bitmap != null) {
-                                FileOutputStream(artFile).use { out ->
-                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                                }
-                            }
-                        }
-                        if (artFile.exists()) {
-                            thumbnailUrl = artFile.absolutePath
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MusicRepository", "Art extraction failed for ${file.name}: ${e.message}")
-            }
+            val raw = readMetadataFromRetriever(meta, file)
+            val artPath = extractEmbeddedArt(meta, artCacheDir, file)
             meta.release()
-
-            LocalSong(
-                id = path,
-                title = title,
-                artist = artist.ifBlank { existing?.artist.orEmpty() },
-                album = album.ifBlank { existing?.album.orEmpty() },
-                genre = genre.ifBlank { existing?.genre.orEmpty() },
-                year = year.ifBlank { existing?.year.orEmpty() },
-                trackNumber = if (track > 0) track else (existing?.trackNumber ?: 0),
-                duration = duration,
-                filePath = path,
-                thumbnailUrl = thumbnailUrl.ifBlank { existing?.thumbnailUrl.orEmpty() },
-                lyrics = existing?.lyrics ?: "",
-                isFavorite = existing?.isFavorite ?: false,
-                playCount = existing?.playCount ?: 0,
-                waveformData = existing?.waveformData ?: ""
-            )
+            buildSongFromRaw(path, raw, artPath, existing)
         } catch (_: Exception) {
-            LocalSong(
-                id = path,
-                title = file.nameWithoutExtension,
-                filePath = path,
-                lyrics = existing?.lyrics ?: "",
-                isFavorite = existing?.isFavorite ?: false,
-                playCount = existing?.playCount ?: 0,
-                waveformData = existing?.waveformData ?: ""
-            )
+            LocalSong(id = path, title = file.nameWithoutExtension, filePath = path,
+                lyrics = existing?.lyrics ?: "", isFavorite = existing?.isFavorite ?: false,
+                playCount = existing?.playCount ?: 0, waveformData = existing?.waveformData ?: "")
         }
+    }
+
+    private data class RawMetadata(val title: String, val artist: String, val album: String,
+        val genre: String, val year: String, val track: Int, val duration: Long)
+
+    private fun readMetadataFromRetriever(meta: MediaMetadataRetriever, file: File): RawMetadata {
+        return RawMetadata(
+            title = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension),
+            artist = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""),
+            album = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""),
+            genre = fixMojibake(meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: ""),
+            year = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR) ?: "",
+            track = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)?.toIntOrNull() ?: 0,
+            duration = meta.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        )
+    }
+
+    private fun extractEmbeddedArt(meta: MediaMetadataRetriever, artCacheDir: File, file: File): String {
+        if (file.extension.lowercase() == "opus") return ""
+        return try {
+            val art = meta.embeddedPicture ?: return ""
+            val artFile = File(artCacheDir, "${file.nameWithoutExtension}.jpg")
+            if (!artFile.exists()) {
+                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size) ?: return ""
+                FileOutputStream(artFile).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out) }
+            }
+            if (artFile.exists()) artFile.absolutePath else ""
+        } catch (_: Exception) { "" }
+    }
+
+    private fun buildSongFromRaw(path: String, raw: RawMetadata, artPath: String, existing: LocalSong?): LocalSong {
+        return LocalSong(
+            id = path, title = raw.title,
+            artist = raw.artist.ifBlank { existing?.artist.orEmpty() },
+            album = raw.album.ifBlank { existing?.album.orEmpty() },
+            genre = raw.genre.ifBlank { existing?.genre.orEmpty() },
+            year = raw.year.ifBlank { existing?.year.orEmpty() },
+            trackNumber = if (raw.track > 0) raw.track else (existing?.trackNumber ?: 0),
+            duration = raw.duration, filePath = path,
+            thumbnailUrl = artPath.ifBlank { existing?.thumbnailUrl.orEmpty() },
+            lyrics = existing?.lyrics ?: "", isFavorite = existing?.isFavorite ?: false,
+            playCount = existing?.playCount ?: 0, waveformData = existing?.waveformData ?: ""
+        )
     }
 
     private suspend fun fetchArtFromITunes(song: LocalSong, artCacheDir: File): String {
@@ -387,15 +370,17 @@ class MusicRepository(private val context: Context) {
     }
 
     suspend fun deleteSongsInFolder(folderPath: String) {
+        val songs = getSongsExclusiveToFolder(folderPath)
+        for (song in songs) dao.deleteSong(song)
+    }
+
+    private suspend fun getSongsExclusiveToFolder(folderPath: String): List<LocalSong> {
         val normalized = folderPath.trimEnd('/')
         val keepFolders = getLibraryFolders().filter { it != normalized }
         val prefix = "$normalized${File.separator}"
-        val songs = dao.getAllSongsNow()
-        for (song in songs) {
-            if (song.filePath.startsWith(prefix)) {
-                val inOtherFolder = keepFolders.any { song.filePath.startsWith("$it${File.separator}") }
-                if (!inOtherFolder) dao.deleteSong(song)
-            }
+        return dao.getAllSongsNow().filter { song ->
+            song.filePath.startsWith(prefix) &&
+                keepFolders.none { song.filePath.startsWith("$it${File.separator}") }
         }
     }
 

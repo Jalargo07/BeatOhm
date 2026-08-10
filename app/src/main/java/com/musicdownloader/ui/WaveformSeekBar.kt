@@ -24,152 +24,67 @@ class WaveformSeekBar @JvmOverloads constructor(
         private val waveformCache = object : LruCache<String, FloatArray>(30) {
             override fun sizeOf(key: String, value: FloatArray) = 1
         }
-
         fun getCachedWaveform(key: String): FloatArray? = waveformCache.get(key)
         fun cacheWaveform(key: String, data: FloatArray) { waveformCache.put(key, data) }
         fun clearCache() { waveformCache.evictAll() }
+        private const val CURSOR_POSITION_RATIO = 0.3f
+        private const val DRAG_SENSITIVITY = 12f
+        private const val FLING_THRESHOLD = 15f
     }
 
     var max: Int = 1000
-        set(value) {
-            field = value
-            invalidate()
-        }
+        set(value) { field = value; invalidate() }
 
+    var onProgressChanged: ((progress: Int) -> Unit)? = null
+    var onProgressStop: ((progress: Int) -> Unit)? = null
+
+    // === Estado ===
     private var currentProgress = 0
     private var isDragging = false
+    private var isFlinging = false
     private var lastTouchX = 0f
-    private var flingVelocity = 0f
+    private var scrollOffset = 0f
+    private var isPlaceholder = false
 
+    // === Dimensiones ===
     private val density = resources.displayMetrics.density
     private val barWidth = 3f * density
     private val barSpacing = 2f * density
     private val minBarHeight = 3f * density
     private val cornerRadius = 1.5f * density
+    private val totalWaveformWidth: Float get() = barCount * (barWidth + barSpacing)
 
-    // Cursor position: fixed at 30% from left edge
-    private val cursorPositionRatio = 0.3f
-
-    // Paints
-    private val playedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val unplayedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x29FFFFFF
-    }
-
-    private var isDarkMode = true
-
-    fun setThemeMode(dark: Boolean) {
-        isDarkMode = dark
-        unplayedPaint.color = if (dark) 0x29FFFFFF else 0x29000000
-        playedGradient = null
-        invalidate()
-    }
-
-    fun setDominantColor(color: Int) {
-        playedGradient = null
-        playedColor = color
-        // Create gradient: dark version → dominant color
-        val darkColor = android.graphics.Color.rgb(
-            android.graphics.Color.red(color) / 3,
-            android.graphics.Color.green(color) / 3,
-            android.graphics.Color.blue(color) / 3
-        )
-        playedGradient = LinearGradient(
-            0f, 0f, width.toFloat(), 0f,
-            intArrayOf(darkColor, color),
-            null,
-            Shader.TileMode.CLAMP
-        )
-        playedPaint.shader = playedGradient
-        invalidate()
-    }
-
-    // Paths (rebuilt each frame for scrolling)
-    private val playedPath = Path()
-    private val unplayedPath = Path()
-
-    // Gradient (cached, screen-relative)
-    private val primaryColor = ContextCompat.getColor(context, R.color.primary)
-    private val accentEnd = ContextCompat.getColor(context, R.color.secondary)
-    private var playedGradient: LinearGradient? = null
-    private var playedColor = primaryColor
-
+    // === Datos ===
     private var bars: FloatArray = floatArrayOf()
     private var barCount = 0
 
-    fun getEnergyAtProgress(progress: Int): Float {
-        if (bars.isEmpty() || max == 0) return 0f
-        val barIndex = getProgressToBarIndex(progress)
-        return getEnergyAtIndex(barIndex)
+    // === Paints ===
+    private val primaryColor = ContextCompat.getColor(context, R.color.primary)
+    private val accentEnd = ContextCompat.getColor(context, R.color.secondary)
+    private val playedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val unplayedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x29FFFFFF }
+    private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = primaryColor
+        strokeWidth = 2f * density
+        alpha = 0
     }
+    private var playedGradient: LinearGradient? = null
+    private var playedColor = primaryColor
+    private var isDarkMode = true
 
-    fun getBarAtIndex(index: Int): Float {
-        if (bars.isEmpty() || index < 0 || index >= bars.size) return 0f
-        return bars[index]
-    }
+    // === Paths ===
+    private val playedPath = Path()
+    private val unplayedPath = Path()
 
-    fun getBarCount(): Int = bars.size
-
-    fun getNearbyBars(progress: Int, count: Int): FloatArray {
-        if (bars.isEmpty() || max == 0) return floatArrayOf()
-        val centerIndex = getProgressToBarIndex(progress)
-        val half = count / 2
-        val start = (centerIndex - half).coerceAtLeast(0)
-        val end = (centerIndex + half + 1).coerceAtMost(bars.size)
-        return bars.copyOfRange(start, end)
-    }
-
-    fun getProgressToBarIndex(progress: Int): Int {
-        if (bars.isEmpty() || max == 0) return 0
-        return ((progress.toFloat() / max) * (bars.size - 1)).toInt().coerceIn(0, bars.size - 1)
-    }
-
-    fun getBarFraction(progress: Int): Float {
-        if (bars.isEmpty() || max == 0) return 0f
-        val exactPosition = (progress.toFloat() / max) * (bars.size - 1)
-        return exactPosition - exactPosition.toInt().toFloat()
-    }
-
-    fun getEnergyAtNextBar(progress: Int): Float {
-        val currentIndex = getProgressToBarIndex(progress)
-        val nextIndex = (currentIndex + 1).coerceAtMost(bars.size - 1)
-        return getEnergyAtIndex(nextIndex)
-    }
-
-    private fun getEnergyAtIndex(index: Int): Float {
-        if (bars.isEmpty()) return 0f
-        val sampleRange = 3
-        var sum = 0f
-        var count = 0
-        for (i in (index - sampleRange)..(index + sampleRange)) {
-            if (i in bars.indices) {
-                sum += bars[i]
-                count++
-            }
-        }
-        return if (count > 0) sum / count else 0f
-    }
-
-    // Total waveform width in pixels
-    private val totalWaveformWidth: Float
-        get() = barCount * (barWidth + barSpacing)
-
-    // Current scroll offset in pixels
-    private var scrollOffset = 0f
-
-    // Fling
-    private val scroller = OverScroller(context).apply {
-        setFriction(0.008f)
-    }
-    private var isFlinging = false
+    // === Fling ===
+    private val scroller = OverScroller(context).apply { setFriction(0.008f) }
     private val flingRunnable = object : Runnable {
         override fun run() {
             if (scroller.computeScrollOffset()) {
                 val newOffset = scroller.currX.toFloat().coerceIn(0f, maxScrollOffset())
-                val deltaOffset = newOffset - scrollOffset
+                val delta = newOffset - scrollOffset
                 scrollOffset = newOffset
-                // Convert scroll delta to progress delta (inverted)
-                val deltaProgress = (-deltaOffset / totalWaveformWidth * max).toInt()
+                val deltaProgress = (-delta / totalWaveformWidth * max).toInt()
                 currentProgress = (currentProgress + deltaProgress).coerceIn(0, max)
                 onProgressChanged?.invoke(currentProgress)
                 invalidate()
@@ -181,43 +96,43 @@ class WaveformSeekBar @JvmOverloads constructor(
         }
     }
 
-    var onProgressChanged: ((progress: Int) -> Unit)? = null
-    var onProgressStop: ((progress: Int) -> Unit)? = null
+    // === API pública ===
+
+    fun setThemeMode(dark: Boolean) {
+        isDarkMode = dark
+        unplayedPaint.color = if (dark) 0x29FFFFFF else 0x29000000
+        playedGradient = null
+        invalidate()
+    }
+
+    fun setDominantColor(color: Int) {
+        playedColor = color
+        val darkColor = android.graphics.Color.rgb(
+            android.graphics.Color.red(color) / 3,
+            android.graphics.Color.green(color) / 3,
+            android.graphics.Color.blue(color) / 3
+        )
+        playedGradient = LinearGradient(0f, 0f, width.toFloat(), 0f,
+            intArrayOf(darkColor, color), null, Shader.TileMode.CLAMP)
+        playedPaint.shader = playedGradient
+        invalidate()
+    }
 
     fun setWaveformData(data: FloatArray) {
         bars = smoothAmplitudes(data)
         barCount = bars.size
         isPlaceholder = false
-        playedPath.reset()
-        unplayedPath.reset()
+        resetPaths()
         scroller.forceFinished(true)
-        isFlinging = false
         invalidate()
     }
-
-    private fun smoothAmplitudes(rawAmplitudes: FloatArray): FloatArray {
-        val smoothed = FloatArray(rawAmplitudes.size)
-        for (i in rawAmplitudes.indices) {
-            val compressed = kotlin.math.sqrt(rawAmplitudes[i].toDouble()).toFloat().coerceIn(0f, 1f)
-            val prev = if (i > 0) kotlin.math.sqrt(rawAmplitudes[i - 1].toDouble()).toFloat() else compressed
-            val next = if (i < rawAmplitudes.size - 1) kotlin.math.sqrt(rawAmplitudes[i + 1].toDouble()).toFloat() else compressed
-            smoothed[i] = (prev * 0.2f) + (compressed * 0.6f) + (next * 0.2f)
-        }
-        return smoothed
-    }
-
-    private var isPlaceholder = false
 
     fun setPlaceholder(numBars: Int = 120) {
         if (barCount > 0 && !isPlaceholder) return
         isPlaceholder = true
-        val random = java.util.Random(42)
-        bars = FloatArray(numBars) {
-            0.15f + random.nextFloat() * 0.7f
-        }
+        bars = FloatArray(numBars) { 0.15f + java.util.Random(42).nextFloat() * 0.7f }
         barCount = numBars
-        playedPath.reset()
-        unplayedPath.reset()
+        resetPaths()
         invalidate()
     }
 
@@ -226,8 +141,7 @@ class WaveformSeekBar @JvmOverloads constructor(
         isPlaceholder = false
         bars = floatArrayOf()
         barCount = 0
-        playedPath.reset()
-        unplayedPath.reset()
+        resetPaths()
         invalidate()
     }
 
@@ -239,160 +153,182 @@ class WaveformSeekBar @JvmOverloads constructor(
         }
     }
 
-    private fun maxScrollOffset(): Float {
-        return (totalWaveformWidth - width * (1f - cursorPositionRatio)).coerceAtLeast(0f)
+    // === Energy query ===
+
+    fun getEnergyAtProgress(progress: Int): Float {
+        if (bars.isEmpty() || max == 0) return 0f
+        return getEnergyAtIndex(getProgressToBarIndex(progress))
     }
+
+    fun getBarAtIndex(index: Int): Float =
+        if (bars.isEmpty() || index < 0 || index >= bars.size) 0f else bars[index]
+
+    fun getBarCount(): Int = bars.size
+
+    fun getNearbyBars(progress: Int, count: Int): FloatArray {
+        if (bars.isEmpty() || max == 0) return floatArrayOf()
+        val center = getProgressToBarIndex(progress)
+        val half = count / 2
+        val start = (center - half).coerceAtLeast(0)
+        val end = (center + half + 1).coerceAtMost(bars.size)
+        return bars.copyOfRange(start, end)
+    }
+
+    fun getProgressToBarIndex(progress: Int): Int {
+        if (bars.isEmpty() || max == 0) return 0
+        return ((progress.toFloat() / max) * (bars.size - 1)).toInt().coerceIn(0, bars.size - 1)
+    }
+
+    fun getBarFraction(progress: Int): Float {
+        if (bars.isEmpty() || max == 0) return 0f
+        val pos = (progress.toFloat() / max) * (bars.size - 1)
+        return pos - pos.toInt().toFloat()
+    }
+
+    fun getEnergyAtNextBar(progress: Int): Float {
+        val next = (getProgressToBarIndex(progress) + 1).coerceAtMost(bars.size - 1)
+        return getEnergyAtIndex(next)
+    }
+
+    private fun getEnergyAtIndex(index: Int): Float {
+        if (bars.isEmpty()) return 0f
+        var sum = 0f; var count = 0
+        for (i in (index - 3)..(index + 3)) {
+            if (i in bars.indices) { sum += bars[i]; count++ }
+        }
+        return if (count > 0) sum / count else 0f
+    }
+
+    // === Scroll ===
+
+    private fun maxScrollOffset() = (totalWaveformWidth - width * (1f - CURSOR_POSITION_RATIO)).coerceAtLeast(0f)
 
     private fun updateScrollOffset() {
         val progressRatio = currentProgress.toFloat() / max.coerceAtLeast(1)
-        val cursorX = width * cursorPositionRatio
-        scrollOffset = progressRatio * totalWaveformWidth - cursorX
-        scrollOffset = scrollOffset.coerceIn(0f, maxScrollOffset())
+        scrollOffset = (progressRatio * totalWaveformWidth - width * CURSOR_POSITION_RATIO)
+            .coerceIn(0f, maxScrollOffset())
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        playedGradient = LinearGradient(
-            0f, 0f, w.toFloat(), 0f,
-            intArrayOf(playedColor, accentEnd),
-            null,
-            Shader.TileMode.CLAMP
-        )
-        playedPaint.shader = playedGradient
-        updateScrollOffset()
+    private fun resetPaths() {
+        playedPath.reset()
+        unplayedPath.reset()
     }
 
-    private fun buildPaths() {
+    // === Smoothing ===
+
+    private fun smoothAmplitudes(raw: FloatArray): FloatArray {
+        return FloatArray(raw.size) { i ->
+            val c = kotlin.math.sqrt(raw[i].toDouble()).toFloat().coerceIn(0f, 1f)
+            val p = if (i > 0) kotlin.math.sqrt(raw[i - 1].toDouble()).toFloat() else c
+            val n = if (i < raw.size - 1) kotlin.math.sqrt(raw[i + 1].toDouble()).toFloat() else c
+            (p * 0.2f) + (c * 0.6f) + (n * 0.2f)
+        }
+    }
+
+    // === Geometría de barras ===
+
+    private fun buildBarPaths() {
         if (width <= 0 || barCount == 0) return
-
         playedPath.rewind()
         unplayedPath.rewind()
 
         val centerY = height / 2f
         val maxHeight = height * 0.85f
-
-        // Determine visible bar range for performance
         val visibleLeft = scrollOffset - (barWidth + barSpacing)
         val visibleRight = scrollOffset + width + (barWidth + barSpacing)
         val startBar = ((visibleLeft / (barWidth + barSpacing)).toInt()).coerceAtLeast(0)
         val endBar = ((visibleRight / (barWidth + barSpacing)).toInt() + 1).coerceAtMost(barCount)
-
-        val progressRatio = currentProgress.toFloat() / max.coerceAtLeast(1)
-        val progressWaveX = progressRatio * totalWaveformWidth
+        val progressWaveX = (currentProgress.toFloat() / max.coerceAtLeast(1)) * totalWaveformWidth
 
         for (i in startBar until endBar) {
             val x = i * (barWidth + barSpacing)
-            val barHeight = minBarHeight + (maxHeight - minBarHeight) * bars[i]
-            val top = centerY - barHeight / 2f
+            val barH = minBarHeight + (maxHeight - minBarHeight) * bars[i]
+            val top = centerY - barH / 2f
             val barEnd = x + barWidth
 
             when {
-                barEnd <= progressWaveX -> {
-                    // Fully played
-                    playedPath.addRoundRect(x, top, barEnd, top + barHeight,
-                        cornerRadius, cornerRadius, Path.Direction.CW)
-                }
-                x >= progressWaveX -> {
-                    // Fully unplayed
-                    unplayedPath.addRoundRect(x, top, barEnd, top + barHeight,
-                        cornerRadius, cornerRadius, Path.Direction.CW)
-                }
+                barEnd <= progressWaveX ->
+                    playedPath.addRoundRect(x, top, barEnd, top + barH, cornerRadius, cornerRadius, Path.Direction.CW)
+                x >= progressWaveX ->
+                    unplayedPath.addRoundRect(x, top, barEnd, top + barH, cornerRadius, cornerRadius, Path.Direction.CW)
                 else -> {
-                    // Partially played — split into played + unplayed fractions
                     val splitX = progressWaveX.coerceIn(x, barEnd)
-                    playedPath.addRoundRect(x, top, splitX, top + barHeight,
-                        cornerRadius, cornerRadius, Path.Direction.CW)
-                    unplayedPath.addRoundRect(splitX, top, barEnd, top + barHeight,
-                        cornerRadius, cornerRadius, Path.Direction.CW)
+                    playedPath.addRoundRect(x, top, splitX, top + barH, cornerRadius, cornerRadius, Path.Direction.CW)
+                    unplayedPath.addRoundRect(splitX, top, barEnd, top + barH, cornerRadius, cornerRadius, Path.Direction.CW)
                 }
             }
         }
+    }
+
+    // === Renderizado ===
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        playedGradient = LinearGradient(0f, 0f, w.toFloat(), 0f,
+            intArrayOf(playedColor, accentEnd), null, Shader.TileMode.CLAMP)
+        playedPaint.shader = playedGradient
+        updateScrollOffset()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (barCount == 0 || bars.isEmpty()) return
 
-        buildPaths()
+        buildBarPaths()
 
-        // Translate canvas so waveform scrolls under fixed cursor
         canvas.save()
         canvas.translate(-scrollOffset, 0f)
-
-        // Layer 1: Unplayed bars (behind)
         canvas.drawPath(unplayedPath, unplayedPaint)
-
-        // Layer 2: Played bars (front, with gradient)
         canvas.drawPath(playedPath, playedPaint)
-
         canvas.restore()
 
-        // Draw cursor line at fixed position
-        val cursorX = width * cursorPositionRatio
-        val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = primaryColor
-            strokeWidth = 2f * density
-            alpha = 0
-        }
+        val cursorX = width * CURSOR_POSITION_RATIO
         canvas.drawLine(cursorX, 0f, cursorX, height.toFloat(), cursorPaint)
     }
+
+    // === Touch handling ===
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                // Cancel any active fling
-                if (isFlinging) {
-                    scroller.forceFinished(true)
-                    isFlinging = false
-                }
+                if (isFlinging) { scroller.forceFinished(true); isFlinging = false }
                 isDragging = true
                 lastTouchX = event.x
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (isDragging) {
-                    val deltaX = (event.x - lastTouchX) * 12f
-                    lastTouchX = event.x
-                    // Invert: drag right-to-left (negative deltaX) = advance (positive progress)
-                    val deltaProgress = (-deltaX / totalWaveformWidth * max).toInt()
-                    currentProgress = (currentProgress + deltaProgress).coerceIn(0, max)
-                    onProgressChanged?.invoke(currentProgress)
-                    updateScrollOffset()
-                    invalidate()
-                    return true
-                }
+                if (isDragging) { handleDragMove(event.x); return true }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (isDragging) {
-                    isDragging = false
-                    val velocityX = event.x - lastTouchX
-                    // Start fling if swipe was fast enough
-                    if (Math.abs(velocityX) > 15f) {
-                        startFling(-velocityX) // Invert: right-to-left swipe = positive fling direction
-                    } else {
-                        onProgressStop?.invoke(currentProgress)
-                    }
-                    return true
-                }
+                if (isDragging) { handleDragEnd(event.x); return true }
             }
         }
         return super.onTouchEvent(event)
     }
 
+    private fun handleDragMove(x: Float) {
+        val deltaX = (x - lastTouchX) * DRAG_SENSITIVITY
+        lastTouchX = x
+        val deltaProgress = (-deltaX / totalWaveformWidth * max).toInt()
+        currentProgress = (currentProgress + deltaProgress).coerceIn(0, max)
+        onProgressChanged?.invoke(currentProgress)
+        updateScrollOffset()
+        invalidate()
+    }
+
+    private fun handleDragEnd(x: Float) {
+        isDragging = false
+        val velocity = x - lastTouchX
+        if (kotlin.math.abs(velocity) > FLING_THRESHOLD) {
+            startFling(-velocity)
+        } else {
+            onProgressStop?.invoke(currentProgress)
+        }
+    }
+
     private fun startFling(velocityX: Float) {
-        val startOffset = scrollOffset.toInt()
-        val minOffset = 0
-        val maxOffset = maxScrollOffset().toInt()
-        scroller.fling(
-            startOffset,
-            0,
-            velocityX.toInt(),
-            0,
-            minOffset,
-            maxOffset,
-            0,
-            0
-        )
+        scroller.fling(scrollOffset.toInt(), 0, velocityX.toInt(), 0,
+            0, maxScrollOffset().toInt(), 0, 0)
         isFlinging = true
         postOnAnimation(flingRunnable)
     }

@@ -56,11 +56,26 @@ class SettingsFragment : Fragment() {
         patternTokens.clear()
         patternTokens.addAll(tokensFromPattern(currentPattern()))
 
+        initPatternBuilder()
+        initPlayerSettings()
+        initActionButtons()
+        setupAppearance()
+        setupLanguageChips()
+    }
+
+    private fun initPatternBuilder() {
         setupTokenBank()
         setupPatternBuilder()
         refreshFromBuilder()
-        setupPlayerSection()
+    }
 
+    private fun initPlayerSettings() {
+        setupPlayerLayoutChips()
+        setupIconPackChips()
+        setupWaveAnimationToggle()
+    }
+
+    private fun initActionButtons() {
         binding.btnSave.setOnClickListener {
             val pattern = buildPatternString().trim()
             if (pattern.isBlank()) {
@@ -78,9 +93,6 @@ class SettingsFragment : Fragment() {
             prefs().edit().putString(FolderPatternParser.KEY_FOLDER_PATTERN, FolderPatternParser.DEFAULT_PATTERN).apply()
             Toast.makeText(requireContext(), R.string.folder_pattern_saved, Toast.LENGTH_SHORT).show()
         }
-
-        setupAppearance()
-        setupLanguageChips()
 
         binding.btnResetTutorial.setOnClickListener {
             TutorialManager.resetAll(requireContext())
@@ -296,42 +308,38 @@ class SettingsFragment : Fragment() {
 
     private fun buildPatternString(): String = patternTokens.joinToString("") { it.toPatternString() }
 
-    private fun setupPlayerSection() {
-        // Player layout chips
-        val chipGroupLayout = binding.chipGroupPlayerLayout
-        // Pre-select current layout
+    private fun setupPlayerLayoutChips() {
+        val chipGroup = binding.chipGroupPlayerLayout
         when (ThemeManager.currentPlayerLayout) {
-            "compact" -> chipGroupLayout.check(R.id.chip_layout_compact)
-            "vinyl" -> chipGroupLayout.check(R.id.chip_layout_vinyl)
-            else -> chipGroupLayout.check(R.id.chip_layout_classic)
+            "compact" -> chipGroup.check(R.id.chip_layout_compact)
+            "vinyl" -> chipGroup.check(R.id.chip_layout_vinyl)
+            else -> chipGroup.check(R.id.chip_layout_classic)
         }
-        chipGroupLayout.setOnCheckedStateChangeListener { _, checkedIds ->
+        chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val layoutId = when (checkedIds.first()) {
                 R.id.chip_layout_compact -> "compact"
                 R.id.chip_layout_vinyl -> "vinyl"
                 else -> "classic"
             }
-            // Save to Room via ThemeManager
             val current = ThemeManager.activeTheme ?: return@setOnCheckedStateChangeListener
             val updated = current.copy(playerLayoutId = layoutId)
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 ThemeManager.updateTheme(updated)
                 ThemeManager.setActiveThemeBlocking(updated)
             }
-            // Apply immediately if player fragment is visible
             PlayerLayoutManager.currentStyle = layoutId
         }
+    }
 
-        // Icon pack chips
-        val chipGroupIcon = binding.chipGroupIconPack
-        // Pre-select current icon pack
+    private fun setupIconPackChips() {
+        val chipGroup = binding.chipGroupIconPack
         when (ThemeManager.currentIconPack) {
-            "darknova" -> chipGroupIcon.check(R.id.chip_icon_bold)
-            "heroic" -> chipGroupIcon.check(R.id.chip_icon_heroic)
-            else -> chipGroupIcon.check(R.id.chip_icon_material)
+            "darknova" -> chipGroup.check(R.id.chip_icon_bold)
+            "heroic" -> chipGroup.check(R.id.chip_icon_heroic)
+            else -> chipGroup.check(R.id.chip_icon_material)
         }
-        chipGroupIcon.setOnCheckedStateChangeListener { _, checkedIds ->
+        chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val packId = when (checkedIds.first()) {
                 R.id.chip_icon_bold -> "darknova"
@@ -348,8 +356,9 @@ class SettingsFragment : Fragment() {
                 }
             }
         }
+    }
 
-        // Wave animation toggle
+    private fun setupWaveAnimationToggle() {
         val switchWave = binding.switchWaveAnimation
         switchWave.isChecked = prefs().getBoolean("show_wave_animation", true)
         switchWave.setOnCheckedChangeListener { _, isChecked ->

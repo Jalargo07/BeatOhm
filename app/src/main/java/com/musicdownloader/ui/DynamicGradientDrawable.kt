@@ -47,6 +47,8 @@ class DynamicGradientDrawable(
     private var baseBottom = DEFAULT_BOTTOM
     private var baseDarkVibrant = DEFAULT_DARK_VIBRANT
 
+    // === API pública ===
+
     fun setColors(
         dominant: Int, vibrant: Int, muted: Int,
         darkVibrant: Int, @Suppress("UNUSED_PARAMETER") darkMuted: Int,
@@ -81,107 +83,61 @@ class DynamicGradientDrawable(
         val newTarget = energy.coerceIn(0f, 1f)
         if (targetEnergy != newTarget) {
             targetEnergy = newTarget
-            if (targetEnergy > 0f) {
-                invalidateSelf()
-            }
+            if (targetEnergy > 0f) invalidateSelf()
         }
     }
+
+    // === Animación de colores ===
 
     private fun animateTo(top: Int, mid: Int, bottom: Int, darkVibrant: Int, durationMs: Long) {
         if (top == topColor && mid == midColor && bottom == bottomColor && darkVibrant == darkVibrantColor) return
         animator?.cancel()
         baseTop = top; baseMid = mid; baseBottom = bottom; baseDarkVibrant = darkVibrant
-        val startTop = topColor; val startMid = midColor; val startBottom = bottomColor; val startDarkVibrant = darkVibrantColor
+        val sTop = topColor; val sMid = midColor; val sBot = bottomColor; val sDV = darkVibrantColor
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = durationMs
             addUpdateListener { anim ->
                 val f = anim.animatedFraction
-                topColor = evaluator.evaluate(f, startTop, top) as Int
-                midColor = evaluator.evaluate(f, startMid, mid) as Int
-                bottomColor = evaluator.evaluate(f, startBottom, bottom) as Int
-                darkVibrantColor = evaluator.evaluate(f, startDarkVibrant, darkVibrant) as Int
-                rebuildWaveGradient(cachedWaveHeight)
+                topColor = evaluator.evaluate(f, sTop, top) as Int
+                midColor = evaluator.evaluate(f, sMid, mid) as Int
+                bottomColor = evaluator.evaluate(f, sBot, bottom) as Int
+                darkVibrantColor = evaluator.evaluate(f, sDV, darkVibrant) as Int
+                rebuildGradients(cachedWaveHeight)
                 invalidateSelf()
             }
             start()
         }
     }
 
-    private fun blend(base: Int, overlay: Int, fraction: Float): Int {
-        val r = (Color.red(base) * (1f - fraction) + Color.red(overlay) * fraction).roundToInt()
-        val g = (Color.green(base) * (1f - fraction) + Color.green(overlay) * fraction).roundToInt()
-        val b = (Color.blue(base) * (1f - fraction) + Color.blue(overlay) * fraction).roundToInt()
-        return Color.rgb(r, g, b)
-    }
+    // === Física de energía ===
 
-    private fun rebuildWaveGradient(height: Int) {
-        if (height <= 0) return
-        waveGradient = LinearGradient(
-            0f, 0f, 0f, height.toFloat(),
-            intArrayOf(topColor, midColor, bottomColor, darkVibrantColor),
-            null, Shader.TileMode.CLAMP
-        )
-        wavePaint?.shader = waveGradient
-
-        // Glow gradient: mismos colores que la ola, solo más brillantes
-        val glowTop = blend(topColor, 0xFFFFFFFF.toInt(), 0.15f)
-        val glowMid = blend(midColor, 0xFFFFFFFF.toInt(), 0.10f)
-        val glowBottom = blend(bottomColor, 0xFFFFFFFF.toInt(), 0.08f)
-        glowGradient = LinearGradient(
-            0f, 0f, 0f, height.toFloat(),
-            intArrayOf(glowTop, glowMid, glowBottom, glowTop),
-            null, Shader.TileMode.CLAMP
-        )
-        glowPaint?.shader = glowGradient
-    }
-
-    override fun draw(canvas: Canvas) {
-        val bounds = bounds
-        if (bounds.isEmpty) return
-        val w = bounds.width().toFloat()
-        val h = bounds.height().toFloat()
-
-        if (wavePaint == null || cachedWaveWidth != w.toInt() || cachedWaveHeight != h.toInt()) {
-            wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            rebuildWaveGradient(h.toInt())
-            cachedWaveWidth = w.toInt()
-            cachedWaveHeight = h.toInt()
-        }
-
-        canvas.drawColor(BASE_COLOR)
-
-        // 1. INTERPOLACIÓN ASIMÉTRICA DE ENERGÍA
-        if (targetEnergy == 0f) {
-            energyModulator += (targetEnergy - energyModulator) * 0.3f
+    private fun updateEnergy() {
+        energyModulator += if (targetEnergy == 0f) {
+            (targetEnergy - energyModulator) * 0.3f
         } else {
-            energyModulator += (targetEnergy - energyModulator) * 0.05f
+            (targetEnergy - energyModulator) * 0.05f
         }
+        if (energyModulator < 0.001f && targetEnergy == 0f) energyModulator = 0f
+    }
 
-        if (energyModulator < 0.001f && targetEnergy == 0f) {
-            energyModulator = 0f
-        }
-
+    private fun updateColors() {
         val factor = 0.7f + 0.3f * energyModulator
         topColor = blend(BASE_COLOR, baseTop, 0.85f * factor)
         midColor = blend(BASE_COLOR, baseMid, 0.75f * factor)
         bottomColor = blend(BASE_COLOR, baseBottom, 0.65f * factor)
         darkVibrantColor = blend(BASE_COLOR, baseDarkVibrant, 0.80f * factor)
-        rebuildWaveGradient(cachedWaveHeight)
+        rebuildGradients(cachedWaveHeight)
+    }
 
-        // Si no hay energía, solo dibujar fondo (sin ola ni cálculos)
-        if (energyModulator <= 0f && targetEnergy <= 0f) {
-            canvas.drawColor(BASE_COLOR)
-            return
-        }
-
-        // 2. FASE CONTINUA (sin ping-pong, solo avanza)
-        val isMoving = energyModulator > 0f && targetEnergy > 0f
-        if (isMoving) {
+    private fun updatePhase() {
+        if (energyModulator > 0f && targetEnergy > 0f) {
             currentPhase += 0.008f + (energyModulator * 0.010f)
         }
+    }
 
-        // 3. PARÁMETROS DE ALTURA
+    // === Geometría de la ola ===
+
+    private fun sampleWavePath(w: Float, h: Float): Float {
         val midScreenY = h * 0.55f
         val floorLimitY = h * 0.65f
         val maxClimbHeight = h * 0.25f * energyModulator
@@ -191,53 +147,113 @@ class DynamicGradientDrawable(
         wavePath.moveTo(0f, h)
 
         var maxPeakY = baseY
-
-        // 4. MUESTREO: ola viajera continua
         for (x in 0..w.toInt() step 3) {
             val fraction = x / w
             val angle = (fraction * Math.PI * 1.8) - currentPhase
-
             val combinedWave = sin(angle).toFloat() * energyModulator
-            val calculatedY = baseY - (combinedWave * maxClimbHeight)
-            val y = calculatedY.coerceAtMost(floorLimitY)
-
+            val y = (baseY - combinedWave * maxClimbHeight).coerceAtMost(floorLimitY)
             if (y < maxPeakY) maxPeakY = y
             wavePath.lineTo(x.toFloat(), y)
         }
 
         wavePath.lineTo(w, h)
         wavePath.close()
+        return baseY - maxPeakY
+    }
 
-        canvas.drawPath(wavePath, wavePaint!!)
+    // === Gradientes ===
 
-        // 5. GLOW SUTIL EN BORDE SUPERIOR
-        val peakAmplitude = (baseY - maxPeakY).coerceAtLeast(0f)
-        val normalizedPeak = (peakAmplitude / (h * 0.12f)).coerceIn(0f, 1f)
+    private fun rebuildGradients(height: Int) {
+        if (height <= 0) return
+        waveGradient = buildWaveGradient(height)
+        wavePaint?.shader = waveGradient
+        glowGradient = buildGlowGradient(height)
+        glowPaint?.shader = glowGradient
+    }
 
-        if (normalizedPeak > 0.01f && energyModulator > 0f) {
-            // Glow sutil: solo borde superior, alpha bajo
-            val glowAlpha = (30 + (normalizedPeak * 50 * energyModulator)).toInt().coerceIn(0, 80)
-            glowPaint?.apply {
-                alpha = glowAlpha
-                maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
-            }
-            canvas.drawPath(wavePath, glowPaint!!)
+    private fun buildWaveGradient(height: Int) = LinearGradient(
+        0f, 0f, 0f, height.toFloat(),
+        intArrayOf(topColor, midColor, bottomColor, darkVibrantColor),
+        null, Shader.TileMode.CLAMP
+    )
+
+    private fun buildGlowGradient(height: Int): LinearGradient {
+        val gTop = blend(topColor, 0xFFFFFFFF.toInt(), 0.15f)
+        val gMid = blend(midColor, 0xFFFFFFFF.toInt(), 0.10f)
+        val gBot = blend(bottomColor, 0xFFFFFFFF.toInt(), 0.08f)
+        return LinearGradient(
+            0f, 0f, 0f, height.toFloat(),
+            intArrayOf(gTop, gMid, gBot, gTop),
+            null, Shader.TileMode.CLAMP
+        )
+    }
+
+    // === Renderizado ===
+
+    private fun ensurePaints(w: Int, h: Int) {
+        if (wavePaint == null || cachedWaveWidth != w || cachedWaveHeight != h) {
+            wavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            rebuildGradients(h)
+            cachedWaveWidth = w
+            cachedWaveHeight = h
         }
+    }
 
-        // 6. CONTROL DEL BUCLE
-        // Solo renderizar si hay energía activa o si la interpolación está en transición
-        val needsRender = energyModulator > 0f || 
+    private fun drawGlow(canvas: Canvas, peakAmplitude: Float, h: Float) {
+        val normalizedPeak = (peakAmplitude / (h * 0.12f)).coerceIn(0f, 1f)
+        if (normalizedPeak <= 0.01f || energyModulator <= 0f) return
+        val glowAlpha = (30 + (normalizedPeak * 50 * energyModulator)).toInt().coerceIn(0, 80)
+        glowPaint?.apply {
+            alpha = glowAlpha
+            maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawPath(wavePath, glowPaint!!)
+    }
+
+    private fun shouldContinueRendering(): Boolean {
+        return energyModulator > 0f ||
             (targetEnergy == 0f && energyModulator > 0f) ||
             kotlin.math.abs(targetEnergy - energyModulator) > 0.001f
-        if (needsRender) {
-            invalidateSelf()
-        }
+    }
+
+    // === draw() principal ===
+
+    override fun draw(canvas: Canvas) {
+        val bounds = bounds
+        if (bounds.isEmpty) return
+        val w = bounds.width().toFloat()
+        val h = bounds.height().toFloat()
+
+        ensurePaints(w.toInt(), h.toInt())
+        canvas.drawColor(BASE_COLOR)
+
+        updateEnergy()
+        updateColors()
+
+        if (energyModulator <= 0f && targetEnergy <= 0f) return
+
+        updatePhase()
+        val peakAmplitude = sampleWavePath(w, h)
+        canvas.drawPath(wavePath, wavePaint!!)
+        drawGlow(canvas, peakAmplitude, h)
+
+        if (shouldContinueRendering()) invalidateSelf()
     }
 
     override fun setAlpha(alpha: Int) { paint.alpha = alpha; invalidateSelf() }
     override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter; invalidateSelf() }
     @Deprecated("Deprecated in Android API 24") override fun getOpacity(): Int = PixelFormat.OPAQUE
     override fun onBoundsChange(bounds: Rect) { super.onBoundsChange(bounds); invalidateSelf() }
+
+    // === Utilidades ===
+
+    private fun blend(base: Int, overlay: Int, fraction: Float): Int {
+        val r = (Color.red(base) * (1f - fraction) + Color.red(overlay) * fraction).roundToInt()
+        val g = (Color.green(base) * (1f - fraction) + Color.green(overlay) * fraction).roundToInt()
+        val b = (Color.blue(base) * (1f - fraction) + Color.blue(overlay) * fraction).roundToInt()
+        return Color.rgb(r, g, b)
+    }
 
     companion object {
         private const val BASE_COLOR_DARK = 0xFF0B0910.toInt()
