@@ -210,29 +210,6 @@ class DynamicGradientDrawable(
 
         canvas.drawPath(wavePath, wavePaint!!)
 
-        // 5. GLOW OPTIMIZADO Y MÁS INTENSO
-        val peakAmplitude = (baseY - maxPeakY).coerceAtLeast(0f)
-        val normalizedPeak = (peakAmplitude / (h * 0.12f)).coerceIn(0f, 1f)
-
-        if (normalizedPeak > 0.01f) {
-            val targetRadius = (20f + (normalizedPeak * 45f)).coerceAtLeast(1f)
-            val roundedRadius = kotlin.math.round(targetRadius)
-
-            if (roundedRadius != lastBlurRadius) {
-                lastBlurRadius = roundedRadius
-                cachedGlowPaintFilter = BlurMaskFilter(roundedRadius, BlurMaskFilter.Blur.NORMAL)
-                glowPaint?.maskFilter = cachedGlowPaintFilter
-            }
-
-            val glowAlpha = (100 + (normalizedPeak * 155 * (0.5f + 0.5f * energyModulator))).toInt().coerceIn(0, 255)
-            glowPaint?.alpha = glowAlpha
-            canvas.drawPath(wavePath, glowPaint!!)
-        } else {
-            lastBlurRadius = -1f
-            glowPaint?.maskFilter = null
-            cachedGlowPaintFilter = null
-        }
-
         // 6. CONTROL DEL BUCLE
         // Solo renderizar si hay energía activa o si la interpolación está en transición
         val needsRender = energyModulator > 0f || 
