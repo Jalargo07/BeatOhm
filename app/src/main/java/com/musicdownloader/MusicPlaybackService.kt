@@ -14,6 +14,7 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.view.KeyEvent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -27,6 +28,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.musicdownloader.audio.EqualizerEffect
+import com.musicdownloader.audio.LevelCaptureProcessor
 import com.musicdownloader.data.EqualizerRepository
 import com.musicdownloader.data.MusicRepository
 import com.musicdownloader.model.Song
@@ -43,11 +45,13 @@ class MusicPlaybackService : MediaSessionService() {
 
     inner class LocalBinder : Binder() {
         fun getService(): MusicPlaybackService = this@MusicPlaybackService
+        fun getLevelCaptureProcessor(): LevelCaptureProcessor = levelCaptureProcessor
     }
 
     private val binder = LocalBinder()
     private lateinit var player: ExoPlayer
     private lateinit var equalizerEffect: EqualizerEffect
+    val levelCaptureProcessor = LevelCaptureProcessor()
     private var mediaSession: MediaSession? = null
     private var playerViewModel: PlayerViewModel? = null
     private val playbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -67,7 +71,7 @@ class MusicPlaybackService : MediaSessionService() {
         equalizerEffect.setGains(savedGains)
 
         val audioSink = DefaultAudioSink.Builder(this)
-            .setAudioProcessors(arrayOf<AudioProcessor>(equalizerEffect))
+            .setAudioProcessors(arrayOf<AudioProcessor>(equalizerEffect, levelCaptureProcessor))
             .build()
         val renderersFactory = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
@@ -220,6 +224,7 @@ class MusicPlaybackService : MediaSessionService() {
 
     fun setViewModel(vm: PlayerViewModel) {
         playerViewModel = vm
+        vm.setPlaying(player.isPlaying)
     }
 
     fun playFile(filePath: String) {
@@ -415,6 +420,7 @@ class MusicPlaybackService : MediaSessionService() {
     }
 
     companion object {
+        private const val TAG = "MusicPlaybackService"
         private const val CHANNEL_ID = "music_playback_channel"
         private const val NOTIFICATION_ID = 1001
         private const val MAX_ARTWORK_ITEMS = 50

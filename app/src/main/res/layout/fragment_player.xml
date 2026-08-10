@@ -319,6 +319,7 @@
         android:id="@+id/mini_lyrics_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:minHeight="80dp"
         android:layout_marginStart="18dp"
         android:layout_marginEnd="18dp"
         android:layout_marginTop="10dp"
@@ -344,8 +345,8 @@
             android:textColor="@color/on_surface"
             android:textSize="21sp"
             android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
+            android:maxLines="2"
+            android:lineSpacingMultiplier="0.85" />
 
         <TextView
             android:id="@+id/tv_mini_lyrics_next"
@@ -355,8 +356,8 @@
             android:gravity="center"
             android:textColor="@color/text_secondary"
             android:textSize="20sp"
-            android:maxLines="1"
-            android:ellipsize="end" />
+            android:maxLines="2"
+            android:lineSpacingMultiplier="0.85" />
 
     </LinearLayout>
 

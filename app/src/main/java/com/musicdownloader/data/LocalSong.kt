@@ -38,3 +38,17 @@ fun LocalSong.toSong(): Song = Song(
     lyrics = lyrics,
     dominantColor = dominantColor
 )
+
+fun Song.toLocalSong(): LocalSong = LocalSong(
+    id = filePath,
+    title = title,
+    artist = artist,
+    album = album,
+    genre = genre,
+    year = year,
+    trackNumber = trackNumber,
+    duration = duration,
+    filePath = filePath,
+    thumbnailUrl = thumbnailUrl,
+    lyrics = lyrics
+)

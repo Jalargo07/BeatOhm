@@ -49,6 +49,7 @@ import coil.request.ImageRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.musicdownloader.R
+import com.musicdownloader.audio.AudioVisualizerManager
 import com.musicdownloader.data.AppDatabase
 import com.musicdownloader.lrc.LrcParser
 import com.musicdownloader.lrc.LrcLine
@@ -64,7 +65,10 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -80,11 +84,15 @@ class PlayerFragment : Fragment() {
     private var currentSongFilePath: String? = null
     private var coverBreatheAnimator: ValueAnimator? = null
     private var miniLrcLines: List<LrcLine> = emptyList()
+    private var lastMiniCurrentIdx = -1
 
     private var audioManager: AudioManager? = null
     private var isVolumeDragging = false
+    private var waveformLayoutListener: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
 
-    private val dynamicGradient = DynamicGradientDrawable()
+    private val audioVisualizerManager = AudioVisualizerManager()
+    private var visualizerAttachJob: Job? = null
+    private val waterVisualizer = WaterVisualizerDrawable()
     private val glowDrawable = GlowDrawable()
     private var primaryColor: Int = Color.BLACK
     private var titleTextColor: Int = Color.WHITE
@@ -126,11 +134,11 @@ class PlayerFragment : Fragment() {
         val isDark = requireContext().resources.configuration.uiMode and
             android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
         isDarkMode = isDark
-        DynamicGradientDrawable.setThemeMode(isDark)
+        WaterVisualizerDrawable.setThemeMode(isDark)
         binding.waveformSeekbar.setThemeMode(isDark)
-        binding.root.background = dynamicGradient
+        binding.root.background = waterVisualizer
         binding.ivGlow.background = glowDrawable
-        glowDrawable.setEndColor(DynamicGradientDrawable.currentBaseColor())
+        glowDrawable.setEndColor(WaterVisualizerDrawable.currentBaseColor())
 
         PlayerLayoutManager.applyStyle(binding.root)
         binding.root.doOnLayout { updateGlowCenter() }
@@ -139,6 +147,22 @@ class PlayerFragment : Fragment() {
         setupSwipeGesture()
         setupLyricsSwipe()
         applyIconPack()
+
+        lifecycleScope.launch {
+            audioVisualizerManager.levels.collect { bands ->
+                binding.waveformSeekbar.setWaterBands(bands)
+            }
+        }
+
+        waveformLayoutListener = object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (isAdded && _binding != null && binding.waveformSeekbar.getBarCount() > 0) {
+                    val path = binding.waveformSeekbar.getBothBarsSilhouettePath(0)
+                    waterVisualizer.setWaveformMask(path)
+                }
+            }
+        }
+        binding.waveformSeekbar.viewTreeObserver.addOnGlobalLayoutListener(waveformLayoutListener)
 
         if (viewModel.currentSong.value == null) {
             binding.waveformSeekbar.setPlaceholder()
@@ -227,7 +251,7 @@ class PlayerFragment : Fragment() {
             .getBoolean("show_wave_animation", true)
         if (song.dominantColor != 0) {
             if (!waveEnabled) binding.waveformSeekbar.setDominantColor(song.dominantColor)
-            dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
+            waterVisualizer.setPrimaryGradient(song.dominantColor, 300)
         }
     }
 
@@ -237,6 +261,7 @@ class PlayerFragment : Fragment() {
             songLyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
         }
         miniLrcLines = LrcParser.parse(songLyrics)
+        lastMiniCurrentIdx = -1
         binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty() && !isLyricsVisible) View.VISIBLE else View.GONE
     }
 
@@ -274,9 +299,24 @@ class PlayerFragment : Fragment() {
             )
             if (playing) {
                 animateCoverPlaying()
+                binding.waveformSeekbar.setWaterActive(true)
                 PlayerLayoutManager.startVinylRotation(binding.root)
+                val service = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService
+                if (service != null) {
+                    visualizerAttachJob?.cancel()
+                    visualizerAttachJob = lifecycleScope.launch {
+                        while (isActive) {
+                            audioVisualizerManager.updateFromProcessor(service.levelCaptureProcessor)
+                            delay(50)
+                        }
+                    }
+                }
             } else {
-                dynamicGradient.modulateByEnergy(0f)
+                visualizerAttachJob?.cancel()
+                visualizerAttachJob = null
+                audioVisualizerManager.stop()
+                waterVisualizer.setActive(false)
+                binding.waveformSeekbar.setWaterActive(false)
                 stopCoverBreathe()
                 PlayerLayoutManager.stopVinylRotation(binding.root)
             }
@@ -372,6 +412,7 @@ class PlayerFragment : Fragment() {
             }
             if (waveform != null && _binding != null) {
                 binding.waveformSeekbar.setWaveformData(waveform)
+                waterVisualizer.setWaveformMask(binding.waveformSeekbar.getBothBarsSilhouettePath(0))
             }
         }
     }
@@ -540,25 +581,25 @@ class PlayerFragment : Fragment() {
     }
 
     private fun applyDominantColorOverride(color: Int) {
-        dynamicGradient.setPrimaryGradient(color, PALETTE_DURATION)
+        waterVisualizer.setPrimaryGradient(color, PALETTE_DURATION)
         glowDrawable.setColor(color, PALETTE_DURATION)
         applyTextColorDefaults()
     }
 
     private fun applyDefaultColors() {
-        dynamicGradient.resetToDefault(PALETTE_DURATION)
+        waterVisualizer.resetToDefault(PALETTE_DURATION)
         glowDrawable.setColor(primaryColor, PALETTE_DURATION)
         applyTextColorDefaults()
     }
 
     private fun applyThemePrimaryColors() {
-        dynamicGradient.setPrimaryGradient(ThemeManager.primaryColor, PALETTE_DURATION)
+        waterVisualizer.setPrimaryGradient(ThemeManager.primaryColor, PALETTE_DURATION)
         glowDrawable.setColor(ThemeManager.primaryColor, PALETTE_DURATION)
         applyTextColorDefaults()
     }
 
     private fun applyDarkNeutralColors() {
-        dynamicGradient.setNeutralDark(PALETTE_DURATION)
+        waterVisualizer.setNeutralDark(PALETTE_DURATION)
         glowDrawable.setColor(primaryColor, PALETTE_DURATION)
         applyTextColorDefaults()
     }
@@ -604,7 +645,7 @@ class PlayerFragment : Fragment() {
         bodyTextColor = swatch?.bodyTextColor ?: secondaryTextColor()
         binding.tvTitle.setTextColor(titleTextColor)
         binding.tvArtist.setTextColor(bodyTextColor)
-        dynamicGradient.setColors(dominant, vibrant, muted, darkVibrant, darkMuted, lightVibrant, PALETTE_DURATION)
+        waterVisualizer.setColors(dominant, vibrant, muted, darkVibrant, darkMuted, lightVibrant, PALETTE_DURATION)
         glowDrawable.setColor(dominant, PALETTE_DURATION)
         applyThemeFont()
     }
@@ -976,6 +1017,7 @@ class PlayerFragment : Fragment() {
             }
             loadLyricsBackground(song)
             miniLrcLines = LrcParser.parse(lyrics)
+            lastMiniCurrentIdx = -1
             binding.lyricsPanel.visibility = View.VISIBLE
             binding.ivLyricsBackground.visibility = View.VISIBLE
             binding.coverContainer.visibility = View.INVISIBLE
@@ -1094,23 +1136,50 @@ class PlayerFragment : Fragment() {
         for (i in miniLrcLines.indices) {
             if (miniLrcLines[i].timeMs <= pos) currentIdx = i else break
         }
-        if (currentIdx >= 0) {
-            binding.tvMiniLyricsCurrent.text = miniLrcLines[currentIdx].text
-            binding.tvMiniLyricsNext.text = if (currentIdx + 1 < miniLrcLines.size) miniLrcLines[currentIdx + 1].text else ""
+        if (currentIdx < 0) return
+
+        binding.tvMiniLyricsCurrent.text = miniLrcLines[currentIdx].text
+        binding.tvMiniLyricsNext.text = if (currentIdx + 1 < miniLrcLines.size) miniLrcLines[currentIdx + 1].text else ""
+
+        if (currentIdx == lastMiniCurrentIdx) return
+
+        binding.miniLyricsContainer.post {
+            if (_binding == null) return@post
+            val currentLines = binding.tvMiniLyricsCurrent.lineCount.coerceIn(1, 2)
+            val nextText = binding.tvMiniLyricsNext.text?.toString().orEmpty()
+            val hasNext = nextText.isNotEmpty()
+
+            val containerLp = binding.miniLyricsContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            val currentLp = binding.tvMiniLyricsCurrent.layoutParams as ViewGroup.MarginLayoutParams
+            val nextLp = binding.tvMiniLyricsNext.layoutParams as ViewGroup.MarginLayoutParams
+
+            if (currentLines >= 2 && hasNext) {
+                containerLp.verticalBias = 0.89f
+                currentLp.topMargin = (2 * resources.displayMetrics.density).toInt()
+                nextLp.topMargin = (6 * resources.displayMetrics.density).toInt()
+            } else if (currentLines >= 2 && !hasNext) {
+                containerLp.verticalBias = 0.90f
+                currentLp.topMargin = (2 * resources.displayMetrics.density).toInt()
+                nextLp.topMargin = (2 * resources.displayMetrics.density).toInt()
+            } else {
+                containerLp.verticalBias = 1.0f
+                currentLp.topMargin = 0
+                nextLp.topMargin = (2 * resources.displayMetrics.density).toInt()
+            }
+
+            binding.miniLyricsContainer.layoutParams = containerLp
+            binding.tvMiniLyricsCurrent.layoutParams = currentLp
+            binding.tvMiniLyricsNext.layoutParams = nextLp
         }
+
+        lastMiniCurrentIdx = currentIdx
     }
 
     private fun updateGradientFromWaveform(progress: Int) {
         val waveEnabled = requireContext()
             .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean("show_wave_animation", true)
-
-        if (waveEnabled && viewModel.isPlaying.value == true) {
-            val energy = binding.waveformSeekbar.getEnergyAtProgress(progress)
-            dynamicGradient.modulateByEnergy(energy)
-        } else {
-            dynamicGradient.modulateByEnergy(0f)
-        }
+        waterVisualizer.setActive(waveEnabled && viewModel.isPlaying.value == true)
     }
 
     private fun applyLyricsBlur(blur: Boolean) {
@@ -1168,6 +1237,9 @@ class PlayerFragment : Fragment() {
                     viewModel.setPosition(pos)
                     updateMiniLyrics()
                     updateGradientFromWaveform(progress)
+                    if (b.waveformSeekbar.getBarCount() > 0) {
+                        waterVisualizer.setWaveformMask(b.waveformSeekbar.getBothBarsSilhouettePath(0))
+                    }
                     if (isLyricsVisible) {
                         b.syncedLyricsView.updatePosition(pos)
                     }
@@ -1185,16 +1257,23 @@ class PlayerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        waveformLayoutListener?.let {
+            try { binding.waveformSeekbar.viewTreeObserver.removeOnGlobalLayoutListener(it) } catch (_: Exception) {}
+        }
+        waveformLayoutListener = null
         PlayerLayoutManager.stopVinylRotation(binding.root)
         PlayerLayoutManager.removeVinylViewIfAny(binding.root)
         stopCoverBreathe()
         cancelSwipeAnimations()
+        visualizerAttachJob?.cancel()
+        audioVisualizerManager.stop()
         updateRunnable?.let { binding.root.removeCallbacks(it) }
         _binding = null
         super.onDestroyView()
     }
 
     companion object {
+        private const val TAG = "PlayerFragment"
         private const val MAX_SEEK = 1000
         private const val PALETTE_DURATION = 2000L
         private const val PALETTE_SIZE = 128

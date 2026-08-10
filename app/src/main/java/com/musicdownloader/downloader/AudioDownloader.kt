@@ -2,20 +2,21 @@ package com.musicdownloader.downloader
 
 import android.content.Context
 import android.util.Log
+import com.musicdownloader.data.AudioTagWriter
+import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.toLocalSong
 import com.musicdownloader.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
-import org.jaudiotagger.tag.images.ArtworkFactory
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 class AudioDownloader(private val context: Context) {
+
+    private val musicRepository by lazy { MusicRepository(context) }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -37,7 +38,9 @@ class AudioDownloader(private val context: Context) {
 
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val name = outputFileName ?: "${song.fileName}.mp3"
+            val ext = detectExtension(mimeType)
+            val base = outputFileName ?: song.fileName
+            val name = "$base.$ext"
             val tempFile = File(outputDir, "${name}_temp")
             val finalFile = File(outputDir, name)
 
@@ -93,45 +96,65 @@ class AudioDownloader(private val context: Context) {
                 return@withContext Result.failure(Exception("0 bytes descargados"))
             }
 
-            val mp3File = convertToMp3(tempFile, finalFile)
-            if (mp3File.exists()) tempFile.delete()
-            writeMetadata(mp3File, song)
+            val resultFile = finalizeFile(tempFile, finalFile)
+            writeMetadata(resultFile, song)
 
-            Log.e(TAG, "OK: ${mp3File.name} (${mp3File.length() / 1024}KB)")
-            Result.success(mp3File)
+            Log.e(TAG, "OK: ${resultFile.name} (${resultFile.length() / 1024}KB)")
+            Result.success(resultFile)
         } catch (e: Exception) {
             Log.e(TAG, "Error downloadAudio: ${e.message}")
             Result.failure(e)
         }
     }
 
-    private fun convertToMp3(input: File, output: File): File {
-        return if (output.exists()) output
-        else {
-            input.copyTo(output, overwrite = true)
-            output
+    private fun finalizeFile(temp: File, final: File): File {
+        if (final.exists()) return final
+        if (temp.renameTo(final)) return final
+        temp.copyTo(final, overwrite = true)
+        temp.delete()
+        return final
+    }
+
+    private fun detectExtension(mimeType: String): String {
+        val mime = mimeType.lowercase()
+        return when {
+            "opus" in mime -> "opus"
+            "ogg" in mime -> "ogg"
+            "mp4" in mime || "m4a" in mime || "mp4a" in mime || "aac" in mime -> "m4a"
+            "mpeg" in mime || "mp3" in mime -> "mp3"
+            "flac" in mime -> "flac"
+            "wav" in mime -> "wav"
+            "webm" in mime -> "webm"
+            else -> "mp3"
         }
     }
 
     private fun writeMetadata(file: File, song: Song) {
         try {
-            val audioFile = AudioFileIO.read(file)
-            val tag = audioFile.tagOrCreateAndSetDefault
-            tag.setEncoding(StandardCharsets.UTF_16)
-            tag.setField(FieldKey.TITLE, song.title)
-            tag.setField(FieldKey.ARTIST, song.artist)
-            tag.setField(FieldKey.ALBUM, song.album)
-            tag.setField(FieldKey.GENRE, song.genre)
-            tag.setField(FieldKey.YEAR, song.year)
-            if (song.trackNumber > 0) tag.setField(FieldKey.TRACK, song.trackNumber.toString())
-            if (song.lyrics.isNotBlank()) tag.setField(FieldKey.LYRICS, song.lyrics)
-            if (song.thumbnailUrl.isNotBlank()) {
-                try { tag.setField(ArtworkFactory.createLinkedArtworkFromURL(song.thumbnailUrl)) } catch (e: Exception) {
-                    Log.e(TAG, "Error artwork: ${e.message}")
+            var artUrl = song.thumbnailUrl
+            var artPath: String? = null
+
+            if (artUrl.isNotBlank() && (artUrl.startsWith("http://") || artUrl.startsWith("https://"))) {
+                val artFileName = "art_${song.youtubeId.ifBlank { file.name.hashCode().toString() }}.jpg"
+                val artFile = File(context.cacheDir, artFileName)
+                try {
+                    musicRepository.downloadArtwork(artUrl, artFile)
+                    if (artFile.exists() && artFile.length() > 0) {
+                        artPath = artFile.absolutePath
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error downloading artwork: ${e.message}")
                 }
+            } else if (artUrl.isNotBlank() && File(artUrl).exists()) {
+                artPath = artUrl
             }
-            AudioFileIO.write(audioFile)
-            Log.e(TAG, "Tags escritos en descarga: ${file.name} [${file.extension.uppercase()}]")
+
+            val localSong = song.toLocalSong().copy(
+                filePath = file.absolutePath,
+                thumbnailUrl = artPath ?: song.thumbnailUrl
+            )
+
+            AudioTagWriter.writeTags(file, localSong)
         } catch (e: Exception) {
             Log.e(TAG, "Error writeMetadata en descarga: ${file.name} - ${e.message}")
         }

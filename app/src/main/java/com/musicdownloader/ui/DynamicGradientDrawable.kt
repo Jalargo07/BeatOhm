@@ -33,6 +33,8 @@ class DynamicGradientDrawable(
     private var energyModulator = 0f
     private var targetEnergy = 0f
     private var lastUpdateNanos = 0L
+    private var lastInvalidateNanos = 0L
+    private var lastPhaseNanos = 0L
 
     private var wavePaint: Paint? = null
     private var glowPaint: Paint? = null
@@ -44,6 +46,14 @@ class DynamicGradientDrawable(
 
     private var lastBlurRadius = -1f
     private var cachedGlowPaintFilter: BlurMaskFilter? = null
+
+    private val frameRunnable = object : Runnable {
+        override fun run() {
+            invalidateSelf()
+        }
+    }
+
+    private var cachedGradientColors = intArrayOf(0, 0, 0, 0)
 
     private var baseTop = DEFAULT_TOP
     private var baseMid = DEFAULT_MID
@@ -86,7 +96,7 @@ class DynamicGradientDrawable(
         val newTarget = energy.coerceIn(0f, 1f)
         if (targetEnergy != newTarget) {
             targetEnergy = newTarget
-            if (targetEnergy > 0f) invalidateSelf()
+            scheduleNextFrame()
         }
     }
 
@@ -141,12 +151,17 @@ class DynamicGradientDrawable(
 
     private fun updatePhase() {
         if (energyModulator <= 0f) return
-        val speed = if (targetEnergy > 0f) {
-            0.008f + (energyModulator * 0.010f)
+        val now = System.nanoTime()
+        val dtMs = if (lastPhaseNanos == 0L) 0L
+        else min((now - lastPhaseNanos) / 1_000_000L, MAX_DT_MS)
+        lastPhaseNanos = now
+        val dtSec = dtMs / 1000f
+        val speedPerSec = if (targetEnergy > 0f) {
+            0.48f + (energyModulator * 0.60f)
         } else {
-            PAUSE_CRUISE_SPEED
+            PAUSE_CRUISE_SPEED_RAD_S
         }
-        currentPhase += speed
+        currentPhase += speedPerSec * dtSec
     }
 
     // === Geometría de la ola ===
@@ -179,6 +194,9 @@ class DynamicGradientDrawable(
 
     private fun rebuildGradients(height: Int) {
         if (height <= 0) return
+        if (topColor == cachedGradientColors[0] && midColor == cachedGradientColors[1] &&
+            bottomColor == cachedGradientColors[2] && darkVibrantColor == cachedGradientColors[3]) return
+        cachedGradientColors = intArrayOf(topColor, midColor, bottomColor, darkVibrantColor)
         waveGradient = buildWaveGradient(height)
         wavePaint?.shader = waveGradient
         glowGradient = buildGlowGradient(height)
@@ -220,15 +238,32 @@ class DynamicGradientDrawable(
         val glowAlpha = (30 + (normalizedPeak * 50 * energyModulator)).toInt().coerceIn(0, 80)
         glowPaint?.apply {
             alpha = glowAlpha
-            maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+            if (lastBlurRadius != GLOW_BLUR_RADIUS) {
+                cachedGlowPaintFilter = BlurMaskFilter(GLOW_BLUR_RADIUS, BlurMaskFilter.Blur.NORMAL)
+                lastBlurRadius = GLOW_BLUR_RADIUS
+            }
+            maskFilter = cachedGlowPaintFilter
         }
         canvas.drawPath(wavePath, glowPaint!!)
     }
 
     private fun shouldContinueRendering(): Boolean {
         return energyModulator > 0f ||
-            (targetEnergy == 0f && energyModulator > 0f) ||
             kotlin.math.abs(targetEnergy - energyModulator) > 0.001f
+    }
+
+    private fun scheduleNextFrame() {
+        if (!shouldContinueRendering()) return
+        unscheduleSelf(frameRunnable)
+        val now = System.nanoTime()
+        val elapsed = now - lastInvalidateNanos
+        if (elapsed >= FRAME_INTERVAL_NANOS) {
+            lastInvalidateNanos = now
+            invalidateSelf()
+        }
+        val delayMs = ((FRAME_INTERVAL_NANOS - elapsed.coerceAtMost(FRAME_INTERVAL_NANOS)) / 1_000_000L)
+            .coerceAtLeast(0L)
+        scheduleSelf(frameRunnable, delayMs)
     }
 
     // === draw() principal ===
@@ -252,7 +287,7 @@ class DynamicGradientDrawable(
         canvas.drawPath(wavePath, wavePaint!!)
         drawGlow(canvas, peakAmplitude, h)
 
-        if (shouldContinueRendering()) invalidateSelf()
+        if (shouldContinueRendering()) scheduleNextFrame()
     }
 
     override fun setAlpha(alpha: Int) { paint.alpha = alpha; invalidateSelf() }
@@ -290,7 +325,9 @@ class DynamicGradientDrawable(
 
         private const val MAX_DT_MS = 100L
         private const val DECAY_HALF_LIFE = 0.4f
-        private const val PAUSE_CRUISE_SPEED = 0.028f
+        private const val PAUSE_CRUISE_SPEED_RAD_S = 1.68f
+        private const val FRAME_INTERVAL_NANOS = 33_333_333L
+        private const val GLOW_BLUR_RADIUS = 8f
 
         fun setThemeMode(isDark: Boolean) {
             BASE_COLOR = if (isDark) BASE_COLOR_DARK else BASE_COLOR_LIGHT

@@ -316,6 +316,7 @@ object ThemeManager {
         }
         val isDark = nightMode == 2
         DynamicGradientDrawable.setThemeMode(isDark)
+        WaterVisualizerDrawable.setThemeMode(isDark)
         AppCompatDelegate.setDefaultNightMode(mode)
     }
 

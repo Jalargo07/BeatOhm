@@ -10,14 +10,16 @@ import kotlinx.coroutines.withContext
 object WaveformExtractor {
 
     private const val TAG = "WaveformExtractor"
+    private const val STRIDE = 24
+    private const val MAX_ITERATIONS = 1_000_000L
 
     /**
-     * Calculates optimal number of bars: 1 bar per 0.1 seconds of audio.
-     * Higher resolution captures transients and dynamic range better.
+     * Calculates optimal number of bars: 1 bar per 2.5 seconds of audio.
+     * Coarser resolution reduces waveform complexity while keeping it readable.
      */
     fun barsForDuration(durationMs: Long): Int {
         val durationSec = durationMs / 1000.0
-        val bars = (durationSec / 0.1).toInt().coerceIn(50, 1000)
+        val bars = (durationSec / 2.5).toInt().coerceIn(30, 400)
         Log.d(TAG, "barsForDuration: durationMs=$durationMs → durationSec=${"%.1f".format(durationSec)} → bars=$bars")
         return bars
     }
@@ -86,7 +88,13 @@ object WaveformExtractor {
         var maxPeakInBar = 0
         var isEOS = false
 
+        var iterations = 0L
         while (currentBar < numBars) {
+            iterations++
+            if (iterations > MAX_ITERATIONS) {
+                Log.w(TAG, "extract BAILED: ${numBars - currentBar} bars pendientes tras ${MAX_ITERATIONS} iteraciones")
+                break
+            }
             if (!isEOS) {
                 val inputIndex = codec.dequeueInputBuffer(10_000)
                 if (inputIndex >= 0) {
@@ -113,15 +121,19 @@ object WaveformExtractor {
                     val bytesPerFrame = channelCount * 2
 
                     while (outputBuffer.remaining() >= bytesPerFrame && currentBar < numBars) {
-                        val rawSample = outputBuffer.short.toInt()
+                        if (samplesInCurrentBar % STRIDE == 0) {
+                            val rawSample = outputBuffer.short.toInt()
 
-                        if (channelCount == 2) {
-                            outputBuffer.short
-                        }
+                            if (channelCount == 2) {
+                                outputBuffer.short
+                            }
 
-                        val absSample = kotlin.math.abs(rawSample)
-                        if (absSample > maxPeakInBar) {
-                            maxPeakInBar = absSample
+                            val absSample = kotlin.math.abs(rawSample)
+                            if (absSample > maxPeakInBar) {
+                                maxPeakInBar = absSample
+                            }
+                        } else {
+                            outputBuffer.position(outputBuffer.position() + bytesPerFrame)
                         }
 
                         samplesInCurrentBar++

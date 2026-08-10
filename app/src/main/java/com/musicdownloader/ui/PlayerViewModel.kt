@@ -1,6 +1,7 @@
 package com.musicdownloader.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -10,6 +11,7 @@ import com.musicdownloader.model.Song
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
+        private const val TAG = "PlayerViewModel"
         private var instance: PlayerViewModel? = null
         fun getInstance(app: Application): PlayerViewModel {
             if (instance == null) instance = PlayerViewModel(app)

@@ -6,11 +6,10 @@ import java.nio.charset.StandardCharsets
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.ArtworkFactory
-import com.musicdownloader.data.MusicRepository
 
 object AudioTagWriter {
     private const val TAG = "AudioTagWriter"
-    private val SUPPORTED = setOf("mp3", "m4a", "flac", "ogg", "opus")
+    private val SUPPORTED = setOf("mp3", "m4a", "flac", "ogg", "opus", "webm")
 
     fun writeTags(file: File, song: LocalSong) {
         Log.e(TAG, "writeTags INICIO: ext=${file.extension} name=${file.name}")
@@ -22,7 +21,7 @@ object AudioTagWriter {
             Log.e(TAG, "Archivo no existe o vacío: ${file.name}")
             return
         }
-        if (file.extension.lowercase() == "opus") {
+        if (file.extension.lowercase() == "opus" || file.extension.lowercase() == "webm") {
             Log.e(TAG, "Delegando a OpusTagWriter: ${file.name}")
             OpusTagWriter.writeTags(file, song)
             return

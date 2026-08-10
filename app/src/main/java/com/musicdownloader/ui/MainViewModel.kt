@@ -132,7 +132,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             mimeType = "audio/mpeg",
                             song = finalSong,
                             outputDir = downloadDir,
-                            outputFileName = "$fileName.mp3",
+                            outputFileName = fileName,
                             onProgress = { progress ->
                                 updateState(downloadId, DownloadStatus.DOWNLOADING, progress)
                             }
@@ -144,7 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             mimeType = audioStream.mimeType,
                             song = finalSong,
                             outputDir = downloadDir,
-                            outputFileName = "$fileName.mp3",
+                            outputFileName = fileName,
                             onProgress = { progress ->
                                 updateState(downloadId, DownloadStatus.DOWNLOADING, progress)
                             }

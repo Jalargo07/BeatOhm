@@ -87,11 +87,22 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun getRealDurationMs(song: LocalSong): Long {
-        val meta = android.media.MediaMetadataRetriever()
+        val extractor = android.media.MediaExtractor()
         return try {
-            meta.setDataSource(song.filePath)
-            meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: song.duration
-        } catch (_: Exception) { song.duration } finally { meta.release() }
+            extractor.setDataSource(song.filePath)
+            var durationUs = 0L
+            for (i in 0 until extractor.trackCount) {
+                val fmt = extractor.getTrackFormat(i)
+                val mime = fmt.getString(android.media.MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("audio/")) {
+                    if (fmt.containsKey(android.media.MediaFormat.KEY_DURATION)) {
+                        durationUs = fmt.getLong(android.media.MediaFormat.KEY_DURATION)
+                    }
+                    break
+                }
+            }
+            if (durationUs > 0L) durationUs / 1000L else song.duration
+        } catch (_: Exception) { song.duration } finally { extractor.release() }
     }
 
     fun startRegenProgress(total: Int) {
@@ -233,7 +244,7 @@ class MusicRepository(private val context: Context) {
         val songsNeedingWaveform = songs.filter { it.waveformData.isBlank() }
         if (songsNeedingWaveform.isEmpty()) return@withContext
 
-        val semaphore = Semaphore(3)
+        val semaphore = Semaphore(2)
         val total = songsNeedingWaveform.size
         var done = 0
 
@@ -241,11 +252,7 @@ class MusicRepository(private val context: Context) {
             async {
                 semaphore.withPermit {
                     try {
-                        val meta = android.media.MediaMetadataRetriever()
-                        val realDurationMs = try {
-                            meta.setDataSource(song.filePath)
-                            meta.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: song.duration
-                        } catch (_: Exception) { song.duration } finally { meta.release() }
+                        val realDurationMs = getRealDurationMs(song)
                         val numBars = WaveformExtractor.barsForDuration(realDurationMs)
                         val data = WaveformExtractor.extract(song.filePath, numBars)
                         val json = Gson().toJson(data.toList())
@@ -489,7 +496,7 @@ class MusicRepository(private val context: Context) {
         return trimmed.lowercase() !in setOf("unknown", "various artists", "desconocido")
     }
 
-    private fun downloadArtwork(url: String, dest: File) {
+    fun downloadArtwork(url: String, dest: File) {
         try {
             if (dest.exists()) return
             val request = Request.Builder().url(url).get().build()
@@ -558,7 +565,7 @@ class MusicRepository(private val context: Context) {
         private const val KEY_FOLDERS = "library_folders"
         private const val ALBUM_COVERS_PREFS = "album_covers"
         private const val MAX_SCAN_DEPTH = 4
-        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav")
+        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav", "webm")
 
         // Static regen progress - survives across MusicRepository instances
         private val _regenProgressStatic = MutableLiveData<Pair<Int, Int>?>()

@@ -2,9 +2,12 @@ package com.musicdownloader.ui
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.util.AttributeSet
 import android.util.LruCache
@@ -30,6 +33,8 @@ class WaveformSeekBar @JvmOverloads constructor(
         private const val CURSOR_POSITION_RATIO = 0.3f
         private const val DRAG_SENSITIVITY = 12f
         private const val FLING_THRESHOLD = 15f
+        private const val WATER_SPRING_K = 120f
+        private const val WATER_DAMPING_C = 10f
     }
 
     var max: Int = 1000
@@ -75,6 +80,26 @@ class WaveformSeekBar @JvmOverloads constructor(
     // === Paths ===
     private val playedPath = Path()
     private val unplayedPath = Path()
+
+    // === Water rendering ===
+    private var waterBands = FloatArray(5) { 0f }
+    private var waterAnchorY = FloatArray(5) { 0f }
+    private var waterAnchorVel = FloatArray(5) { 0f }
+    private var waterAnchorTarget = FloatArray(5) { 0f }
+    private var waterActive = false
+    private var waterBaselineRatio = 0.5f
+    private var currentWaterLevel = 0.5f
+
+    private val waterPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val waterMaskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val waterXfermodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+    }
+    private val waterPath = Path()
+    private var waterGradient: LinearGradient? = null
+
+    private var waterTopColor = 0xFF1A6B5A.toInt()
+    private var waterBottomColor = 0xFF0D3B30.toInt()
 
     // === Fling ===
     private val scroller = OverScroller(context).apply { setFriction(0.008f) }
@@ -153,6 +178,24 @@ class WaveformSeekBar @JvmOverloads constructor(
         }
     }
 
+    fun setWaterBands(bands: FloatArray) {
+        val count = kotlin.math.min(bands.size, 5)
+        for (i in 0 until count) waterBands[i] = bands[i].coerceIn(0f, 1f)
+        invalidate()
+    }
+
+    fun setWaterActive(active: Boolean) {
+        waterActive = active
+        invalidate()
+    }
+
+    fun setWaterColors(top: Int, bottom: Int) {
+        waterTopColor = top
+        waterBottomColor = bottom
+        waterGradient = null
+        invalidate()
+    }
+
     // === Energy query ===
 
     fun getEnergyAtProgress(progress: Int): Float {
@@ -225,6 +268,79 @@ class WaveformSeekBar @JvmOverloads constructor(
         }
     }
 
+    // === Water physics ===
+
+    private fun updateWaterPhysics() {
+        val h = height.toFloat()
+        if (h <= 0f) return
+
+        val barMaxHeight = h * 0.85f
+        val barCenterY = h / 2f
+
+        var energy = 0f
+        for (i in 0 until 5) energy += waterBands[i]
+        energy /= 5f
+
+        // Serene: water fills bottom 1/4 of bar height
+        val sereneLevel = barCenterY + barMaxHeight * 0.25f
+        // Max: water rises to 1/5 from top of bar (4/5 filled)
+        val maxLevel = barCenterY - barMaxHeight * 0.30f
+
+        for (i in 0 until 5) {
+            val bandVal = if (waterActive) waterBands[i] else 0f
+            waterAnchorTarget[i] = sereneLevel - bandVal * (sereneLevel - maxLevel)
+
+            val displacement = waterAnchorY[i] - waterAnchorTarget[i]
+            val springForce = -WATER_SPRING_K * displacement
+            val dampingForce = -WATER_DAMPING_C * waterAnchorVel[i]
+            waterAnchorVel[i] += (springForce + dampingForce) * 0.016f
+            waterAnchorY[i] += waterAnchorVel[i] * 0.016f
+            waterAnchorY[i] = waterAnchorY[i].coerceIn(maxLevel, sereneLevel)
+        }
+    }
+
+    private fun buildWaterPath(w: Float, h: Float) {
+        waterPath.rewind()
+        waterPath.moveTo(0f, h)
+
+        val anchorX = floatArrayOf(0.06f * w, 0.28f * w, 0.50f * w, 0.72f * w, 0.94f * w)
+
+        val leftY = waterAnchorY[0] + (waterAnchorY[0] - waterAnchorY[1]) * 0.1f
+        waterPath.lineTo(0f, leftY.coerceIn(0f, h))
+
+        for (i in 0 until 4) {
+            val p0 = if (i > 0) waterAnchorY[i - 1] else waterAnchorY[0]
+            val p1 = waterAnchorY[i]
+            val p2 = waterAnchorY[i + 1]
+            val p3 = if (i + 2 < 5) waterAnchorY[i + 2] else waterAnchorY[4]
+
+            val cp1x = anchorX[i] + (anchorX[i + 1] - anchorX[i]) * 0.3f
+            val cp1y = p1 + (p2 - p0) * 0.15f
+            val cp2x = anchorX[i + 1] - (anchorX[i + 1] - anchorX[i]) * 0.3f
+            val cp2y = p2 - (p3 - p1) * 0.15f
+
+            var x = anchorX[i]
+            val endX = anchorX[i + 1]
+            while (x < endX) {
+                val t = ((x - anchorX[i]) / (endX - anchorX[i])).coerceIn(0f, 1f)
+                val omt = 1f - t
+                val y = omt * omt * omt * p1 + 3f * omt * omt * t * cp1y + 3f * omt * t * t * cp2y + t * t * t * p2
+                waterPath.lineTo(x, y.coerceIn(0f, h))
+                x += 4f
+            }
+        }
+
+        val rightY = waterAnchorY[4] + (waterAnchorY[4] - waterAnchorY[3]) * 0.1f
+        waterPath.lineTo(w, rightY.coerceIn(0f, h))
+        waterPath.lineTo(w, h)
+        waterPath.close()
+    }
+
+    private fun hasWaterVelocity(): Boolean {
+        for (v in waterAnchorVel) { if (kotlin.math.abs(v) > 0.5f) return true }
+        return false
+    }
+
     // === Geometría de barras ===
 
     private fun buildBarPaths() {
@@ -268,6 +384,17 @@ class WaveformSeekBar @JvmOverloads constructor(
             intArrayOf(playedColor, accentEnd), null, Shader.TileMode.CLAMP)
         playedPaint.shader = playedGradient
         updateScrollOffset()
+
+        val barCenterY = h / 2f
+        val barMaxHeight = h * 0.85f
+        val sereneY = barCenterY + barMaxHeight * 0.25f  // bottom 1/4
+        for (i in 0 until 5) {
+            waterAnchorY[i] = sereneY
+            waterAnchorVel[i] = 0f
+        }
+        waterGradient = LinearGradient(0f, 0f, 0f, h.toFloat(),
+            intArrayOf(waterTopColor, waterBottomColor), null, Shader.TileMode.CLAMP)
+        waterPaint.shader = waterGradient
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -284,6 +411,21 @@ class WaveformSeekBar @JvmOverloads constructor(
 
         val cursorX = width * CURSOR_POSITION_RATIO
         canvas.drawLine(cursorX, 0f, cursorX, height.toFloat(), cursorPaint)
+
+        // === Water inside bars ===
+        updateWaterPhysics()
+        buildWaterPath(width.toFloat(), height.toFloat())
+
+        val saveCount = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
+        canvas.save()
+        canvas.translate(-scrollOffset, 0f)
+        canvas.drawPath(playedPath, waterMaskPaint)
+        canvas.drawPath(unplayedPath, waterMaskPaint)
+        canvas.restore()
+        canvas.drawPath(waterPath, waterXfermodePaint)
+        canvas.restoreToCount(saveCount)
+
+        if (waterActive || hasWaterVelocity()) invalidate()
     }
 
     // === Touch handling ===
@@ -331,6 +473,44 @@ class WaveformSeekBar @JvmOverloads constructor(
             0, maxScrollOffset().toInt(), 0, 0)
         isFlinging = true
         postOnAnimation(flingRunnable)
+    }
+
+    // === Silhouette paths (for WaterVisualizerDrawable masking) ===
+
+    /**
+     * Returns a copy of the played bar silhouette path, translated to the
+     * parent layout's coordinate space (for masking in WaterVisualizerDrawable).
+     */
+    fun getPlayedSilhouettePath(parentLayoutTop: Int): Path {
+        buildBarPaths()
+        val translatedPath = Path(playedPath)
+        val loc = IntArray(2)
+        getLocationInWindow(loc)
+        val parentLoc = IntArray(2)
+        (parent as? android.view.View)?.getLocationInWindow(parentLoc)
+        val offsetX = (loc[0] - parentLoc[0]).toFloat()
+        val offsetY = (loc[1] - parentLoc[1]).toFloat()
+        translatedPath.offset(-scrollOffset + offsetX, offsetY)
+        return translatedPath
+    }
+
+    fun getUnplayedSilhouettePath(parentLayoutTop: Int): Path {
+        buildBarPaths()
+        val translatedPath = Path(unplayedPath)
+        val loc = IntArray(2)
+        getLocationInWindow(loc)
+        val parentLoc = IntArray(2)
+        (parent as? android.view.View)?.getLocationInWindow(parentLoc)
+        val offsetX = (loc[0] - parentLoc[0]).toFloat()
+        val offsetY = (loc[1] - parentLoc[1]).toFloat()
+        translatedPath.offset(-scrollOffset + offsetX, offsetY)
+        return translatedPath
+    }
+
+    fun getBothBarsSilhouettePath(parentLayoutTop: Int): Path {
+        val combined = getPlayedSilhouettePath(parentLayoutTop)
+        combined.addPath(getUnplayedSilhouettePath(parentLayoutTop))
+        return combined
     }
 
     override fun onDetachedFromWindow() {
