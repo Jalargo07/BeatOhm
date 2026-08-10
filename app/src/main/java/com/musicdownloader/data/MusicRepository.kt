@@ -435,8 +435,27 @@ class MusicRepository(private val context: Context) {
             thumbnailUrl = thumbnailUrl.ifBlank { existing.thumbnailUrl },
             lyrics = existing.lyrics,
             isFavorite = existing.isFavorite,
-            playCount = existing.playCount
+            playCount = existing.playCount,
+            dominantColor = existing.dominantColor
         )
+
+        // Extract dominant color from artwork if we have a thumbnail
+        if (updated.thumbnailUrl.isNotBlank() && updated.dominantColor == 0) {
+            try {
+                val bitmap = android.graphics.BitmapFactory.decodeFile(updated.thumbnailUrl)
+                if (bitmap != null) {
+                    val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
+                    val dominant = palette.getDominantColor(0)
+                    if (dominant != 0) {
+                        updated = updated.copy(dominantColor = dominant)
+                        Log.d("MusicRepository", "enrichSong: extracted dominantColor=#${Integer.toHexString(dominant)} for '${updated.title}'")
+                    }
+                    bitmap.recycle()
+                }
+            } catch (e: Exception) {
+                Log.e("MusicRepository", "enrichSong: failed to extract dominant color: ${e.message}")
+            }
+        }
 
         if (fetchLyrics && updated.lyrics.isBlank()) {
             try {

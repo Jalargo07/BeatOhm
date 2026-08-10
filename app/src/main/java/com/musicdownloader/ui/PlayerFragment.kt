@@ -22,6 +22,7 @@ import android.graphics.drawable.TransitionDrawable
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -213,7 +214,9 @@ class PlayerFragment : Fragment() {
                 val waveEnabled = requireContext()
                     .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
                     .getBoolean("show_wave_animation", true)
+                Log.d("PlayerFragment", "loadSong: waveEnabled=$waveEnabled dominantColor=${song.dominantColor}")
                 if (!waveEnabled && song.dominantColor != 0) {
+                    Log.d("PlayerFragment", "loadSong: applying dominantColor=#${Integer.toHexString(song.dominantColor)}")
                     binding.waveformSeekbar.setDominantColor(song.dominantColor)
                     dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
                 }
@@ -562,11 +565,15 @@ class PlayerFragment : Fragment() {
                     // Save dominant color to DB
                     val path = currentSongFilePath
                     if (path != null) {
+                        Log.d("PlayerFragment", "applyPalette: saving dominantColor=#${Integer.toHexString(dominant)} for path=$path")
                         lifecycleScope.launch(Dispatchers.IO) {
                             val db = AppDatabase.getInstance(requireContext())
                             val songId = db.songDao().getIdByPath(path)
                             if (songId != null) {
                                 db.songDao().updateDominantColor(songId, dominant)
+                                Log.d("PlayerFragment", "applyPalette: saved dominantColor to DB songId=$songId")
+                            } else {
+                                Log.e("PlayerFragment", "applyPalette: songId not found for path=$path")
                             }
                         }
                     }
