@@ -214,13 +214,17 @@ class PlayerFragment : Fragment() {
                 val waveEnabled = requireContext()
                     .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
                     .getBoolean("show_wave_animation", true)
-                Log.d("PlayerFragment", "loadSong: waveEnabled=$waveEnabled dominantColor=${song.dominantColor}")
+                Log.d("PlayerFragment", "LOAD_SONG: waveEnabled=$waveEnabled song.dominantColor=${song.dominantColor} (#${Integer.toHexString(song.dominantColor)})")
                 if (song.dominantColor != 0) {
-                    Log.d("PlayerFragment", "loadSong: applying dominantColor=#${Integer.toHexString(song.dominantColor)} waveEnabled=$waveEnabled")
+                    Log.d("PlayerFragment", "LOAD_SONG: APPLYING dominantColor=#${Integer.toHexString(song.dominantColor)} waveEnabled=$waveEnabled")
                     if (!waveEnabled) {
                         binding.waveformSeekbar.setDominantColor(song.dominantColor)
+                        Log.d("PlayerFragment", "LOAD_SONG: waveformSeekbar.setDominantColor applied")
                     }
                     dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
+                    Log.d("PlayerFragment", "LOAD_SONG: dynamicGradient.setPrimaryGradient applied")
+                } else {
+                    Log.w("PlayerFragment", "LOAD_SONG: dominantColor=0 - will use theme primary color")
                 }
 
                 // Parse lyrics for mini preview
@@ -567,15 +571,15 @@ class PlayerFragment : Fragment() {
                     // Save dominant color to DB
                     val path = currentSongFilePath
                     if (path != null) {
-                        Log.d("PlayerFragment", "applyPalette: saving dominantColor=#${Integer.toHexString(dominant)} for path=$path")
+                        Log.d("PlayerFragment", "APPLY_PALETTE: saving dominantColor=#${Integer.toHexString(dominant)} for path=$path")
                         lifecycleScope.launch(Dispatchers.IO) {
                             val db = AppDatabase.getInstance(requireContext())
                             val songId = db.songDao().getIdByPath(path)
                             if (songId != null) {
                                 db.songDao().updateDominantColor(songId, dominant)
-                                Log.d("PlayerFragment", "applyPalette: saved dominantColor to DB songId=$songId")
+                                Log.d("PlayerFragment", "APPLY_PALETTE: SAVED to DB songId=$songId color=#${Integer.toHexString(dominant)}")
                             } else {
-                                Log.e("PlayerFragment", "applyPalette: songId not found for path=$path")
+                                Log.e("PlayerFragment", "APPLY_PALETTE: songId NOT FOUND for path=$path")
                             }
                         }
                     }

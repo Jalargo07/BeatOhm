@@ -446,15 +446,22 @@ class MusicRepository(private val context: Context) {
                 if (bitmap != null) {
                     val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
                     val dominant = palette.getDominantColor(0)
+                    Log.d("MusicRepository", "enrichSong DOMINANT: raw=#${Integer.toHexString(dominant)} from='${updated.thumbnailUrl}'")
                     if (dominant != 0) {
                         updated = updated.copy(dominantColor = dominant)
-                        Log.d("MusicRepository", "enrichSong: extracted dominantColor=#${Integer.toHexString(dominant)} for '${updated.title}'")
+                        Log.d("MusicRepository", "enrichSong DOMINANT: SAVED dominantColor=#${Integer.toHexString(dominant)} for '${updated.title}'")
+                    } else {
+                        Log.w("MusicRepository", "enrichSong DOMINANT: dominantColor=0 (Palette returned default)")
                     }
                     bitmap.recycle()
+                } else {
+                    Log.w("MusicRepository", "enrichSong DOMINANT: bitmap=null for '${updated.thumbnailUrl}'")
                 }
             } catch (e: Exception) {
-                Log.e("MusicRepository", "enrichSong: failed to extract dominant color: ${e.message}")
+                Log.e("MusicRepository", "enrichSong DOMINANT: FAILED ${e.message}")
             }
+        } else {
+            Log.d("MusicRepository", "enrichSong DOMINANT: SKIPPED thumb='${updated.thumbnailUrl}' existingColor=${updated.dominantColor}")
         }
 
         if (fetchLyrics && updated.lyrics.isBlank()) {
