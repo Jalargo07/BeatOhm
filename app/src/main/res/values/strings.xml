@@ -188,6 +188,12 @@
     <string name="settings_player_layout_compact">Compacto</string>
     <string name="settings_player_layout_vinyl">Vinilo</string>
     <string name="settings_wave_animation">Ola animada en el reproductor</string>
+    <string name="regen_select_title">¿Qué deseas regenerar?</string>
+    <string name="regen_metadata">Metadata (título, artista, álbum, género)</string>
+    <string name="regen_lyrics">Letras sincronizadas</string>
+    <string name="regen_waveform">Forma de onda de audio</string>
+    <string name="regen_artwork">Carátula del álbum</string>
+    <string name="regen_color">Color dominante</string>
 
     <!-- Theme selector -->
     <string name="theme_selector_title">Selector de Temas</string>

@@ -188,6 +188,12 @@
     <string name="settings_player_layout_compact">Compact</string>
     <string name="settings_player_layout_vinyl">Vinyl</string>
     <string name="settings_wave_animation">Wave animation on player</string>
+    <string name="regen_select_title">What do you want to regenerate?</string>
+    <string name="regen_metadata">Metadata (title, artist, album, genre)</string>
+    <string name="regen_lyrics">Synced lyrics</string>
+    <string name="regen_waveform">Audio waveform</string>
+    <string name="regen_artwork">Album artwork</string>
+    <string name="regen_color">Dominant color</string>
 
     <!-- Theme selector -->
     <string name="theme_selector_title">Theme Selector</string>

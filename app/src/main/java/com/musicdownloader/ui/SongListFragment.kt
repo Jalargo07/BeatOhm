@@ -287,18 +287,35 @@ class SongListFragment : Fragment() {
     }
 
     private fun regenerateMetadata(songs: List<LocalSong>) {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_regen_options, null)
+        val checkMetadata = dialogView.findViewById<android.widget.CheckBox>(R.id.check_metadata)
+        val checkLyrics = dialogView.findViewById<android.widget.CheckBox>(R.id.check_lyrics)
+        val checkWaveform = dialogView.findViewById<android.widget.CheckBox>(R.id.check_waveform)
+        val checkArtwork = dialogView.findViewById<android.widget.CheckBox>(R.id.check_artwork)
+        val checkColor = dialogView.findViewById<android.widget.CheckBox>(R.id.check_color)
+
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(getString(R.string.regenerar_metadata))
-            .setMessage(getString(R.string.rebuscar_metadata, songs.size, if (songs.size > 1) "s" else ""))
+            .setTitle(getString(R.string.regen_select_title))
+            .setView(dialogView)
             .setPositiveButton("Regenerar") { _, _ ->
+                val doMetadata = checkMetadata.isChecked
+                val doLyrics = checkLyrics.isChecked
+                val doWaveform = checkWaveform.isChecked
+                val doArtwork = checkArtwork.isChecked
+                val doColor = checkColor.isChecked
+
+                if (!doMetadata && !doLyrics && !doWaveform && !doArtwork && !doColor) return@setPositiveButton
+
                 adapter.deselectAll()
                 requireActivity().lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
                         repository.startRegenProgress(songs.size)
                         for ((index, song) in songs.withIndex()) {
                             repository.updateRegenProgress(index + 1, songs.size)
-                            repository.resetWaveform(song)
-                            repository.enrichSong(song, skipTagWrite = true, fetchLyrics = true)
+                            if (doWaveform) repository.resetWaveform(song)
+                            if (doMetadata || doLyrics || doArtwork || doColor) {
+                                repository.enrichSong(song, skipTagWrite = !doMetadata, fetchLyrics = doLyrics)
+                            }
                         }
                         repository.finishRegenProgress()
                     }
