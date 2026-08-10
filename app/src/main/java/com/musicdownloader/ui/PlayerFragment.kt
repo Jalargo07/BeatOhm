@@ -210,14 +210,16 @@ class PlayerFragment : Fragment() {
                 updateFavoriteIcon(path)
                 loadWaveform(path, song.duration)
 
-                // Load dominant color from DB for waveform coloring
+                // Load dominant color from DB for waveform/wave coloring
                 val waveEnabled = requireContext()
                     .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
                     .getBoolean("show_wave_animation", true)
                 Log.d("PlayerFragment", "loadSong: waveEnabled=$waveEnabled dominantColor=${song.dominantColor}")
-                if (!waveEnabled && song.dominantColor != 0) {
-                    Log.d("PlayerFragment", "loadSong: applying dominantColor=#${Integer.toHexString(song.dominantColor)}")
-                    binding.waveformSeekbar.setDominantColor(song.dominantColor)
+                if (song.dominantColor != 0) {
+                    Log.d("PlayerFragment", "loadSong: applying dominantColor=#${Integer.toHexString(song.dominantColor)} waveEnabled=$waveEnabled")
+                    if (!waveEnabled) {
+                        binding.waveformSeekbar.setDominantColor(song.dominantColor)
+                    }
                     dynamicGradient.setPrimaryGradient(song.dominantColor, 300)
                 }
 
