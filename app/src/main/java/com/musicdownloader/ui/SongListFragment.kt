@@ -1,5 +1,6 @@
 package com.musicdownloader.ui
 
+import android.util.Log
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 
@@ -308,27 +310,51 @@ class SongListFragment : Fragment() {
 
                 adapter.deselectAll()
                 requireActivity().lifecycleScope.launch {
+                    val failedSongs = mutableListOf<String>()
                     withContext(Dispatchers.IO) {
                         repository.startRegenProgress(songs.size)
                         for ((index, song) in songs.withIndex()) {
                             repository.updateRegenProgress(index + 1, songs.size)
-                            var updated = song
-                            if (doWaveform) repository.resetWaveform(updated)
-                            if (doMetadata) updated = repository.fetchMetadata(updated)
-                            if (doArtwork) updated = repository.downloadArtworkForSong(updated)
-                            if (doColor) updated = repository.extractDominantColor(updated)
-                            if (doLyrics) updated = repository.fetchLyricsForSong(updated)
-                            if (doMetadata || doLyrics || doArtwork || doColor) {
-                                repository.saveSong(updated)
+                            Log.d("SongListFragment", "Regen [${index + 1}/${songs.size}] ${song.title}...")
+                            try {
+                                val result = withTimeoutOrNull(30_000L) {
+                                    var updated = song
+                                    if (doMetadata) updated = repository.fetchMetadata(updated)
+                                    if (doArtwork) updated = repository.downloadArtworkForSong(updated)
+                                    if (doColor) updated = repository.extractDominantColor(updated)
+                                    if (doLyrics) updated = repository.fetchLyricsForSong(updated)
+                                    if (doMetadata || doLyrics || doArtwork || doColor) {
+                                        repository.saveSong(updated)
+                                    }
+                                    if (doWaveform) repository.resetWaveform(updated)
+                                    Unit
+                                }
+                                if (result == null) {
+                                    Log.e("SongListFragment", "Regen TIMEOUT for '${song.title}' (30s)")
+                                    failedSongs.add(song.title)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("SongListFragment", "Regen FAILED for '${song.title}': ${e.message}")
+                                failedSongs.add(song.title)
                             }
                         }
                         repository.finishRegenProgress()
                     }
-                    android.widget.Toast.makeText(
-                        requireContext(),
-                        getString(R.string.metadata_regenerada, songs.size, songs.size),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    if (failedSongs.isNotEmpty()) {
+                        val skipped = failedSongs.take(3).joinToString()
+                        val extra = if (failedSongs.size > 3) " y ${failedSongs.size - 3} más" else ""
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "Regenerado ${songs.size - failedSongs.size}/${songs.size}. Fallaron: $skipped$extra",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            getString(R.string.metadata_regenerada, songs.size, songs.size),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
             .setNegativeButton("Cancelar", null)
