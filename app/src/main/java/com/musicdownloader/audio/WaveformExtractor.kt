@@ -4,13 +4,13 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.util.Log
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object WaveformExtractor {
 
     private const val TAG = "WaveformExtractor"
-    private const val STRIDE = 24
     private const val MAX_ITERATIONS = 1_000_000L
 
     /**
@@ -62,8 +62,8 @@ object WaveformExtractor {
                 break
             }
         }
+
         if (audioTrackIndex < 0 || format == null) {
-            Log.e(TAG, "No audio track found")
             extractor.release()
             return FloatArray(numBars) { 0.3f }
         }
@@ -74,27 +74,25 @@ object WaveformExtractor {
         val durationUs = format.getLong(MediaFormat.KEY_DURATION)
         val mime = format.getString(MediaFormat.KEY_MIME)!!
 
-        val totalSamples = (durationUs / 1_000_000.0 * sampleRate).toLong()
-        val samplesPerBar = (totalSamples / numBars).coerceAtLeast(1)
+        val totalFrames = (durationUs / 1_000_000.0 * sampleRate).toLong()
+        val framesPerBar = (totalFrames / numBars).coerceAtLeast(1)
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
 
         val bufferInfo = MediaCodec.BufferInfo()
-        val amplitudes = FloatArray(numBars)
+        val rawPeaks = FloatArray(numBars)
         var currentBar = 0
-        var samplesInCurrentBar = 0
-        var maxPeakInBar = 0
+        var framesInCurrentBar = 0L
+        var maxPeakInBar = 0f
         var isEOS = false
-
         var iterations = 0L
+
         while (currentBar < numBars) {
             iterations++
-            if (iterations > MAX_ITERATIONS) {
-                Log.w(TAG, "extract BAILED: ${numBars - currentBar} bars pendientes tras ${MAX_ITERATIONS} iteraciones")
-                break
-            }
+            if (iterations > MAX_ITERATIONS) break
+
             if (!isEOS) {
                 val inputIndex = codec.dequeueInputBuffer(10_000)
                 if (inputIndex >= 0) {
@@ -114,38 +112,33 @@ object WaveformExtractor {
             if (outputIndex >= 0) {
                 val outputBuffer = codec.getOutputBuffer(outputIndex) ?: continue
                 val size = bufferInfo.size
+
                 if (size > 0) {
                     outputBuffer.position(bufferInfo.offset)
                     outputBuffer.limit(bufferInfo.offset + size)
+                    val shortBuf = outputBuffer.asShortBuffer()
 
-                    val bytesPerFrame = channelCount * 2
-
-                    while (outputBuffer.remaining() >= bytesPerFrame && currentBar < numBars) {
-                        if (samplesInCurrentBar % STRIDE == 0) {
-                            val rawSample = outputBuffer.short.toInt()
-
-                            if (channelCount == 2) {
-                                outputBuffer.short
-                            }
-
-                            val absSample = kotlin.math.abs(rawSample)
-                            if (absSample > maxPeakInBar) {
-                                maxPeakInBar = absSample
-                            }
-                        } else {
-                            outputBuffer.position(outputBuffer.position() + bytesPerFrame)
+                    while (shortBuf.hasRemaining() && currentBar < numBars) {
+                        val sampleL = abs(shortBuf.get().toInt())
+                        if (channelCount == 2 && shortBuf.hasRemaining()) {
+                            shortBuf.get()
                         }
 
-                        samplesInCurrentBar++
+                        if (sampleL > maxPeakInBar) {
+                            maxPeakInBar = sampleL.toFloat()
+                        }
 
-                        if (samplesInCurrentBar >= samplesPerBar) {
-                            amplitudes[currentBar] = (maxPeakInBar.toFloat() / Short.MAX_VALUE).coerceIn(0f, 1f)
+                        framesInCurrentBar++
+
+                        if (framesInCurrentBar >= framesPerBar) {
+                            rawPeaks[currentBar] = maxPeakInBar
                             currentBar++
-                            samplesInCurrentBar = 0
-                            maxPeakInBar = 0
+                            framesInCurrentBar = 0
+                            maxPeakInBar = 0f
                         }
                     }
                 }
+
                 codec.releaseOutputBuffer(outputIndex, false)
                 if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
                     break
@@ -154,9 +147,9 @@ object WaveformExtractor {
         }
 
         if (currentBar < numBars) {
-            val lastVal = if (currentBar > 0) amplitudes[currentBar - 1] else 0.1f
+            val lastVal = if (currentBar > 0) rawPeaks[currentBar - 1] else 1f
             for (i in currentBar until numBars) {
-                amplitudes[i] = lastVal
+                rawPeaks[i] = lastVal
             }
         }
 
@@ -164,13 +157,15 @@ object WaveformExtractor {
         codec.release()
         extractor.release()
 
-        val maxGlobalPeak = amplitudes.maxOrNull() ?: 1f
-        if (maxGlobalPeak > 0f) {
-            for (i in amplitudes.indices) {
-                amplitudes[i] = (amplitudes[i] / maxGlobalPeak).coerceIn(0.05f, 1f)
-            }
-        }
+        val absoluteMax = rawPeaks.maxOrNull() ?: 1f
 
-        return amplitudes
+        return if (absoluteMax > 0f) {
+            FloatArray(numBars) { i ->
+                val normalized = rawPeaks[i] / absoluteMax
+                normalized.coerceIn(0.08f, 1f)
+            }
+        } else {
+            FloatArray(numBars) { 0.3f }
+        }
     }
 }

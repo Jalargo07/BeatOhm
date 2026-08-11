@@ -216,6 +216,7 @@ class CategoryListFragment : Fragment() {
                 else -> repository.getAllSongs()
             }
             flow.collectLatest { songs ->
+                if (_binding == null) return@collectLatest
                 songsAdapter.submitList(songs)
                 if (songs.isEmpty()) {
                     binding.rvCategories.visibility = View.GONE

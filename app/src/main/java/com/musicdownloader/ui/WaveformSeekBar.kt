@@ -53,10 +53,10 @@ class WaveformSeekBar @JvmOverloads constructor(
 
     // === Dimensiones ===
     private val density = resources.displayMetrics.density
-    private val barWidth = 3f * density
-    private val barSpacing = 2f * density
+    private val barWidth = 15f * density
+    private val barSpacing = 6f * density
     private val minBarHeight = 3f * density
-    private val cornerRadius = 1.5f * density
+    private val cornerRadius = 3.5f * density
     private val totalWaveformWidth: Float get() = barCount * (barWidth + barSpacing)
 
     // === Datos ===
@@ -67,7 +67,7 @@ class WaveformSeekBar @JvmOverloads constructor(
     private val primaryColor = ContextCompat.getColor(context, R.color.primary)
     private val accentEnd = ContextCompat.getColor(context, R.color.secondary)
     private val playedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val unplayedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x29FFFFFF }
+    private val unplayedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x50C0C0C0 }
     private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = primaryColor
         strokeWidth = 2f * density
@@ -82,10 +82,10 @@ class WaveformSeekBar @JvmOverloads constructor(
     private val unplayedPath = Path()
 
     // === Water rendering ===
-    private var waterBands = FloatArray(5) { 0f }
-    private var waterAnchorY = FloatArray(5) { 0f }
-    private var waterAnchorVel = FloatArray(5) { 0f }
-    private var waterAnchorTarget = FloatArray(5) { 0f }
+    private var waterBands = FloatArray(3) { 0f }
+    private var waterAnchorY = FloatArray(3) { 0f }
+    private var waterAnchorVel = FloatArray(3) { 0f }
+    private var waterAnchorTarget = FloatArray(3) { 0f }
     private var waterActive = false
     private var waterBaselineRatio = 0.5f
     private var currentWaterLevel = 0.5f
@@ -125,7 +125,7 @@ class WaveformSeekBar @JvmOverloads constructor(
 
     fun setThemeMode(dark: Boolean) {
         isDarkMode = dark
-        unplayedPaint.color = if (dark) 0x29FFFFFF else 0x29000000
+        unplayedPaint.color = if (dark) 0x50C0C0C0 else 0x50606060
         playedGradient = null
         invalidate()
     }
@@ -147,6 +147,8 @@ class WaveformSeekBar @JvmOverloads constructor(
         bars = smoothAmplitudes(data)
         barCount = bars.size
         isPlaceholder = false
+        unplayedPaint.color = 0xFFC0BFBC.toInt()
+        unplayedPaint.alpha = 255
         resetPaths()
         scroller.forceFinished(true)
         invalidate()
@@ -155,6 +157,7 @@ class WaveformSeekBar @JvmOverloads constructor(
     fun setPlaceholder(numBars: Int = 120) {
         if (barCount > 0 && !isPlaceholder) return
         isPlaceholder = true
+        unplayedPaint.alpha = 255
         bars = FloatArray(numBars) { 0.15f + java.util.Random(42).nextFloat() * 0.7f }
         barCount = numBars
         resetPaths()
@@ -179,7 +182,7 @@ class WaveformSeekBar @JvmOverloads constructor(
     }
 
     fun setWaterBands(bands: FloatArray) {
-        val count = kotlin.math.min(bands.size, 5)
+        val count = kotlin.math.min(bands.size, 3)
         for (i in 0 until count) waterBands[i] = bands[i].coerceIn(0f, 1f)
         invalidate()
     }
@@ -278,15 +281,13 @@ class WaveformSeekBar @JvmOverloads constructor(
         val barCenterY = h / 2f
 
         var energy = 0f
-        for (i in 0 until 5) energy += waterBands[i]
-        energy /= 5f
+        for (i in 0 until 3) energy += waterBands[i]
+        energy /= 3f
 
-        // Serene: water fills bottom 1/4 of bar height
         val sereneLevel = barCenterY + barMaxHeight * 0.25f
-        // Max: water rises to 1/5 from top of bar (4/5 filled)
         val maxLevel = barCenterY - barMaxHeight * 0.30f
 
-        for (i in 0 until 5) {
+        for (i in 0 until 3) {
             val bandVal = if (waterActive) waterBands[i] else 0f
             waterAnchorTarget[i] = sereneLevel - bandVal * (sereneLevel - maxLevel)
 
@@ -303,16 +304,16 @@ class WaveformSeekBar @JvmOverloads constructor(
         waterPath.rewind()
         waterPath.moveTo(0f, h)
 
-        val anchorX = floatArrayOf(0.06f * w, 0.28f * w, 0.50f * w, 0.72f * w, 0.94f * w)
+        val anchorX = floatArrayOf(0.08f * w, 0.50f * w, 0.92f * w)
 
         val leftY = waterAnchorY[0] + (waterAnchorY[0] - waterAnchorY[1]) * 0.1f
         waterPath.lineTo(0f, leftY.coerceIn(0f, h))
 
-        for (i in 0 until 4) {
+        for (i in 0 until 2) {
             val p0 = if (i > 0) waterAnchorY[i - 1] else waterAnchorY[0]
             val p1 = waterAnchorY[i]
             val p2 = waterAnchorY[i + 1]
-            val p3 = if (i + 2 < 5) waterAnchorY[i + 2] else waterAnchorY[4]
+            val p3 = if (i + 2 < 3) waterAnchorY[i + 2] else waterAnchorY[2]
 
             val cp1x = anchorX[i] + (anchorX[i + 1] - anchorX[i]) * 0.3f
             val cp1y = p1 + (p2 - p0) * 0.15f
@@ -330,7 +331,7 @@ class WaveformSeekBar @JvmOverloads constructor(
             }
         }
 
-        val rightY = waterAnchorY[4] + (waterAnchorY[4] - waterAnchorY[3]) * 0.1f
+        val rightY = waterAnchorY[2] + (waterAnchorY[2] - waterAnchorY[1]) * 0.1f
         waterPath.lineTo(w, rightY.coerceIn(0f, h))
         waterPath.lineTo(w, h)
         waterPath.close()
@@ -387,14 +388,15 @@ class WaveformSeekBar @JvmOverloads constructor(
 
         val barCenterY = h / 2f
         val barMaxHeight = h * 0.85f
-        val sereneY = barCenterY + barMaxHeight * 0.25f  // bottom 1/4
-        for (i in 0 until 5) {
+        val sereneY = barCenterY + barMaxHeight * 0.25f
+        for (i in 0 until 3) {
             waterAnchorY[i] = sereneY
             waterAnchorVel[i] = 0f
         }
         waterGradient = LinearGradient(0f, 0f, 0f, h.toFloat(),
             intArrayOf(waterTopColor, waterBottomColor), null, Shader.TileMode.CLAMP)
         waterPaint.shader = waterGradient
+        waterPaint.alpha = 80
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -402,28 +404,30 @@ class WaveformSeekBar @JvmOverloads constructor(
         if (barCount == 0 || bars.isEmpty()) return
 
         buildBarPaths()
+        updateWaterPhysics()
+        buildWaterPath(width.toFloat(), height.toFloat())
 
+        // CAPA 1+2: Waveform base + Progreso
         canvas.save()
         canvas.translate(-scrollOffset, 0f)
         canvas.drawPath(unplayedPath, unplayedPaint)
         canvas.drawPath(playedPath, playedPaint)
         canvas.restore()
 
+        // CAPA 3: Agua enmascarada dentro de la silueta del waveform
+        canvas.save()
+        val fullWaveformSilhouette = Path().apply {
+            addPath(playedPath)
+            addPath(unplayedPath)
+            offset(-scrollOffset, 0f)
+        }
+        canvas.clipPath(fullWaveformSilhouette)
+        canvas.drawPath(waterPath, waterPaint)
+        canvas.restore()
+
+        // CAPA 4: Cursor
         val cursorX = width * CURSOR_POSITION_RATIO
         canvas.drawLine(cursorX, 0f, cursorX, height.toFloat(), cursorPaint)
-
-        // === Water inside bars ===
-        updateWaterPhysics()
-        buildWaterPath(width.toFloat(), height.toFloat())
-
-        val saveCount = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
-        canvas.save()
-        canvas.translate(-scrollOffset, 0f)
-        canvas.drawPath(playedPath, waterMaskPaint)
-        canvas.drawPath(unplayedPath, waterMaskPaint)
-        canvas.restore()
-        canvas.drawPath(waterPath, waterXfermodePaint)
-        canvas.restoreToCount(saveCount)
 
         if (waterActive || hasWaterVelocity()) invalidate()
     }

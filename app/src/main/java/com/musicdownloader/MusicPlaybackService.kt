@@ -378,6 +378,7 @@ class MusicPlaybackService : MediaSessionService() {
         widgetTickerRunnable = object : Runnable {
             override fun run() {
                 if (player.isPlaying) {
+                    playerViewModel?.setPlaying(true)
                     playerViewModel?.setPosition(player.currentPosition)
                     MusicWidgetProvider.updateAllWidgets(this@MusicPlaybackService)
                 }

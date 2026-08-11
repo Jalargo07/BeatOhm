@@ -158,6 +158,12 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
         private var currentPath: String = ""
         private var isPlaying = false
 
+        init {
+            setHasStableIds(true)
+        }
+
+        override fun getItemId(position: Int): Long = items[position].filePath.hashCode().toLong()
+
         fun submitSongs(songs: List<Song>) {
             if (items == songs) return
             val diffResult = DiffUtil.calculateDiff(QueueDiffCallback(items, songs))
@@ -168,15 +174,19 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
         fun setCurrentPath(path: String) {
             if (currentPath != path) {
+                val oldIndex = items.indexOfFirst { it.filePath == currentPath }
+                val newIndex = items.indexOfFirst { it.filePath == path }
                 currentPath = path
-                notifyDataSetChanged()
+                if (oldIndex >= 0) notifyItemChanged(oldIndex)
+                if (newIndex >= 0 && newIndex != oldIndex) notifyItemChanged(newIndex)
             }
         }
 
         fun setPlaying(playing: Boolean) {
             if (isPlaying != playing) {
                 isPlaying = playing
-                notifyDataSetChanged()
+                val currentIndex = items.indexOfFirst { it.filePath == currentPath }
+                if (currentIndex >= 0) notifyItemChanged(currentIndex)
             }
         }
 
@@ -248,14 +258,6 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 }
                 true
             }
-            holder.itemView.alpha = 0f
-            holder.itemView.translationY = 20f
-            holder.itemView.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(200)
-                .setStartDelay(position * 30L)
-                .start()
         }
 
         private fun loadArtwork(iv: ImageView, song: Song) {

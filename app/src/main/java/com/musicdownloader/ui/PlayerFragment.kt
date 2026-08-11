@@ -136,7 +136,7 @@ class PlayerFragment : Fragment() {
         isDarkMode = isDark
         WaterVisualizerDrawable.setThemeMode(isDark)
         binding.waveformSeekbar.setThemeMode(isDark)
-        binding.root.background = waterVisualizer
+        binding.root.background = null
         binding.ivGlow.background = glowDrawable
         glowDrawable.setEndColor(WaterVisualizerDrawable.currentBaseColor())
 
