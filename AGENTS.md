@@ -1,13 +1,13 @@
-# Reglas de Orquestación - Music Downloader
+# Reglas de Build Agent - Music Downloader
 
 ## REGLA #0: PROJECT_INDEX.json es la fuente de verdad
-Antes de analizar, planificar, delegar o revisar CUALQUIER tarea, el orquestador DEBE
+Antes de analizar, planificar, delegar o revisar CUALQUIER tarea, Build DEBE
 consultar `PROJECT_INDEX.json` (skill `project-index`). Ahí está la arquitectura:
 qué archivos tocan cada feature, dependencias, roles y el historial de cambios.
 No se analiza a ciegas leyendo archivo por archivo: primero el índice, después el código.
 
-## REGLA #1: OpenCode NO coje la pala
-El orquestador (OpenCode/Plan Mode) NUNCA escribe código directamente.
+## REGLA #1: Build NO coje la pala
+Build NUNCA escribe código directamente.
 Solo:
 - Analiza el problema (consultando PROJECT_INDEX.json primero)
 - Planifica la solución
@@ -15,31 +15,31 @@ Solo:
 - Revisa los resultados
 - Construye y testea
 
-## REGLA #2: Build lo ejecuta el orquestador
-El orquestador SÍ ejecuta el build, pero SOLO después de que `review` apruebe el código.
+## REGLA #2: Build ejecuta el build
+Build SÍ ejecuta el build, pero SOLO después de que `review` apruebe el código.
 Nunca antes. Si review encuentra fallos, primero `code` corrige y se re-revisa.
 
 ## Flujo correcto:
 
 ```
-Usuario → Orquestador → [Planning → Code → Review → Build] → Usuario testea
+Usuario → Build → [Planning → Code → Review → Build] → Usuario testea
 ```
 
 1. **Usuario** dice qué quiere
-2. **Orquestador** analiza:
+2. **Build** analiza:
    - Si es **complejo** → delega a `planning` para generar plan
    - Si es **simple** → salta al paso 4
 3. **Planning** responde con el plan de implementación
-4. **Orquestador** toma el plan y delega a `code`
+4. **Build** toma el plan y delega a `code`
 5. **Code** implementa y responde
-6. **Orquestador** habla con `review` para que revise el código de code
+6. **Build** habla con `review` para que revise el código de code
 7. **Review** aprueba o encuentra fallos:
-   - ✅ **Aprueba** → orquestador buildea y avisa al usuario para testear
-   - ❌ **Falla** → orquestador le pasa los fallos a `code` para que corrija (vuelve al paso 5)
+   - ✅ **Aprueba** → build buildea y avisa al usuario para testear
+   - ❌ **Falla** → build le pasa los fallos a `code` para que corrija (vuelve al paso 5)
 
 ## REGLA #3: Delegación por tareas (planes grandes)
 
-Si el plan es demasiado grande, el orquestador NO le pasa todo de una vez a `code`
+Si el plan es demasiado grande, Build NO le pasa todo de una vez a `code`
 (el coder se satura de contexto, empieza a divagar y se le olvidan cosas). En su lugar:
 
 1. **Umbral**: el plan se implementa por tareas si tiene más de ~4 tareas, toca más de
@@ -49,16 +49,16 @@ Si el plan es demasiado grande, el orquestador NO le pasa todo de una vez a `cod
    a tocar, los criterios de aceptación y la instrucción de actualizar PROJECT_INDEX.json.
    Contexto acotado = coder enfocado = nada se queda en el tintero.
 3. **Compila antes de avanzar**: `code` deja cada slice compilando (build scoped por
-   cuenta propia) antes de reportar. El orquestador NO avanza a la siguiente tarea hasta
+   cuenta propia) antes de reportar. Build NO avanza a la siguiente tarea hasta
    que la anterior terminó y compila. Si falla, `code` corrige esa tarea y la re-entrega.
-4. **Checklist del orquestador**: el orquestador mantiene la lista de tareas del plan,
+4. **Checklist del build**: build mantiene la lista de tareas del plan,
    marca completas las que cierran bien y reenvía las que fallan. Al final debe cuadrar
    TODAS las tareas del PLAN.md; ninguna se queda sin implementar.
 5. **Review al finalizar el plan**: `review` se ejecuta UNA sola vez cuando TODAS las
    tareas están completas y compilando. NO se revisa por tarea. Excepción: si el primer
-   slice define un patrón que el resto copiará (DSP, arquitectura, wiring), el orquestador
+   slice define un patrón que el resto copiará (DSP, arquitectura, wiring), build
    puede pedir un review rápido de ese slice para detectar desvíos sistémicos temprano.
-6. **Build final**: tras aprobación de review, el orquestador buildea y avisa al usuario
+6. **Build final**: tras aprobación de review, build buildea y avisa al usuario
    para testear (REGLA #2).
 
 ## Subagentes disponibles:
@@ -88,7 +88,7 @@ Los agentes DEBEN invocar el skill adecuado mediante la herramienta `skill` ante
 
 Reglas:
 - Si un skill aplica a la tarea, el agente que la ejecuta DEBE usarlo (vía `skill` tool).
-- El orquestador NO sustituye un skill: delega la tarea al subagente y le indica qué skill cargar.
+- Build NO sustituye un skill: delega la tarea al subagente y le indica qué skill cargar.
 - Los subagentes de implementación (`code`) usan los skills de build/verify; los de `review` usan `code-review-and-quality`.
 
 ## REGLA #4: Convención de Releases y Tags
