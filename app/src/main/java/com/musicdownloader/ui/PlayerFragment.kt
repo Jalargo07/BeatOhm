@@ -218,6 +218,7 @@ class PlayerFragment : Fragment() {
             isLyricsVisible = false
             applyLyricsBlur(false)
             binding.lyricsPanel.visibility = View.GONE
+            binding.syncedLyricsView.setLyrics("")
             binding.ivLyricsBackground.visibility = View.GONE
             binding.coverContainer.visibility = View.VISIBLE
             binding.ivGlow.visibility = View.VISIBLE

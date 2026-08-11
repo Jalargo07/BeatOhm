@@ -339,4 +339,17 @@
     <string name="equalizer_treble_boost">Treble Boost</string>
     <string name="equalizer_db_value">%+d dB</string>
     <string name="equalizer_unsaved_changes">Unsaved changes</string>
+
+    <!-- Metadata Regen Service -->
+    <string name="regen_notification_title">Regenerating metadata</string>
+    <string name="regen_notification_progress">Regenerating %1$d/%2$d — %3$s</string>
+    <string name="regen_notification_paused">Paused (%1$d/%2$d)</string>
+    <string name="regen_notification_complete">Regeneration complete (%1$d/%2$d)</string>
+    <string name="regen_notification_failed">Regeneration with failures (%1$d/%2$d succeeded, %3$d failed)</string>
+    <string name="regen_action_pause">Pause</string>
+    <string name="regen_action_resume">Resume</string>
+    <string name="regen_action_cancel">Cancel</string>
+    <string name="regen_retry_failed">Retry failed (%1$d failed)</string>
+    <string name="regen_channel_name">Metadata regeneration</string>
+    <string name="regen_channel_description">Progress of song metadata regeneration</string>
 </resources>

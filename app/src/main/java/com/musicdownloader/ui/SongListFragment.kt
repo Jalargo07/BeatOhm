@@ -1,8 +1,8 @@
 package com.musicdownloader.ui
 
-import android.util.Log
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,6 +11,7 @@ import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.Spinner
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
@@ -19,6 +20,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.musicdownloader.data.toSong
 import coil.load
+import com.musicdownloader.MetadataRegenService
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
@@ -31,7 +33,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 
@@ -45,6 +46,8 @@ class SongListFragment : Fragment() {
     private var collectJob: Job? = null
     private var folderPath: String = ""
     private var searchQuery: String = ""
+    private var isRegenActive = false
+    private var currentSortKey: String = SORT_TITLE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +71,10 @@ class SongListFragment : Fragment() {
                 binding.tvProgress.text = getString(R.string.regenerando, progress.first, progress.second)
             } else {
                 binding.llProgress.visibility = View.GONE
+                if (isRegenActive) {
+                    isRegenActive = false
+                    collectSongs(currentSortKey)
+                }
             }
         }
 
@@ -215,11 +222,13 @@ class SongListFragment : Fragment() {
 
         val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val saved = prefs.getString(PREFS_SORT_ORDER, SORT_TITLE) ?: SORT_TITLE
+        currentSortKey = saved
         spinner.setSelection(sortKeys.indexOf(saved).coerceAtLeast(0))
 
         spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val key = sortKeys[position]
+                currentSortKey = key
                 prefs.edit().putString(PREFS_SORT_ORDER, key).apply()
                 collectSongs(key)
             }
@@ -238,8 +247,13 @@ class SongListFragment : Fragment() {
                 else -> repository.getAllSongsByTitle()
             }
             flow.collectLatest { songs ->
-                adapter.submitList(songs)
-                if (songs.isEmpty()) {
+                val filtered = if (isRegenActive) {
+                    songs.filter { it.regenStatus == "pending" || it.regenStatus == "failed" }
+                } else {
+                    songs
+                }
+                adapter.submitList(filtered)
+                if (filtered.isEmpty()) {
                     binding.rvSongs.visibility = View.GONE
                     binding.llSongListEmpty.visibility = View.VISIBLE
                 } else {
@@ -295,6 +309,36 @@ class SongListFragment : Fragment() {
         val checkWaveform = dialogView.findViewById<android.widget.CheckBox>(R.id.check_waveform)
         val checkArtwork = dialogView.findViewById<android.widget.CheckBox>(R.id.check_artwork)
         val checkColor = dialogView.findViewById<android.widget.CheckBox>(R.id.check_color)
+        val btnRetryFailed = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_retry_failed)
+
+        lifecycleScope.launch {
+            val failedCount = withContext(Dispatchers.IO) { repository.getFailedCount() }
+            if (failedCount > 0) {
+                btnRetryFailed.visibility = View.VISIBLE
+                btnRetryFailed.text = getString(R.string.regen_retry_failed, failedCount)
+                btnRetryFailed.setOnClickListener {
+                    lifecycleScope.launch {
+                        val failedSongs = withContext(Dispatchers.IO) { repository.getFailedSongsNow() }
+                        if (failedSongs.isNotEmpty()) {
+                            val failedSongIds = failedSongs.map { it.id }.toTypedArray()
+                            val intent = Intent(requireContext(), MetadataRegenService::class.java).apply {
+                                action = MetadataRegenService.ACTION_START
+                                putExtra(MetadataRegenService.EXTRA_SONG_IDS, failedSongIds)
+                                putExtra(MetadataRegenService.EXTRA_DO_METADATA, checkMetadata.isChecked)
+                                putExtra(MetadataRegenService.EXTRA_DO_LYRICS, checkLyrics.isChecked)
+                                putExtra(MetadataRegenService.EXTRA_DO_WAVEFORM, checkWaveform.isChecked)
+                                putExtra(MetadataRegenService.EXTRA_DO_ARTWORK, checkArtwork.isChecked)
+                                putExtra(MetadataRegenService.EXTRA_DO_COLOR, checkColor.isChecked)
+                            }
+                            ContextCompat.startForegroundService(requireContext(), intent)
+                            isRegenActive = true
+                            collectSongs(currentSortKey)
+                            adapter.deselectAll()
+                        }
+                    }
+                }
+            }
+        }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.regen_select_title))
@@ -309,53 +353,19 @@ class SongListFragment : Fragment() {
                 if (!doMetadata && !doLyrics && !doWaveform && !doArtwork && !doColor) return@setPositiveButton
 
                 adapter.deselectAll()
-                requireActivity().lifecycleScope.launch {
-                    val failedSongs = mutableListOf<String>()
-                    withContext(Dispatchers.IO) {
-                        repository.startRegenProgress(songs.size)
-                        for ((index, song) in songs.withIndex()) {
-                            repository.updateRegenProgress(index + 1, songs.size)
-                            Log.d("SongListFragment", "Regen [${index + 1}/${songs.size}] ${song.title}...")
-                            try {
-                                val result = withTimeoutOrNull(30_000L) {
-                                    var updated = song
-                                    if (doMetadata) updated = repository.fetchMetadata(updated)
-                                    if (doArtwork) updated = repository.downloadArtworkForSong(updated)
-                                    if (doColor) updated = repository.extractDominantColor(updated)
-                                    if (doLyrics) updated = repository.fetchLyricsForSong(updated)
-                                    if (doMetadata || doLyrics || doArtwork || doColor) {
-                                        repository.saveSong(updated)
-                                    }
-                                    if (doWaveform) repository.resetWaveform(updated)
-                                    Unit
-                                }
-                                if (result == null) {
-                                    Log.e("SongListFragment", "Regen TIMEOUT for '${song.title}' (30s)")
-                                    failedSongs.add(song.title)
-                                }
-                            } catch (e: Exception) {
-                                Log.e("SongListFragment", "Regen FAILED for '${song.title}': ${e.message}")
-                                failedSongs.add(song.title)
-                            }
-                        }
-                        repository.finishRegenProgress()
-                    }
-                    if (failedSongs.isNotEmpty()) {
-                        val skipped = failedSongs.take(3).joinToString()
-                        val extra = if (failedSongs.size > 3) " y ${failedSongs.size - 3} más" else ""
-                        android.widget.Toast.makeText(
-                            requireContext(),
-                            "Regenerado ${songs.size - failedSongs.size}/${songs.size}. Fallaron: $skipped$extra",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                    } else {
-                        android.widget.Toast.makeText(
-                            requireContext(),
-                            getString(R.string.metadata_regenerada, songs.size, songs.size),
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                val songIds = songs.map { it.id }.toTypedArray()
+                val intent = Intent(requireContext(), MetadataRegenService::class.java).apply {
+                    action = MetadataRegenService.ACTION_START
+                    putExtra(MetadataRegenService.EXTRA_SONG_IDS, songIds)
+                    putExtra(MetadataRegenService.EXTRA_DO_METADATA, doMetadata)
+                    putExtra(MetadataRegenService.EXTRA_DO_LYRICS, doLyrics)
+                    putExtra(MetadataRegenService.EXTRA_DO_WAVEFORM, doWaveform)
+                    putExtra(MetadataRegenService.EXTRA_DO_ARTWORK, doArtwork)
+                    putExtra(MetadataRegenService.EXTRA_DO_COLOR, doColor)
                 }
+                ContextCompat.startForegroundService(requireContext(), intent)
+                isRegenActive = true
+                collectSongs(currentSortKey)
             }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -393,6 +403,7 @@ class SongListFragment : Fragment() {
 
     override fun onDestroyView() {
         collectJob?.cancel()
+        isRegenActive = false
         _binding = null
         super.onDestroyView()
     }

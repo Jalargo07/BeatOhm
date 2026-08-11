@@ -333,4 +333,17 @@
     <string name="equalizer_treble_boost">Refoco de agudos</string>
     <string name="equalizer_db_value">%+d dB</string>
     <string name="equalizer_unsaved_changes">Alteracoes nao salvas</string>
+
+    <!-- Metadata Regen Service -->
+    <string name="regen_notification_title">Regenerando metadados</string>
+    <string name="regen_notification_progress">Regenerando %1$d/%2$d — %3$s</string>
+    <string name="regen_notification_paused">Pausado (%1$d/%2$d)</string>
+    <string name="regen_notification_complete">Regeneração completa (%1$d/%2$d)</string>
+    <string name="regen_notification_failed">Regeneração com falhas (%1$d/%2$d bem-sucedidas, %3$d falharam)</string>
+    <string name="regen_action_pause">Pausar</string>
+    <string name="regen_action_resume">Retomar</string>
+    <string name="regen_action_cancel">Cancelar</string>
+    <string name="regen_retry_failed">Repetir falhadas (%1$d falharam)</string>
+    <string name="regen_channel_name">Regeneração de metadados</string>
+    <string name="regen_channel_description">Progresso da regeneração de metadados das músicas</string>
 </resources>

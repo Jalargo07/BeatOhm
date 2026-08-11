@@ -20,7 +20,8 @@ data class LocalSong(
     val isFavorite: Boolean = false,
     val playCount: Int = 0,
     val waveformData: String = "",
-    val dominantColor: Int = 0
+    val dominantColor: Int = 0,
+    val regenStatus: String? = null
 )
 
 fun LocalSong.toSong(): Song = Song(

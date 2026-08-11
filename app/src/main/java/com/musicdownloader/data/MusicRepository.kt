@@ -117,6 +117,16 @@ class MusicRepository(private val context: Context) {
         _regenProgress.postValue(null)
     }
 
+    // Regen status tracking
+    suspend fun markPending(songIds: List<String>) = dao.markPending(songIds)
+    suspend fun markSuccess(songId: String) = dao.markSuccess(songId)
+    suspend fun markFailed(songId: String) = dao.markFailed(songId)
+    fun getFailedSongs(): Flow<List<LocalSong>> = dao.getFailedSongs()
+    fun getPendingAndFailedSongs(): Flow<List<LocalSong>> = dao.getPendingAndFailedSongs()
+    suspend fun getFailedSongsNow(): List<LocalSong> = dao.getFailedSongsNow()
+    suspend fun clearRegenStatus() = dao.clearRegenStatus()
+    suspend fun getFailedCount(): Int = dao.getFailedCount()
+
     fun getLibraryFolders(): List<String> {
         val defaultDir = getMusicDir().absolutePath
         val set = foldersPrefs().getStringSet(KEY_FOLDERS, null)
@@ -417,18 +427,29 @@ class MusicRepository(private val context: Context) {
 
     suspend fun extractDominantColor(song: LocalSong): LocalSong {
         val thumbnailUrl = song.thumbnailUrl
-        if (thumbnailUrl.isBlank()) return song
+        if (thumbnailUrl.isBlank()) {
+            Log.w(TAG, "extractDominantColor: skipped '${song.title}' - thumbnailUrl is blank")
+            return song
+        }
+        val file = File(thumbnailUrl)
+        if (!file.exists()) {
+            Log.w(TAG, "extractDominantColor: skipped '${song.title}' - file not found: $thumbnailUrl")
+            return song
+        }
         try {
             val bitmap = android.graphics.BitmapFactory.decodeFile(thumbnailUrl)
             if (bitmap != null) {
                 val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
                 val dominant = palette.getDominantColor(0)
-                Log.d("MusicRepository", "extractDominantColor: #${Integer.toHexString(dominant)} for '${song.title}'")
+                Log.d(TAG, "extractDominantColor: #${Integer.toHexString(dominant)} for '${song.title}'")
                 bitmap.recycle()
                 if (dominant != 0) return song.copy(dominantColor = dominant)
+                Log.w(TAG, "extractDominantColor: palette returned 0 for '${song.title}'")
+            } else {
+                Log.w(TAG, "extractDominantColor: BitmapFactory returned null for '${song.title}' ($thumbnailUrl)")
             }
         } catch (e: Exception) {
-            Log.e("MusicRepository", "extractDominantColor: FAILED ${e.message}")
+            Log.e(TAG, "extractDominantColor: FAILED for '${song.title}': ${e.message}")
         }
         return song
     }
@@ -561,6 +582,7 @@ class MusicRepository(private val context: Context) {
     }
 
     companion object {
+        private const val TAG = "MusicRepository"
         private const val PREFS_NAME = "library_prefs"
         private const val KEY_FOLDERS = "library_folders"
         private const val ALBUM_COVERS_PREFS = "album_covers"

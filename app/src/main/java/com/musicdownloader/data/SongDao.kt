@@ -114,6 +114,30 @@ interface SongDao {
 
     @Query("SELECT id FROM songs WHERE filePath = :path LIMIT 1")
     suspend fun getIdByPath(path: String): String?
+
+    @Query("UPDATE songs SET regenStatus = 'pending' WHERE id IN (:songIds)")
+    suspend fun markPending(songIds: List<String>)
+
+    @Query("UPDATE songs SET regenStatus = 'success' WHERE id = :songId")
+    suspend fun markSuccess(songId: String)
+
+    @Query("UPDATE songs SET regenStatus = 'failed' WHERE id = :songId")
+    suspend fun markFailed(songId: String)
+
+    @Query("SELECT * FROM songs WHERE regenStatus = 'failed'")
+    fun getFailedSongs(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs WHERE regenStatus IN ('pending', 'failed')")
+    fun getPendingAndFailedSongs(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM songs WHERE regenStatus = 'failed'")
+    suspend fun getFailedSongsNow(): List<LocalSong>
+
+    @Query("UPDATE songs SET regenStatus = NULL")
+    suspend fun clearRegenStatus()
+
+    @Query("SELECT COUNT(*) FROM songs WHERE regenStatus = 'failed'")
+    suspend fun getFailedCount(): Int
 }
 
 data class AlbumWithCover(val name: String, val coverPath: String)
