@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🎵 Music Downloader
+# 🎵 BeatOhm
 
-### Tu música. Tu biblioteca. El alma de tu colección en una sola app.
+### Tu estudio de sonido personal. Audio moldea, BeatOhm lo hace visible.
 
-**Descargá, organizá y escuchá tu música favorita directo desde YouTube — con metadata impecable, letras multi-fuente y un reproductor premium con visualizador de onda de audio real.**
+**Descargá, procesá y escuchá tu música favorita — con decodificación Opus, metadata impecable, letras multi-fuente y un visualizador que moldea el audio en tiempo real.**
 
 [![Version](https://img.shields.io/badge/version-2.9-blue.svg)]()
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
@@ -32,6 +32,7 @@
 
 ### 🎧 Reproductor Premium
 
+- **Waveform stroboscópico** — extracción ultra-rápida con `seekTo()` + 3 sub-muestras por barra (~1.5s por canción vs ~25s antes). RMS + Peak mix, contraste exponencial, suavizado entre barras vecinas.
 - **Visualizador de onda de audio real** — extrae amplitud real del archivo de audio via MediaExtractor + MediaCodec. 1 barra por 1.2 segundos de audio. Datos cacheados en Room para carga instantánea.
 - **Scroll continuo tipo Poweramp** — cursor fijo al 30%, la onda se desplaza suavemente. Fling con inercia (OverScroller, fricción 0.008) para deslizamiento fluido.
 - **Gesto invertido** — deslizar a la izquierda adelanta, a la derecha retrocede (empujar línea de tiempo).
@@ -43,6 +44,17 @@
 - **Media3 ExoPlayer** — motor de reproducción nativo con controles en notificación.
 - **Shuffle & Repeat** — aleatorio y repetición (una canción / toda la lista).
 - **Favoritos** — marcá cualquier canción como favorita con un toque.
+
+### 🌊 BeatVisualizer — DSP en tiempo real
+
+- **5 bandas de frecuencia** — Bass (<150Hz), Mids (300Hz–3.5kHz), Treble (>4kHz) con filtros IIR de primer orden.
+- **Filtros adaptativos** — alfas calculados dinámicamente desde `sampleRate` del dispositivo (no hardcoded).
+- **Peak detection** — captura el pico máximo de cada banda por buffer, no el promedio. La ola reacciona al instante.
+- **Mezcla mono L+R** — `(L+R)/2` para análisis de frecuencia preciso.
+- **Mapeo espacial** — Treble → izquierda, Mids → centro, Bass → derecha. La ola se mueve asimétricamente.
+- **Smoothing asimétrico** — ataque rápido (0.95), release diferenciado por banda. Bombo "respira", voz fluye.
+- **Waveform mask** — la ola solo se visible dentro de las barras del waveform.
+- **Física de spring** — 5 anclas con damped spring + Catmull-Rom Bézier para curvas suaves.
 
 ### 📚 Biblioteca
 
@@ -72,6 +84,13 @@
 - **Enriquecimiento en background** — metadata automática sin duplicar datos.
 - **Renombrado automático** — archivos renombrados al formato "Artista - Título".
 
+### 🔧 Regeneración de metadata
+
+- **Regen por canción** — regenerá metadata, waveform, artwork, letras o color dominante por canción.
+- **Regen en lote** — seleccioná varias canciones y regenerá todo de una.
+- **Reintentar fallidas** — botón para reintentar canciones pendientes o fallidas.
+- **Foreground Service** — regeneración con notificación, pause/resume/cancel.
+
 ---
 
 ## Stack tecnológico
@@ -81,12 +100,13 @@
 | **Lenguaje** | Kotlin | — | 100% Kotlin |
 | **UI** | XML + ViewBinding | — | Layouts declarativos |
 | **Reproductor** | Media3 ExoPlayer | 1.3.1 | Motor de audio, MediaSession |
-| **Base de datos** | Room | 2.6.1 | Persistencia (songs, playlists, waveformData) |
+| **Base de datos** | Room | 2.6.1 | Persistencia (songs, playlists, waveformData, themes) |
 | **Networking** | OkHttp | 4.12.0 | Descargas, APIs |
 | **JSON** | Gson | 2.10.1 | Parseo de respuestas API |
 | **Tags** | JAudioTagger + vorbis-java | 3.0.1 + 0.8 | Escritura de tags ID3 y Vorbis Comments |
 | **Imágenes** | Coil | 2.6.0 | Carga de carátulas |
-| **Waveform** | MediaCodec | — | Decodificación PCM para RMS amplitude |
+| **Waveform** | MediaCodec + seekTo | — | Stroboscopic extraction (~1.5s/song) |
+| **DSP** | IIR Filters | — | 3-band frequency separation (bass/mid/treble) |
 | **Design** | Material Components | 1.11.0 | Material 3, bottom sheets |
 | **Palette** | Palette | 1.0.0 | Colores dinámicos desde carátula |
 
@@ -122,51 +142,112 @@ app/src/main/java/com/musicdownloader/
 ├── MainActivity.kt
 ├── MusicPlaybackService.kt
 ├── PlaylistDetailActivity.kt
+├── MetadataRegenService.kt          # Foreground Service para regen
+├── DeviceUtils.kt                    # DRY: getOptimalThreadCount() centralizado
 │
 ├── audio/
-│   └── WaveformExtractor.kt           # MediaExtractor + MediaCodec → RMS → FloatArray
+│   ├── WaveformExtractor.kt         # Stroboscopic: seekTo + 3 sub-muestras + RMS/Peak
+│   ├── LevelCaptureProcessor.kt     # DSP: 3-band IIR filter → 5 anchors
+│   └── AudioVisualizerManager.kt    # Consume LevelCaptureProcessor → StateFlow
 │
 ├── data/
-│   ├── AppDatabase.kt                 # Room DB v5 (songs, playlists, waveformData, themes)
-│   ├── LocalSong.kt                   # Entidad con waveformData
-│   ├── SongDao.kt                     # DAO (40+ queries)
-│   ├── MusicRepository.kt             # Scan, folders, enrich, waveform, isIncomplete
-│   └── AudioTagWriter.kt              # Tags ID3 + Vorbis Comments
+│   ├── AppDatabase.kt               # Room DB v7
+│   ├── LocalSong.kt                 # Entidad con waveformData
+│   ├── SongDao.kt                   # DAO (40+ queries)
+│   ├── IMusicRepository.kt          # Interface (Dependency Inversion)
+│   ├── MusicRepository.kt           # Enrichment + CRUD (~200 líneas)
+│   ├── IWaveformRepository.kt       # Interface
+│   ├── WaveformRepository.kt        # Waveform extraction
+│   ├── IRegenRepository.kt          # Interface
+│   ├── RegenRepository.kt           # Regen status tracking
+│   ├── ILibraryRepository.kt        # Interface
+│   ├── LibraryRepository.kt         # Scan, folders, covers
+│   ├── PlaylistRepository.kt        # Playlists
+│   ├── AudioTagWriter.kt            # Tags ID3 + Vorbis Comments
+│   └── AudioTagReader.kt            # Read tags
 │
 ├── ui/
-│   ├── PlayerFragment.kt              # Reproductor premium con gradient, lyrics, waveform
-│   ├── WaveformSeekBar.kt             # Waveform real con scroll, fling, placeholder
-│   ├── DynamicGradientDrawable.kt     # Gradient animado desde Palette
-│   ├── GlowDrawable.kt                # Efecto de brillo dual-layer
-│   ├── SyncedLyricsView.kt            # Letras sincronizadas con tap-to-seek, scroll manual
-│   ├── QueueBottomSheetDialogFragment.kt  # Cola glassmorphism
-│   ├── LibraryFragment.kt             # Biblioteca con multi-selección
-│   ├── SongListFragment.kt            # Lista de canciones con borrar/enriquecer
-│   ├── DownloadsFragment.kt           # Descargas con búsqueda
-│   ├── TutorialManager.kt             # Sistema de tooltips por sección
-│   ├── ThemeManager.kt                # Gestión de temas y colores
-│   └── ArtworkLoader.kt               # Carga de carátulas desde archivos
+│   ├── PlayerFragment.kt            # Reproductor premium
+│   ├── PlayerAnimationHelper.kt     # SRP: animaciones del player
+│   ├── PlayerLyricsHelper.kt        # SRP: letras del player
+│   ├── WaveformSeekBar.kt           # Waveform real con scroll, fling
+│   ├── WaterVisualizerDrawable.kt   # Ola animada con spring physics
+│   ├── DynamicGradientDrawable.kt   # Gradient animado desde Palette
+│   ├── GlowDrawable.kt              # Efecto de brillo dual-layer
+│   ├── SyncedLyricsView.kt          # Letras sincronizadas
+│   ├── QueueBottomSheetDialogFragment.kt
+│   ├── LibraryFragment.kt
+│   ├── LibraryViewModel.kt          # Scan + enrichment orchestration
+│   ├── SongListFragment.kt          # Lista con multi-selección
+│   ├── DownloadsFragment.kt
+│   ├── TutorialManager.kt
+│   ├── ThemeManager.kt
+│   ├── ArtworkLoader.kt
+│   └── player/
+│       └── PlayerLayoutManager.kt   # Estilos de layout (vinyl, etc.)
 │
 ├── metadata/
-│   ├── MetadataFetcher.kt             # iTunes + MusicBrainz con limpieza
-│   └── LyricsFetcher.kt               # LRCLIB → Genius → lyrics.ovh
+│   ├── MetadataFetcher.kt           # iTunes + MusicBrainz
+│   └── LyricsFetcher.kt             # LRCLIB → Genius → lyrics.ovh
 │
 ├── downloader/
-│   ├── AudioDownloader.kt             # Descarga + conversión + tags
-│   └── ProxyDownloader.kt             # Proxy loader.to
+│   ├── AudioDownloader.kt           # Descarga + conversión + tags
+│   └── ProxyDownloader.kt           # Proxy loader.to
 │
 ├── extractor/
-│   └── YouTubeExtractor.kt            # InnerTube iOS client
+│   └── YouTubeExtractor.kt          # InnerTube iOS client
 │
-└── model/
-    ├── Song.kt
-    ├── SearchResult.kt
-    └── DownloadState.kt
+├── model/
+│   ├── Song.kt
+│   ├── SearchResult.kt
+│   └── DownloadState.kt
+│
+└── util/
+    └── FolderPatternParser.kt
 ```
 
 ---
 
 ## Changelog
+
+### v2.9-nightly.260811
+
+**BeatOhm — Renaming + Architecture Overhaul**
+
+**Nuevo nombre: BeatOhm**
+- La app ahora se llama BeatOhm — ritmo + frecuencia, estudio de sonido personal.
+
+**Clean Architecture**
+- 5 interfaces: IMusicRepository, IWaveformRepository, IRegenRepository, ILibraryRepository
+- 5 repositorios dedicados: MusicRepository (~200 líneas), WaveformRepository, RegenRepository, LibraryRepository, PlaylistRepository
+- Dependency Inversion: toda la UI depende de interfaces, no de implementaciones concretas
+- Ningún Fragment accede a AppDatabase directamente
+
+**SRP (Single Responsibility)**
+- MusicRepository: de 637 → ~200 líneas (solo enrichment)
+- PlayerFragment: de 1302 → ~960 líneas (extrajo PlayerAnimationHelper + PlayerLyricsHelper)
+
+**Waveform Stroboscópico**
+- Extracción con `seekTo()` en vez de decodificar el archivo completo
+- 3 sub-muestras por barra distribuidas en el rango temporal
+- RMS + Peak mix: `(0.6 × RMS) + (0.4 × Peak)`
+- Contraste exponencial: `pow(normalized, 1.5)`
+- Suavizado 20/60/20 entre barras vecinas
+- Velocidad: ~1.5s por canción (antes ~25s)
+
+**BeatVisualizer — DSP en tiempo real**
+- 3-band IIR filter (bass <150Hz, mids 300Hz–3.5kHz, treble >4kHz)
+- Alfas calculados dinámicamente desde sampleRate
+- Peak detection en vez de Sum
+- Mapeo espacial: treble→izq, mids→centro, bass→der
+- Smoothing asimétrico por ancla
+
+**Fixes**
+- Retry button ahora cuenta pending + failed (antes solo failed)
+- Strings i18n: "Reset" y "Cancelar" movidos a strings.xml
+- Naming warnings eliminados (oldId, notification unused)
+
+---
 
 ### v2.9-stable
 
@@ -282,7 +363,7 @@ app/src/main/java/com/musicdownloader/
 
 ```
 MIT License
-Copyright (c) 2026 Music Downloader
+Copyright (c) 2026 BeatOhm
 ```
 
 ---

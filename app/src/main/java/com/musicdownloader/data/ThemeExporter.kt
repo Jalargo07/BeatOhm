@@ -16,7 +16,7 @@ import com.musicdownloader.R
 object ThemeExporter {
 
     private const val MIMETYPE_THEME = "application/vnd.musicdownloader.theme+json"
-    private const val SHARE_SUBJECT = "Music Downloader Theme"
+    private const val SHARE_SUBJECT = "BeatOhm Theme"
 
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
@@ -25,7 +25,7 @@ object ThemeExporter {
      */
     fun exportToJson(theme: UserTheme): String {
         val json = mapOf(
-            "app" to "MusicDownloader",
+            "app" to "BeatOhm",
             "version" to 1,
             "theme" to mapOf(
                 "name" to theme.name,
@@ -50,7 +50,7 @@ object ThemeExporter {
     fun importFromJson(json: String): UserTheme? {
         return try {
             val root = JsonParser.parseString(json).asJsonObject
-            if (root.get("app")?.asString != "MusicDownloader") return null
+            if (root.get("app")?.asString != "BeatOhm") return null
 
             val version = root.get("version")?.asInt ?: return null
             if (version > 1) return null // future version

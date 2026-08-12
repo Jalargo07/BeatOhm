@@ -4,23 +4,46 @@ import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import java.nio.ByteBuffer
 import kotlin.math.abs
+import kotlin.math.max
 
 class LevelCaptureProcessor : BaseAudioProcessor() {
 
     private var channelCount = 2
-    private var prevSample: Short = 0
+    private var sampleRate = 44100
+
+    // Alfas dinámicos
+    private var bassLpAlpha = 0.02f
+    private var hpAlpha = 0.08f   // High-pass 300Hz
+    private var lpAlpha = 0.35f   // Low-pass 3500Hz
+    private var trebleHpAlpha = 0.08f // High-pass 4000Hz
+
+    // Estados por banda (frecuencia, no por canal)
     private var bassLpState = 0f
     private var midLpBassCut = 0f
     private var midLpTrebleCut = 0f
+    private var trebleLpState = 0f
 
+    // --- Salida (5 anclas) ---
     @Volatile
-    var bands = FloatArray(BAND_COUNT) { 0f }
+    var bands = FloatArray(5) { 0f }
         private set
 
-    private val smoothedBands = FloatArray(BAND_COUNT) { 0f }
+    private val smoothedBands = FloatArray(5) { 0f }
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         channelCount = inputAudioFormat.channelCount
+        sampleRate = inputAudioFormat.sampleRate
+
+        val bassCutoff = 150f
+        val hpCutoff = 300f
+        val lpCutoff = 3500f
+        val trebleCutoff = 4000f
+
+        bassLpAlpha = (1.0 - Math.exp(-2.0 * Math.PI * bassCutoff / sampleRate)).toFloat()
+        hpAlpha = (1.0 - Math.exp(-2.0 * Math.PI * hpCutoff / sampleRate)).toFloat()
+        lpAlpha = (1.0 - Math.exp(-2.0 * Math.PI * lpCutoff / sampleRate)).toFloat()
+        trebleHpAlpha = (1.0 - Math.exp(-2.0 * Math.PI * trebleCutoff / sampleRate)).toFloat()
+
         return inputAudioFormat
     }
 
@@ -36,86 +59,72 @@ class LevelCaptureProcessor : BaseAudioProcessor() {
             val samples = ShortArray(sampleCount)
             shortBuf.get(samples)
 
-            var trebleSum = 0.0
-            var midSum = 0.0
-            var bassSum = 0.0
+            // Picos por banda (frecuencia)
+            var treblePeak = 0f
+            var midPeak = 0f
+            var bassPeak = 0f
+
             var processedSamples = 0
 
             for (i in 0 until sampleCount step step) {
-                val sampleF = samples[i].toFloat()
+                val sampleL = samples[i].toFloat()
+                val sampleR = if (i + 1 < sampleCount) samples[i + 1].toFloat() else sampleL
 
-                // 1. TREBLE: primera derivada
-                val diff = abs(samples[i].toInt() - prevSample.toInt())
-                trebleSum += diff
-                prevSample = samples[i]
+                // Mezclamos L+R para obtener una señal mono (capturar todo)
+                val sampleMono = (sampleL + sampleR) / 2f
+                val absMono = abs(sampleMono)
 
-                // 2. MIDS: Pasa-banda IIR (HP ~300Hz + LP ~3.5kHz)
-                midLpBassCut += HP_ALPHA * (sampleF - midLpBassCut)
-                val voiceOnly = sampleF - midLpBassCut
-                midLpTrebleCut += LP_ALPHA * (voiceOnly - midLpTrebleCut)
-                midSum += abs(midLpTrebleCut)
+                // --- 1. TREBLE (>4kHz) ---
+                trebleLpState += trebleHpAlpha * (sampleMono - trebleLpState)
+                val trebleOnly = sampleMono - trebleLpState
+                treblePeak = max(treblePeak, abs(trebleOnly))
 
-                // 3. BASS: Low-pass estricto (<150Hz)
-                bassLpState += BASS_LP_ALPHA * (sampleF - bassLpState)
-                bassSum += abs(bassLpState)
+                // --- 2. MIDS (300-3500Hz) ---
+                midLpBassCut += hpAlpha * (sampleMono - midLpBassCut)
+                val voiceOnly = sampleMono - midLpBassCut
+                midLpTrebleCut += lpAlpha * (voiceOnly - midLpTrebleCut)
+                midPeak = max(midPeak, abs(midLpTrebleCut))
+
+                // --- 3. BASS (<150Hz) ---
+                bassLpState += bassLpAlpha * (sampleMono - bassLpState)
+                bassPeak = max(bassPeak, abs(bassLpState))
 
                 processedSamples++
             }
 
-            if (processedSamples > 0) {
-                var trebleRaw = (trebleSum / processedSamples / (Short.MAX_VALUE * 0.12f)).toFloat()
-                var midsRaw = (midSum / processedSamples / (Short.MAX_VALUE * 0.15f)).toFloat()
-                var bassRaw = (bassSum / processedSamples / (Short.MAX_VALUE * 0.18f)).toFloat()
+            if (processedSamples >= 2) {
+                // Normalizar
+                var trebleRaw = (treblePeak / Short.MAX_VALUE).coerceIn(0f, 1f)
+                var midRaw = (midPeak / Short.MAX_VALUE).coerceIn(0f, 1f)
+                var bassRaw = (bassPeak / Short.MAX_VALUE).coerceIn(0f, 1f)
 
-                trebleRaw = if (trebleRaw > 0.03f) (trebleRaw - 0.03f) * 2.2f else 0f
-                midsRaw = if (midsRaw > 0.05f) (midsRaw - 0.05f) * 1.8f else 0f
-                bassRaw = if (bassRaw > 0.18f) (bassRaw - 0.18f) * 2.0f else 0f
+                // Umbrales (noise gate)
+                trebleRaw = if (trebleRaw > 0.008f) trebleRaw else 0f
+                midRaw = if (midRaw > 0.015f) midRaw else 0f
+                bassRaw = if (bassRaw > 0.025f) bassRaw else 0f
 
-                trebleRaw = trebleRaw.coerceIn(0f, 1f)
-                midsRaw = midsRaw.coerceIn(0f, 1f)
-                bassRaw = bassRaw.coerceIn(0f, 1f)
+                // Boosts (para que cada banda se vea con fuerza)
+                trebleRaw = (trebleRaw * 1.6f).coerceIn(0f, 1f)
+                midRaw = (midRaw * 1.3f).coerceIn(0f, 1f)   // Voz protagonista
+                bassRaw = (bassRaw * 1.2f).coerceIn(0f, 1f) // Bombo con punch
 
-                // === SIDECHAIN: Atenuación proporcional continua ===
+                // --- Asignamos a las 5 anclas ---
+                // Ancla 0 y 1 = Treble (izquierda)
+                // Ancla 2 = Mids (centro)
+                // Ancla 3 y 4 = Bass (derecha)
+                val target = floatArrayOf(
+                    trebleRaw, trebleRaw,  // 0 y 1
+                    midRaw,                // 2
+                    bassRaw, bassRaw       // 3 y 4
+                )
 
-                // Bass vs Mids: si el bajo domina >1.5x, suprime voz
-                val bassToMidRatio = if (midsRaw > 0.01f) bassRaw / midsRaw else 1f
-                val bassToMidSuppression = if (bassToMidRatio > 1.5f) {
-                    (1f - (bassToMidRatio - 1.5f) * 0.4f).coerceAtLeast(0.3f)
-                } else 1f
-
-                // Treble vs Mids: si los agudos dominan >1.5x, suprime voz
-                val trebleToMidRatio = if (midsRaw > 0.01f) trebleRaw / midsRaw else 1f
-                val trebleToMidSuppression = if (trebleToMidRatio > 1.5f) {
-                    (1f - (trebleToMidRatio - 1.5f) * 0.3f).coerceAtLeast(0.4f)
-                } else 1f
-
-                midsRaw *= (bassToMidSuppression * trebleToMidSuppression)
-
-                // Bass vs Treble: si el bajo explota >2x, limpia brillo
-                val bassToTrebleRatio = if (trebleRaw > 0.01f) bassRaw / trebleRaw else 1f
-                val bassToTrebleSuppression = if (bassToTrebleRatio > 2.0f) {
-                    (1f - (bassToTrebleRatio - 2.0f) * 0.25f).coerceAtLeast(0.5f)
-                } else 1f
-                trebleRaw *= bassToTrebleSuppression
-
-                // Voz vs Bajos: si la voz domina >1.8x, atenúa bajo
-                val midToBassRatio = if (bassRaw > 0.01f) midsRaw / bassRaw else 1f
-                val midToBassSuppression = if (midToBassRatio > 1.8f) {
-                    (1f - (midToBassRatio - 1.8f) * 0.3f).coerceAtLeast(0.6f)
-                } else 1f
-                bassRaw *= midToBassSuppression
-
-                val target = FloatArray(BAND_COUNT)
-                target[0] = trebleRaw
-                target[1] = midsRaw
-                target[2] = bassRaw
-
-                // Suavizado asimétrico por nodo
-                for (i in 0 until BAND_COUNT) {
+                // Suavizado asimétrico por ancla
+                for (i in 0 until 5) {
                     val currentAlpha = when (i) {
-                        0 -> if (target[0] > smoothedBands[0]) 0.90f else 0.54f
-                        2 -> if (target[2] > smoothedBands[2]) 0.95f else 0.66f
-                        else -> 0.42f
+                        0,1 -> if (target[i] > smoothedBands[i]) 0.95f else 0.65f  // Agudos: subida rápida, bajada media
+                        2   -> if (target[i] > smoothedBands[i]) 0.92f else 0.55f  // Voz: bajada más lenta
+                        3,4 -> if (target[i] > smoothedBands[i]) 0.95f else 0.70f  // Graves: bajada rápida para que el bombo "explote"
+                        else -> 0.50f
                     }
                     smoothedBands[i] = currentAlpha * target[i] + (1f - currentAlpha) * smoothedBands[i]
                     bands[i] = smoothedBands[i]
@@ -123,6 +132,7 @@ class LevelCaptureProcessor : BaseAudioProcessor() {
             }
         }
 
+        // Pasamos el audio sin modificar
         val out = replaceOutputBuffer(bytesAvailable)
         out.put(inputBuffer)
         out.flip()
@@ -131,16 +141,9 @@ class LevelCaptureProcessor : BaseAudioProcessor() {
     override fun onFlush() {
         smoothedBands.fill(0f)
         bands.fill(0f)
-        prevSample = 0
         bassLpState = 0f
         midLpBassCut = 0f
         midLpTrebleCut = 0f
-    }
-
-    companion object {
-        const val BAND_COUNT = 3
-        private const val BASS_LP_ALPHA = 0.02f  // Filtro estricto: solo <100Hz
-        private const val HP_ALPHA = 0.08f
-        private const val LP_ALPHA = 0.35f
+        trebleLpState = 0f
     }
 }

@@ -1,9 +1,11 @@
 package com.musicdownloader.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.widget.ImageView
+import com.musicdownloader.DeviceUtils
 import com.musicdownloader.R
 import java.io.File
 import java.io.FileOutputStream
@@ -16,10 +18,12 @@ import kotlinx.coroutines.withContext
 
 object ArtworkLoader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val semaphore = Semaphore(3)
+    private lateinit var context: Context
+    private val semaphore by lazy { Semaphore(DeviceUtils.getOptimalThreadCount(context)) }
     private var cacheDir: File? = null
 
-    fun init(cacheDir: File) {
+    fun init(context: Context, cacheDir: File) {
+        this.context = context.applicationContext
         this.cacheDir = cacheDir
     }
 

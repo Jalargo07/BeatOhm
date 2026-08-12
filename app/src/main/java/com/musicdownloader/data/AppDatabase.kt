@@ -9,11 +9,12 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.lang.reflect.Field
 
-@Database(entities = [LocalSong::class, Playlist::class, PlaylistSong::class, UserTheme::class], version = 7, exportSchema = false)
+@Database(entities = [LocalSong::class, Playlist::class, PlaylistSong::class, UserTheme::class, RegenStatus::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
     abstract fun playlistDao(): PlaylistDao
     abstract fun themeDao(): ThemeDao
+    abstract fun regenStatusDao(): RegenStatusDao
 
     companion object {
         @Volatile
@@ -61,7 +62,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE songs ADD COLUMN regenStatus TEXT DEFAULT NULL")
+                db.execSQL("CREATE TABLE IF NOT EXISTS regen_status (songId TEXT NOT NULL PRIMARY KEY, status TEXT NOT NULL)")
             }
         }
 

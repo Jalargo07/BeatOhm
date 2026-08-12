@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MusicDownloader" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.BeatOhm" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@color/on_primary</item>
         <item name="colorPrimaryContainer">@color/primary_container</item>
@@ -28,7 +28,7 @@
         <item name="tabStyle">@style/Widget.Material3.TabLayout</item>
     </style>
 
-    <style name="Toolbar.MusicDownloader" parent="Widget.Material3.Toolbar">
+    <style name="Toolbar.BeatOhm" parent="Widget.Material3.Toolbar">
         <item name="android:background">@color/background</item>
         <item name="android:elevation">0dp</item>
         <item name="titleTextColor">@color/on_surface</item>

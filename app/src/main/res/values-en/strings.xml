@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Music Downloader</string>
+    <string name="app_name">BeatOhm</string>
     <string name="url_hint">Paste a YouTube / YouTube Music URL</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading…</string>
@@ -155,7 +155,7 @@
     <string name="settings_section_about">About</string>
     <string name="settings_section_language">Language</string>
     <string name="reset_tutorial">Reset tutorial</string>
-    <string name="settings_about_version">Music Downloader v%1$s</string>
+    <string name="settings_about_version">BeatOhm v%1$s</string>
     <string name="settings_primary_color">Primary color</string>
     <string name="settings_accent_color">Accent color</string>
     <string name="settings_font">Font</string>

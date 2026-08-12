@@ -19,6 +19,8 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.ILibraryRepository
+import com.musicdownloader.data.LibraryRepository
 import com.musicdownloader.databinding.FragmentCategoryListBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -36,6 +38,7 @@ class CategoryListFragment : Fragment() {
     private lateinit var adapter: CategoryAdapter
     private lateinit var songsAdapter: FilteredSongAdapter
     private lateinit var repository: MusicRepository
+    private lateinit var libraryRepo: ILibraryRepository
     private lateinit var playerViewModel: PlayerViewModel
     private lateinit var categoryType: String
 
@@ -70,6 +73,7 @@ class CategoryListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         repository = MusicRepository(requireContext())
+        libraryRepo = LibraryRepository(requireContext())
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
 
         songsAdapter = FilteredSongAdapter(onItemClick = { song ->
@@ -154,7 +158,7 @@ class CategoryListFragment : Fragment() {
                 "album" -> {
                     repository.getAllAlbums().combine(repository.getAllAlbumsWithCover()) { allAlbums, covers ->
                         val coverMap = covers.associateBy { it.name }
-                        val overrideMap = allAlbums.associateWith { repository.getAlbumCoverOverride(it) }
+                        val overrideMap = allAlbums.associateWith { libraryRepo.getAlbumCoverOverride(it) }
                         allAlbums.map { name ->
                             val cover = overrideMap[name]
                                 ?: coverMap[name]?.coverPath
@@ -259,12 +263,12 @@ class CategoryListFragment : Fragment() {
                             ""
                         }
                         if (coverPath.isNotBlank()) {
-                            repository.setAlbumCoverOverride(albumName, coverPath)
+                            libraryRepo.setAlbumCoverOverride(albumName, coverPath)
                             loadCategories()
                         }
                     }
                     .setNeutralButton("Quitar carátula") { _, _ ->
-                        repository.setAlbumCoverOverride(albumName, "")
+                        libraryRepo.setAlbumCoverOverride(albumName, "")
                         loadCategories()
                     }
                     .setNegativeButton(R.string.cancel, null)

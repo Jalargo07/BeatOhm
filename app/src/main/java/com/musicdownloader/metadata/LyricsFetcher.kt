@@ -76,7 +76,7 @@ class LyricsFetcher {
                 "&track_name=${URLEncoder.encode(title, "UTF-8")}"
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "MusicDownloader/2.0 (Android)")
+                .header("User-Agent", "BeatOhm/2.0 (Android)")
                 .build()
             client.newCall(request).execute().use { response ->
                 if (response.code != 200) {
@@ -210,6 +210,6 @@ class LyricsFetcher {
     }
 
     companion object {
-        private const val TAG = "MusicDownloader"
+        private const val TAG = "BeatOhm"
     }
 }

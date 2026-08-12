@@ -198,7 +198,7 @@ class MetadataFetcher {
             val url = "https://musicbrainz.org/ws/2/recording/?query=$query&fmt=json&limit=3"
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "MusicDownloader/1.0 (alejo@email.com)")
+                .header("User-Agent", "BeatOhm/1.0 (alejo@email.com)")
                 .get()
                 .build()
             val response = client.newCall(request).execute()

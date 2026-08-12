@@ -437,7 +437,7 @@ class YouTubeExtractor {
     }
 
     companion object {
-        private const val TAG = "MusicDownloader"
+        private const val TAG = "BeatOhm"
         private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.165 Mobile Safari/537.36"
         private const val IOS_CLIENT_VERSION = "20.10.4"
         private const val IOS_USER_AGENT = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_7_2 like Mac OS X)"

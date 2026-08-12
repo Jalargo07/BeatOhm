@@ -5,13 +5,14 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.util.Log
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object WaveformExtractor {
 
     private const val TAG = "WaveformExtractor"
-    private const val MAX_ITERATIONS = 1_000_000L
 
     /**
      * Calculates optimal number of bars: 1 bar per 2.5 seconds of audio.
@@ -69,13 +70,9 @@ object WaveformExtractor {
         }
 
         extractor.selectTrack(audioTrackIndex)
-        val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        val channelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
         val durationUs = format.getLong(MediaFormat.KEY_DURATION)
+        val channelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
         val mime = format.getString(MediaFormat.KEY_MIME)!!
-
-        val totalFrames = (durationUs / 1_000_000.0 * sampleRate).toLong()
-        val framesPerBar = (totalFrames / numBars).coerceAtLeast(1)
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
@@ -83,74 +80,52 @@ object WaveformExtractor {
 
         val bufferInfo = MediaCodec.BufferInfo()
         val rawPeaks = FloatArray(numBars)
-        var currentBar = 0
-        var framesInCurrentBar = 0L
-        var maxPeakInBar = 0f
-        var isEOS = false
-        var iterations = 0L
 
-        while (currentBar < numBars) {
-            iterations++
-            if (iterations > MAX_ITERATIONS) break
+        val stepUs = durationUs / numBars
+        val subSamplesPerBar = 3
+        val subStepUs = stepUs / subSamplesPerBar
 
-            if (!isEOS) {
-                val inputIndex = codec.dequeueInputBuffer(10_000)
+        for (bar in 0 until numBars) {
+            val barStartUs = bar * stepUs
+            
+            var sumSquares = 0.0
+            var sampleCount = 0L
+            var maxPeak = 0f
+
+            for (sub in 0 until subSamplesPerBar) {
+                val targetUs = barStartUs + (sub * subStepUs)
+                extractor.seekTo(targetUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+
+                val inputIndex = codec.dequeueInputBuffer(5_000)
                 if (inputIndex >= 0) {
-                    val inputBuffer = codec.getInputBuffer(inputIndex) ?: continue
+                    val inputBuffer = codec.getInputBuffer(inputIndex) ?: break
                     val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                    if (sampleSize < 0) {
-                        codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        isEOS = true
-                    } else {
+                    if (sampleSize > 0) {
                         codec.queueInputBuffer(inputIndex, 0, sampleSize, extractor.sampleTime, 0)
                         extractor.advance()
                     }
                 }
-            }
 
-            val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 10_000)
-            if (outputIndex >= 0) {
-                val outputBuffer = codec.getOutputBuffer(outputIndex) ?: continue
-                val size = bufferInfo.size
-
-                if (size > 0) {
-                    outputBuffer.position(bufferInfo.offset)
-                    outputBuffer.limit(bufferInfo.offset + size)
+                val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 5_000)
+                if (outputIndex >= 0) {
+                    val outputBuffer = codec.getOutputBuffer(outputIndex) ?: continue
                     val shortBuf = outputBuffer.asShortBuffer()
 
-                    while (shortBuf.hasRemaining() && currentBar < numBars) {
-                        val sampleL = abs(shortBuf.get().toInt())
+                    while (shortBuf.hasRemaining()) {
+                        val sample = abs(shortBuf.get().toInt()).toFloat()
+                        if (sample > maxPeak) maxPeak = sample
+                        sumSquares += sample.toDouble() * sample.toDouble()
+                        sampleCount++
                         if (channelCount == 2 && shortBuf.hasRemaining()) {
                             shortBuf.get()
                         }
-
-                        if (sampleL > maxPeakInBar) {
-                            maxPeakInBar = sampleL.toFloat()
-                        }
-
-                        framesInCurrentBar++
-
-                        if (framesInCurrentBar >= framesPerBar) {
-                            rawPeaks[currentBar] = maxPeakInBar
-                            currentBar++
-                            framesInCurrentBar = 0
-                            maxPeakInBar = 0f
-                        }
                     }
-                }
-
-                codec.releaseOutputBuffer(outputIndex, false)
-                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-                    break
+                    codec.releaseOutputBuffer(outputIndex, false)
                 }
             }
-        }
 
-        if (currentBar < numBars) {
-            val lastVal = if (currentBar > 0) rawPeaks[currentBar - 1] else 1f
-            for (i in currentBar until numBars) {
-                rawPeaks[i] = lastVal
-            }
+            val rms = if (sampleCount > 0) sqrt(sumSquares / sampleCount).toFloat() else 0f
+            rawPeaks[bar] = (0.6f * rms) + (0.4f * maxPeak)
         }
 
         codec.stop()
@@ -158,14 +133,24 @@ object WaveformExtractor {
         extractor.release()
 
         val absoluteMax = rawPeaks.maxOrNull() ?: 1f
-
-        return if (absoluteMax > 0f) {
-            FloatArray(numBars) { i ->
-                val normalized = rawPeaks[i] / absoluteMax
-                normalized.coerceIn(0.08f, 1f)
-            }
-        } else {
-            FloatArray(numBars) { 0.3f }
+        val contrastedPeaks = FloatArray(numBars) { i ->
+            val norm = if (absoluteMax > 0f) rawPeaks[i] / absoluteMax else 0f
+            norm.toDouble().pow(1.5).toFloat()
         }
+
+        val smoothedPeaks = FloatArray(numBars) { i ->
+            when (i) {
+                0 -> contrastedPeaks[0]
+                numBars - 1 -> contrastedPeaks[numBars - 1]
+                else -> {
+                    val smooth = (contrastedPeaks[i - 1] * 0.2f) +
+                        (contrastedPeaks[i] * 0.6f) +
+                        (contrastedPeaks[i + 1] * 0.2f)
+                    smooth
+                }
+            }
+        }
+
+        return FloatArray(numBars) { i -> smoothedPeaks[i].coerceIn(0.08f, 1f) }
     }
 }

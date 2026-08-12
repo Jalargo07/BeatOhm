@@ -3,7 +3,7 @@ package com.musicdownloader.downloader
 import android.content.Context
 import android.util.Log
 import com.musicdownloader.data.AudioTagWriter
-import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.LibraryRepository
 import com.musicdownloader.data.toLocalSong
 import com.musicdownloader.model.Song
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 
 class AudioDownloader(private val context: Context) {
 
-    private val musicRepository by lazy { MusicRepository(context) }
+    private val musicRepository by lazy { LibraryRepository(context) }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -161,6 +161,6 @@ class AudioDownloader(private val context: Context) {
     }
 
     companion object {
-        private const val TAG = "MusicDownloader"
+        private const val TAG = "BeatOhm"
     }
 }

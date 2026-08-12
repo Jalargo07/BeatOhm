@@ -284,6 +284,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     companion object {
-        private const val TAG = "MusicDownloader"
+        private const val TAG = "BeatOhm"
     }
 }

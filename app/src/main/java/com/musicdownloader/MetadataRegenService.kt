@@ -12,15 +12,22 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.musicdownloader.data.AppDatabase
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.RegenRepository
+import com.musicdownloader.data.WaveformRepository
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
@@ -36,6 +43,8 @@ class MetadataRegenService : Service() {
     private var regenJob: Job? = null
     @Volatile private var isPaused = false
     private lateinit var repository: MusicRepository
+    private lateinit var regenRepo: RegenRepository
+    private lateinit var waveformRepo: WaveformRepository
     private val dao by lazy { AppDatabase.getInstance(this).songDao() }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -44,6 +53,8 @@ class MetadataRegenService : Service() {
         super.onCreate()
         createNotificationChannel()
         repository = MusicRepository(this)
+        regenRepo = RegenRepository(this)
+        waveformRepo = WaveformRepository(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -106,63 +117,90 @@ class MetadataRegenService : Service() {
             val failedIds = mutableListOf<String>()
             val failedReasons = mutableMapOf<String, String>()
 
-            repository.markPending(songIds.toList())
-            repository.startRegenProgress(songIds.size)
+            regenRepo.markPending(songIds.toList())
+            regenRepo.startRegenProgress(songIds.size)
 
-            for ((index, songId) in songIds.withIndex()) {
-                if (!isActive) break
+            val threads = DeviceUtils.getOptimalThreadCount(this@MetadataRegenService)
+            val semaphore = Semaphore(threads)
+            val done = AtomicInteger(0)
+            val total = songIds.size
+            val batches = songIds.toList().chunked(10)
 
-                if (isPaused) {
-                    updateNotificationPaused(index, songIds.size)
-                    while (isPaused) {
-                        delay(500)
-                        if (!isActive) break
-                    }
-                    if (!isActive) break
-                }
+            Log.d(TAG, "Processing $total songs with $threads threads (batched by 10)")
 
-                val song = dao.getSongById(songId)
-                if (song == null) {
-                    failedIds.add(songId)
-                    failedReasons[songId] = "not_found"
-                    continue
-                }
+            batches.map { batch ->
+                async {
+                    semaphore.withPermit {
+                        for (songId in batch) {
+                            if (!isActive) return@async
 
-                repository.updateRegenProgress(index + 1, songIds.size)
-                updateNotificationProgress(index + 1, songIds.size, song.title)
+                            if (isPaused) {
+                                updateNotificationPaused(done.get(), total)
+                                while (isPaused) {
+                                    delay(500)
+                                    if (!isActive) return@async
+                                }
+                                if (!isActive) return@async
+                            }
 
-                try {
-                    val result = withTimeoutOrNull(30_000L) {
-                        var updated = song
-                        if (doMetadata) updated = repository.fetchMetadata(updated)
-                        if (doArtwork) updated = repository.downloadArtworkForSong(updated)
-                        if (doColor) updated = repository.extractDominantColor(updated)
-                        if (doLyrics) updated = repository.fetchLyricsForSong(updated)
-                        if (doMetadata || doLyrics || doArtwork || doColor) {
-                            repository.saveSong(updated)
+                            val song = dao.getSongById(songId)
+                            if (song == null) {
+                                synchronized(failedIds) {
+                                    failedIds.add(songId)
+                                    failedReasons[songId] = "not_found"
+                                }
+                                done.incrementAndGet()
+                                continue
+                            }
+
+                            updateNotificationProgress(done.get() + 1, total, song.title)
+
+                            try {
+                                val result = withTimeoutOrNull(30_000L) {
+                                    var updated = song
+                                    if (doMetadata) updated = repository.fetchMetadata(updated)
+                                    if (doArtwork) updated = repository.downloadArtworkForSong(updated)
+                                    if (doColor) updated = repository.extractDominantColor(updated)
+                                    if (doLyrics) updated = repository.fetchLyricsForSong(updated)
+                                    if (doMetadata || doLyrics || doArtwork || doColor) {
+                                        repository.saveSong(updated)
+                                    }
+                                    if (doWaveform) waveformRepo.resetWaveform(updated)
+                                    Unit
+                                }
+                                val current = done.incrementAndGet()
+                                regenRepo.updateRegenProgress(current, total)
+                                updateNotificationProgress(current, total, song.title)
+                                if (result != null) {
+                                    synchronized(succeededIds) {
+                                        succeededIds.add(songId)
+                                    }
+                                    regenRepo.markSuccess(songId)
+                                } else {
+                                    synchronized(failedIds) {
+                                        failedIds.add(songId)
+                                        failedReasons[songId] = "timeout"
+                                    }
+                                    regenRepo.markFailed(songId)
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                val current = done.incrementAndGet()
+                                regenRepo.updateRegenProgress(current, total)
+                                synchronized(failedIds) {
+                                    failedIds.add(songId)
+                                    failedReasons[songId] = e.message ?: "unknown"
+                                }
+                                regenRepo.markFailed(songId)
+                            }
                         }
-                        if (doWaveform) repository.resetWaveform(updated)
-                        Unit
                     }
-                    if (result != null) {
-                        succeededIds.add(songId)
-                        repository.markSuccess(songId)
-                    } else {
-                        failedIds.add(songId)
-                        failedReasons[songId] = "timeout"
-                        repository.markFailed(songId)
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    failedIds.add(songId)
-                    failedReasons[songId] = e.message ?: "unknown"
-                    repository.markFailed(songId)
                 }
-            }
+            }.awaitAll()
 
-            repository.finishRegenProgress()
-            repository.clearRegenStatus()
+            regenRepo.finishRegenProgress()
+            regenRepo.clearRegenStatus()
             saveLastRegenResult(succeededIds, failedIds, failedReasons, songIds.size)
             showCompletionNotification(succeededIds.size, failedIds.size)
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -183,8 +221,7 @@ class MetadataRegenService : Service() {
         regenJob?.cancel()
         regenJob = null
         serviceScope.launch {
-            repository.finishRegenProgress()
-            repository.clearRegenStatus()
+            regenRepo.finishRegenProgress()
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -236,8 +273,6 @@ class MetadataRegenService : Service() {
     }
 
     private fun updateNotificationProgress(done: Int, total: Int, title: String) {
-        val notification = buildProgressNotification(done, total, title)
-
         val cancelIntent = PendingIntent.getService(
             this, ACTION_CANCEL.hashCode(),
             Intent(this, MetadataRegenService::class.java).apply { action = ACTION_CANCEL },

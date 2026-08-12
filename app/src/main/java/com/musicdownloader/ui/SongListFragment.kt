@@ -23,9 +23,15 @@ import coil.load
 import com.musicdownloader.MetadataRegenService
 import com.musicdownloader.R
 import com.musicdownloader.data.LocalSong
+import com.musicdownloader.data.IMusicRepository
+import com.musicdownloader.data.IWaveformRepository
+import com.musicdownloader.data.ILibraryRepository
+import com.musicdownloader.data.IRegenRepository
 import com.musicdownloader.data.MusicRepository
-import com.musicdownloader.data.AppDatabase
-import com.musicdownloader.data.PlaylistSong
+import com.musicdownloader.data.LibraryRepository
+import com.musicdownloader.data.RegenRepository
+import com.musicdownloader.data.WaveformRepository
+import com.musicdownloader.data.PlaylistRepository
 import com.musicdownloader.databinding.FragmentSongListBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Job
@@ -41,7 +47,11 @@ class SongListFragment : Fragment() {
     private var _binding: FragmentSongListBinding? = null
     private val binding get() = _binding!!
     private lateinit var adapter: SongItemAdapter
-    private lateinit var repository: MusicRepository
+    private lateinit var repository: IMusicRepository
+    private lateinit var libraryRepo: ILibraryRepository
+    private lateinit var waveformRepo: IWaveformRepository
+    private lateinit var regenRepo: IRegenRepository
+    private lateinit var playlistRepository: PlaylistRepository
     private lateinit var playerViewModel: PlayerViewModel
     private var collectJob: Job? = null
     private var folderPath: String = ""
@@ -63,9 +73,13 @@ class SongListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         repository = MusicRepository(requireContext())
+        libraryRepo = LibraryRepository(requireContext())
+        waveformRepo = WaveformRepository(requireContext())
+        regenRepo = RegenRepository(requireContext())
+        playlistRepository = PlaylistRepository(requireContext())
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
 
-        repository.regenProgress.observe(viewLifecycleOwner) { progress ->
+        regenRepo.regenProgress.observe(viewLifecycleOwner) { progress ->
             if (progress != null) {
                 binding.llProgress.visibility = View.VISIBLE
                 binding.tvProgress.text = getString(R.string.regenerando, progress.first, progress.second)
@@ -79,7 +93,7 @@ class SongListFragment : Fragment() {
         }
 
         // Restore progress if regen is still running (survives navigation)
-        repository.regenProgress.value?.let { progress ->
+        regenRepo.regenProgress.value?.let { progress ->
             binding.llProgress.visibility = View.VISIBLE
             binding.tvProgress.text = getString(R.string.regenerando, progress.first, progress.second)
         }
@@ -102,15 +116,15 @@ class SongListFragment : Fragment() {
                 com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.reset_waveform))
                     .setMessage(getString(R.string.regenerar_waveform, song.title))
-                    .setPositiveButton("Reset") { _, _ ->
+                    .setPositiveButton(getString(R.string.reset_waveform)) { _, _ ->
                         lifecycleScope.launch {
                             withContext(Dispatchers.IO) {
-                                repository.resetWaveform(song)
+                                waveformRepo.resetWaveform(song)
                             }
                             android.widget.Toast.makeText(requireContext(), getString(R.string.waveform_regenerado), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
-                    .setNegativeButton("Cancelar", null)
+                    .setNegativeButton(getString(R.string.cancel), null)
                     .show()
             }
         )
@@ -197,7 +211,7 @@ class SongListFragment : Fragment() {
     private fun collectFolderSongs() {
         collectJob?.cancel()
         collectJob = lifecycleScope.launch {
-            repository.getSongsInFolder(folderPath).collectLatest { songs ->
+            libraryRepo.getSongsInFolder(folderPath).collectLatest { songs ->
                 adapter.submitList(songs)
                 if (songs.isEmpty()) {
                     binding.rvSongs.visibility = View.GONE
@@ -248,7 +262,10 @@ class SongListFragment : Fragment() {
             }
             flow.collectLatest { songs ->
                 val filtered = if (isRegenActive) {
-                    songs.filter { it.regenStatus == "pending" || it.regenStatus == "failed" }
+                    val pendingFailedIds = withContext(Dispatchers.IO) {
+                        regenRepo.getPendingAndFailedSongs().first().map { it.songId }.toSet()
+                    }
+                    songs.filter { it.id in pendingFailedIds }
                 } else {
                     songs
                 }
@@ -265,9 +282,8 @@ class SongListFragment : Fragment() {
     }
 
     private fun showAddToPlaylistDialog(songs: List<LocalSong>) {
-        val db = AppDatabase.getInstance(requireContext())
         lifecycleScope.launch {
-            val list = withContext(Dispatchers.IO) { db.playlistDao().getAllPlaylists().first() }
+            val list = withContext(Dispatchers.IO) { playlistRepository.getAllPlaylists().first() }
             if (list.isEmpty()) {
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.sin_playlists))
@@ -284,9 +300,7 @@ class SongListFragment : Fragment() {
                     lifecycleScope.launch {
                         withContext(Dispatchers.IO) {
                             for (song in songs) {
-                                db.playlistDao().addSongToPlaylist(
-                                    PlaylistSong(playlist.id, song.filePath, 0)
-                                )
+                                playlistRepository.addSongToPlaylist(playlist.id, song.filePath)
                             }
                         }
                         android.widget.Toast.makeText(
@@ -312,18 +326,18 @@ class SongListFragment : Fragment() {
         val btnRetryFailed = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_retry_failed)
 
         lifecycleScope.launch {
-            val failedCount = withContext(Dispatchers.IO) { repository.getFailedCount() }
-            if (failedCount > 0) {
+            val pendingFailedCount = withContext(Dispatchers.IO) { regenRepo.getPendingAndFailedCount() }
+            if (pendingFailedCount > 0) {
                 btnRetryFailed.visibility = View.VISIBLE
-                btnRetryFailed.text = getString(R.string.regen_retry_failed, failedCount)
+                btnRetryFailed.text = getString(R.string.regen_retry_failed, pendingFailedCount)
                 btnRetryFailed.setOnClickListener {
                     lifecycleScope.launch {
-                        val failedSongs = withContext(Dispatchers.IO) { repository.getFailedSongsNow() }
-                        if (failedSongs.isNotEmpty()) {
-                            val failedSongIds = failedSongs.map { it.id }.toTypedArray()
+                        val pendingFailedSongs = withContext(Dispatchers.IO) { regenRepo.getPendingAndFailedSongsNow() }
+                        if (pendingFailedSongs.isNotEmpty()) {
+                            val pendingFailedSongIds = pendingFailedSongs.map { it.songId }.toTypedArray()
                             val intent = Intent(requireContext(), MetadataRegenService::class.java).apply {
                                 action = MetadataRegenService.ACTION_START
-                                putExtra(MetadataRegenService.EXTRA_SONG_IDS, failedSongIds)
+                                putExtra(MetadataRegenService.EXTRA_SONG_IDS, pendingFailedSongIds)
                                 putExtra(MetadataRegenService.EXTRA_DO_METADATA, checkMetadata.isChecked)
                                 putExtra(MetadataRegenService.EXTRA_DO_LYRICS, checkLyrics.isChecked)
                                 putExtra(MetadataRegenService.EXTRA_DO_WAVEFORM, checkWaveform.isChecked)

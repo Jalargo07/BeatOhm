@@ -8,7 +8,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.musicdownloader.data.LocalSong
+import com.musicdownloader.data.ILibraryRepository
+import com.musicdownloader.data.IMusicRepository
+import com.musicdownloader.data.IWaveformRepository
+import com.musicdownloader.data.LibraryRepository
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.WaveformRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -21,7 +26,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         val withLyrics: Boolean = false
     )
 
-    private val repo = MusicRepository(application)
+    private val repo: IMusicRepository = MusicRepository(application)
+    private val libraryRepo: ILibraryRepository = LibraryRepository(application)
+    private val waveformRepo: IWaveformRepository = WaveformRepository(application)
 
     private val _folders = MutableLiveData<List<String>>(emptyList())
     val folders: LiveData<List<String>> = _folders
@@ -47,7 +54,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun refreshLibrary() {
         if (_isScanning.value == true) return
-        _folders.postValue(repo.getLibraryFolders())
+        _folders.postValue(libraryRepo.getLibraryFolders())
         viewModelScope.launch(Dispatchers.IO) {
             _isScanning.postValue(true)
             try {
@@ -55,7 +62,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 _allSongs.postValue(repo.getAllSongsNow())
 
                 // Phase 2: Fast scan — find new files, insert to DB with minimal metadata
-                val result = repo.fastScan()
+                val result = libraryRepo.fastScan()
                 _allSongs.postValue(result.songs)
 
                 // Phase 3: Background enrichment (gradual, non-blocking)
@@ -65,7 +72,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         Log.d(TAG, "Enriching: $done/$total - $title")
                     }
                     // After metadata enrichment, extract waveforms
-                    repo.extractMissingWaveforms(repo.getAllSongsNow()) { done, total ->
+                    waveformRepo.extractMissingWaveforms(repo.getAllSongsNow()) { done, total ->
                         Log.d(TAG, "Waveform: $done/$total")
                     }
                 }
@@ -82,27 +89,27 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 Log.e(TAG, "Error scanning library", e)
             } finally {
                 _isScanning.postValue(false)
-                _folders.postValue(repo.getLibraryFolders())
+                _folders.postValue(libraryRepo.getLibraryFolders())
             }
         }
     }
 
     fun refreshFolders() {
-        _folders.postValue(repo.getLibraryFolders())
+        _folders.postValue(libraryRepo.getLibraryFolders())
     }
 
     fun addFolder(path: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            repo.addLibraryFolder(path)
+            libraryRepo.addLibraryFolder(path)
             refreshLibrary()
         }
     }
 
     fun removeFolder(path: String, deleteSongs: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            repo.removeLibraryFolder(path)
-            if (deleteSongs) repo.deleteSongsInFolder(path)
-            _folders.postValue(repo.getLibraryFolders())
+            libraryRepo.removeLibraryFolder(path)
+            if (deleteSongs) libraryRepo.deleteSongsInFolder(path)
+            _folders.postValue(libraryRepo.getLibraryFolders())
             refreshLibrary()
         }
     }

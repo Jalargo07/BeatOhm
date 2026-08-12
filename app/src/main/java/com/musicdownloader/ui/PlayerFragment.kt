@@ -1,6 +1,5 @@
 package com.musicdownloader.ui
 
-import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.app.Application
 import android.content.BroadcastReceiver
@@ -9,32 +8,22 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.TransitionDrawable
 import android.media.AudioManager
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.BounceInterpolator
 import android.view.animation.DecelerateInterpolator
-import android.view.animation.OvershootInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.view.doOnLayout
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
@@ -51,13 +40,15 @@ import com.google.gson.reflect.TypeToken
 import com.musicdownloader.R
 import com.musicdownloader.audio.AudioVisualizerManager
 import com.musicdownloader.data.AppDatabase
-import com.musicdownloader.lrc.LrcParser
-import com.musicdownloader.lrc.LrcLine
+import com.musicdownloader.data.IMusicRepository
+import com.musicdownloader.data.IWaveformRepository
 import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.WaveformRepository
 import com.musicdownloader.data.PlaylistSong
-import com.musicdownloader.data.toSong
 import com.musicdownloader.databinding.FragmentPlayerBinding
+import com.musicdownloader.ui.player.PlayerAnimationHelper
 import com.musicdownloader.ui.player.PlayerLayoutManager
+import com.musicdownloader.ui.player.PlayerLyricsHelper
 import com.musicdownloader.model.Song
 import com.musicdownloader.util.FolderPatternParser
 import java.io.File
@@ -77,14 +68,13 @@ class PlayerFragment : Fragment() {
     private var _binding: FragmentPlayerBinding? = null
     private val binding get() = _binding!!
     private lateinit var viewModel: PlayerViewModel
-    private lateinit var repository: MusicRepository
+    private lateinit var repository: IMusicRepository
+    private lateinit var waveformRepo: IWaveformRepository
+    private lateinit var animationHelper: PlayerAnimationHelper
+    private lateinit var lyricsHelper: PlayerLyricsHelper
     private var isSeeking = false
-    private var isLyricsVisible = false
     private var updateRunnable: Runnable? = null
     private var currentSongFilePath: String? = null
-    private var coverBreatheAnimator: ValueAnimator? = null
-    private var miniLrcLines: List<LrcLine> = emptyList()
-    private var lastMiniCurrentIdx = -1
 
     private var audioManager: AudioManager? = null
     private var isVolumeDragging = false
@@ -103,7 +93,6 @@ class PlayerFragment : Fragment() {
     private fun secondaryTextColor(): Int = if (isDarkMode) 0xFFB0B0B0.toInt() else 0xFF666666.toInt()
 
     private var downX = 0f
-    private var downY = 0f
     private var isDragging = false
     private var swipeDirection = 0
     private var swipeSpring: SpringAnimation? = null
@@ -127,6 +116,9 @@ class PlayerFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
         repository = MusicRepository(requireContext())
+        waveformRepo = WaveformRepository(requireContext())
+        animationHelper = PlayerAnimationHelper(binding)
+        lyricsHelper = PlayerLyricsHelper(binding, this)
         audioManager = requireContext().getSystemService(AudioManager::class.java)
         primaryColor = ThemeManager.primaryColor
         requireActivity().volumeControlStream = AudioManager.STREAM_MUSIC
@@ -145,7 +137,7 @@ class PlayerFragment : Fragment() {
         setupObservers()
         setupControls()
         setupSwipeGesture()
-        setupLyricsSwipe()
+        lyricsHelper.setupLyricsSwipe()
         applyIconPack()
 
         lifecycleScope.launch {
@@ -215,11 +207,7 @@ class PlayerFragment : Fragment() {
 
     private fun observeCurrentSong() {
         viewModel.currentSong.observe(viewLifecycleOwner) { song ->
-            isLyricsVisible = false
-            applyLyricsBlur(false)
-            binding.lyricsPanel.visibility = View.GONE
-            binding.syncedLyricsView.setLyrics("")
-            binding.ivLyricsBackground.visibility = View.GONE
+            lyricsHelper.resetOnSongChange()
             binding.coverContainer.visibility = View.VISIBLE
             binding.ivGlow.visibility = View.VISIBLE
             binding.titleContainer.visibility = View.VISIBLE
@@ -234,12 +222,25 @@ class PlayerFragment : Fragment() {
                 val path = song.filePath.ifBlank { song.youtubeUrl }
                 currentSongFilePath = path
                 binding.emptyPlayerState.visibility = View.GONE
+                cancelSwipeAnimations()
                 PlayerLayoutManager.animateSongChange(binding.root)
-                animateSongChange(song, path)
+                animationHelper.animateSongChange(song) {
+                    binding.ivCover.translationX = 0f
+                    binding.ivCover.alpha = 0f
+                    binding.ivCover.scaleX = 1f
+                    binding.ivCover.scaleY = 1f
+                    binding.ivCoverPreview.alpha = 0f
+                    binding.ivCoverPreview.translationX = 0f
+                    binding.ivCoverPreview.setImageDrawable(null)
+                    binding.tvTitle.text = song.title
+                    binding.tvArtist.text = song.artist.ifBlank { getString(R.string.unknown_artist) }
+                    binding.ivCover.contentDescription = "${song.title} - ${song.artist}"
+                    loadCover(song, path)
+                }
                 updateFavoriteIcon(path)
                 loadWaveform(path, song.duration)
                 applyDominantColor(song)
-                parseMiniLyrics(song, path)
+                lyricsHelper.parseMiniLyrics(song)
             } else {
                 showEmptyState()
             }
@@ -256,16 +257,6 @@ class PlayerFragment : Fragment() {
         }
     }
 
-    private fun parseMiniLyrics(song: Song, path: String) {
-        var songLyrics = song.lyrics.orEmpty()
-        if (songLyrics.isBlank() && path.isNotBlank()) {
-            songLyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
-        }
-        miniLrcLines = LrcParser.parse(songLyrics)
-        lastMiniCurrentIdx = -1
-        binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty() && !isLyricsVisible) View.VISIBLE else View.GONE
-    }
-
     private fun showEmptyState() {
         currentSongFilePath = null
         binding.emptyPlayerState.visibility = View.VISIBLE
@@ -278,7 +269,7 @@ class PlayerFragment : Fragment() {
         binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
             if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
         }.start()
-        stopCoverBreathe()
+        animationHelper.stopCoverBreathe()
         applyPalette(null)
     }
 
@@ -299,7 +290,7 @@ class PlayerFragment : Fragment() {
                 else icons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
             )
             if (playing) {
-                animateCoverPlaying()
+                animationHelper.animateCoverPlaying()
                 binding.waveformSeekbar.setWaterActive(true)
                 PlayerLayoutManager.startVinylRotation(binding.root)
                 val service = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService
@@ -318,7 +309,7 @@ class PlayerFragment : Fragment() {
                 audioVisualizerManager.stop()
                 waterVisualizer.setActive(false)
                 binding.waveformSeekbar.setWaterActive(false)
-                stopCoverBreathe()
+                animationHelper.stopCoverBreathe()
                 PlayerLayoutManager.stopVinylRotation(binding.root)
             }
         }
@@ -404,7 +395,7 @@ class PlayerFragment : Fragment() {
                             withContext(Dispatchers.IO) {
                                 repository.getSongById(path)?.let { song ->
                                     val json = Gson().toJson(data.toList())
-                                    repository.updateWaveform(song.id, json)
+                                    waveformRepo.updateWaveform(song.id, json)
                                 }
                             }
                             data
@@ -416,67 +407,6 @@ class PlayerFragment : Fragment() {
                 waterVisualizer.setWaveformMask(binding.waveformSeekbar.getBothBarsSilhouettePath(0))
             }
         }
-    }
-
-    private fun animateFavoriteHeart() {
-        val btn = binding.btnFavorite
-        btn.animate().cancel()
-        btn.scaleX = 1f
-        btn.scaleY = 1f
-        btn.animate()
-            .scaleX(1.3f)
-            .scaleY(1.3f)
-            .setDuration(150)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction {
-                btn.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(200)
-                    .setInterpolator(OvershootInterpolator(2f))
-                    .start()
-            }
-            .start()
-    }
-
-    private fun animateSongChange(song: Song, path: String) {
-        val density = resources.displayMetrics.density
-        cancelSwipeAnimations()
-        binding.ivCover.animate().cancel()
-        binding.titleTextContainer.animate().cancel()
-
-        binding.ivCover.animate()
-            .alpha(0f)
-            .setDuration(100)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction {
-                if (_binding == null) return@withEndAction
-                binding.ivCover.translationX = 0f
-                binding.ivCover.alpha = 0f
-                binding.ivCover.scaleX = 1f
-                binding.ivCover.scaleY = 1f
-                binding.ivCoverPreview.alpha = 0f
-                binding.ivCoverPreview.translationX = 0f
-                binding.ivCoverPreview.setImageDrawable(null)
-                binding.tvTitle.text = song.title
-                binding.tvArtist.text = song.artist.ifBlank { getString(R.string.unknown_artist) }
-                binding.ivCover.contentDescription = "${song.title} - ${song.artist}"
-                loadCover(song, path)
-                binding.titleTextContainer.translationY = 20 * density
-                binding.titleTextContainer.alpha = 0f
-                binding.titleTextContainer.animate()
-                    .translationY(0f)
-                    .alpha(1f)
-                    .setDuration(200)
-                    .setInterpolator(DecelerateInterpolator())
-                    .start()
-                binding.ivCover.animate()
-                    .alpha(1f)
-                    .setDuration(200)
-                    .setInterpolator(DecelerateInterpolator())
-                    .start()
-            }
-            .start()
     }
 
     private fun extractBitmap(drawable: Drawable?): Bitmap? {
@@ -670,59 +600,6 @@ class PlayerFragment : Fragment() {
         binding.tvArtist.typeface = typeface
     }
 
-    private fun animateCoverPlaying() {
-        stopCoverBreathe()
-        val sf = PlayerLayoutManager.currentScaleFactor
-        binding.coverContainer.scaleX = sf * 0.95f
-        binding.coverContainer.scaleY = sf * 0.95f
-        binding.coverContainer.animate()
-            .scaleX(sf)
-            .scaleY(sf)
-            .setDuration(400)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction {
-                if (_binding != null) startCoverBreathe()
-            }
-            .start()
-    }
-
-    private fun startCoverBreathe() {
-        val sf = PlayerLayoutManager.currentScaleFactor
-        val animator = ValueAnimator.ofFloat(sf * 0.98f, sf).apply {
-            duration = 1600L
-            interpolator = AccelerateDecelerateInterpolator()
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            addUpdateListener { anim ->
-                val value = anim.animatedValue as Float
-                binding.coverContainer.scaleX = value
-                binding.coverContainer.scaleY = value
-            }
-            start()
-        }
-        coverBreatheAnimator = animator
-    }
-
-    private fun stopCoverBreathe() {
-        coverBreatheAnimator?.cancel()
-        coverBreatheAnimator = null
-        binding.coverContainer.animate().cancel()
-        binding.coverContainer.alpha = 1f
-        binding.coverContainer.scaleX = PlayerLayoutManager.currentScaleFactor
-        binding.coverContainer.scaleY = PlayerLayoutManager.currentScaleFactor
-    }
-
-    private fun animatePlayPausePress() {
-        binding.btnPlayPause.scaleX = 0.9f
-        binding.btnPlayPause.scaleY = 0.9f
-        binding.btnPlayPause.animate()
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(200)
-            .setInterpolator(BounceInterpolator())
-            .start()
-    }
-
     private fun setupControls() {
         binding.btnPlayPause.setOnClickListener {
             val song = viewModel.currentSong.value ?: return@setOnClickListener
@@ -730,7 +607,7 @@ class PlayerFragment : Fragment() {
             val service = activity.playbackService
             if (service == null) return@setOnClickListener
 
-            animatePlayPausePress()
+            animationHelper.animatePlayPausePress()
 
             if (service.isPlaying()) service.pause() else service.play()
         }
@@ -785,7 +662,7 @@ class PlayerFragment : Fragment() {
                 Toast.makeText(requireContext(), R.string.no_lyrics, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            toggleLyrics()
+            lyricsHelper.toggleLyrics(song)
         }
 
         binding.btnFavorite.setOnClickListener {
@@ -796,7 +673,7 @@ class PlayerFragment : Fragment() {
                     val newFav = !song.isFavorite
                     repository.setFavorite(path, newFav)
                     updateFavoriteIcon(path)
-                    if (newFav) animateFavoriteHeart()
+                    if (newFav) animationHelper.animateFavoriteHeart()
                 }
             }
         }
@@ -850,7 +727,7 @@ class PlayerFragment : Fragment() {
     private fun setupSwipeGesture() {
         val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
         binding.coverContainer.setOnTouchListener { _, event ->
-            if (isLyricsVisible || viewModel.currentSong.value == null) return@setOnTouchListener false
+            if (lyricsHelper.isLyricsOpen() || viewModel.currentSong.value == null) return@setOnTouchListener false
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.x
@@ -902,23 +779,6 @@ class PlayerFragment : Fragment() {
     }
 
     private fun coverWidthPx(): Float = binding.coverContainer.width.toFloat().coerceAtLeast(1f)
-
-    private fun setupLyricsSwipe() {
-        val swipeCloseThreshold = 100 * resources.displayMetrics.density
-        binding.lyricsPanel.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> downY = event.y
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val deltaY = event.y - downY
-                    if (isLyricsVisible && deltaY > swipeCloseThreshold) {
-                        closeLyrics()
-                    }
-                }
-                else -> {}
-            }
-            false
-        }
-    }
 
     private fun loadPreviewCover(song: Song?) {
         val iv = binding.ivCoverPreview
@@ -997,195 +857,11 @@ class PlayerFragment : Fragment() {
         binding.ivCoverPreview.animate().cancel()
     }
 
-    private fun toggleLyrics() {
-        isLyricsVisible = !isLyricsVisible
-        if (isLyricsVisible) {
-            val song = viewModel.currentSong.value
-            var lyrics = song?.lyrics.orEmpty()
-            // Try reading from file tags if DB lyrics are empty
-            if (lyrics.isBlank()) {
-                val path = song?.filePath?.ifBlank { song.youtubeUrl }.orEmpty()
-                if (path.isNotBlank()) {
-                    lyrics = com.musicdownloader.data.AudioTagReader.readLyrics(path)
-                }
-            }
-            binding.syncedLyricsView.setLyrics(lyrics)
-            binding.syncedLyricsView.onLineClicked = { positionMs ->
-                (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.seekTo(positionMs)
-            }
-            binding.syncedLyricsView.onSwipeDown = {
-                closeLyrics()
-            }
-            loadLyricsBackground(song)
-            miniLrcLines = LrcParser.parse(lyrics)
-            lastMiniCurrentIdx = -1
-            binding.lyricsPanel.visibility = View.VISIBLE
-            binding.ivLyricsBackground.visibility = View.VISIBLE
-            binding.coverContainer.visibility = View.INVISIBLE
-            binding.ivCover.visibility = View.INVISIBLE
-            binding.ivGlow.visibility = View.INVISIBLE
-            binding.titleContainer.visibility = View.INVISIBLE
-            binding.waveformSeekbar.visibility = View.INVISIBLE
-            binding.timeRow.visibility = View.INVISIBLE
-            binding.controlsContainer.visibility = View.INVISIBLE
-            binding.bottomActions.visibility = View.INVISIBLE
-            binding.miniLyricsContainer.visibility = View.GONE
-
-            binding.lyricsPanel.alpha = 0f
-            binding.lyricsPanel.scaleX = 0.97f
-            binding.lyricsPanel.scaleY = 0.97f
-            binding.lyricsPanel.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(250)
-                .setInterpolator(DecelerateInterpolator())
-                .start()
-
-            applyLyricsBlur(true)
-            val pos = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.getCurrentPosition() ?: 0L
-            binding.syncedLyricsView.scrollToCurrentPosition(pos)
-
-            TutorialManager.showTutorial(
-                requireActivity(),
-                "lyrics",
-                listOf(
-                    TutorialManager.TooltipStep({ binding.syncedLyricsView }, getString(R.string.tutorial_lyrics_tap), getString(R.string.tutorial_lyrics_tap_desc)),
-                    TutorialManager.TooltipStep({ binding.syncedLyricsView }, getString(R.string.tutorial_lyrics_swipe), getString(R.string.tutorial_lyrics_swipe_desc))
-                )
-            )
-        } else {
-            closeLyrics()
-        }
-    }
-
-    private fun loadLyricsBackground(song: Song?) {
-        val iv = binding.ivLyricsBackground
-        if (song != null && song.thumbnailUrl.isNotBlank()) {
-            iv.load(song.thumbnailUrl) {
-                crossfade(true)
-                placeholder(R.drawable.ic_player)
-                error(R.drawable.ic_player)
-            }
-        } else {
-            val path = when {
-                song == null -> ""
-                song.filePath.isNotBlank() -> song.filePath
-                else -> song.youtubeUrl
-            }
-            if (path.isNotBlank() && File(path).exists()) {
-                ArtworkLoader.loadArtFromAudioFile(iv, path)
-            } else {
-                iv.setImageResource(R.drawable.ic_player)
-            }
-        }
-        applyLyricsBackgroundTint()
-    }
-
-    private fun applyLyricsBackgroundTint() {
-        val colorMatrix = ColorMatrix().apply {
-            setSaturation(0.35f)
-        }
-        binding.ivLyricsBackground.colorFilter = ColorMatrixColorFilter(colorMatrix)
-        if (Build.VERSION.SDK_INT >= 31) {
-            binding.ivLyricsBackground.setRenderEffect(
-                RenderEffect.createBlurEffect(50f, 50f, Shader.TileMode.CLAMP)
-            )
-        }
-    }
-
-    private fun closeLyrics() {
-        isLyricsVisible = false
-        binding.miniLyricsContainer.visibility = if (miniLrcLines.isNotEmpty()) View.VISIBLE else View.GONE
-        updateMiniLyrics()
-        applyLyricsBlur(false)
-        val panelHeight = binding.lyricsPanel.height.toFloat()
-        binding.lyricsPanel.animate()
-            .alpha(0f)
-            .translationY(panelHeight * 0.3f)
-            .setDuration(300)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction {
-                if (_binding != null) {
-                    binding.lyricsPanel.translationY = 0f
-                    binding.lyricsPanel.visibility = View.GONE
-                    binding.ivLyricsBackground.visibility = View.GONE
-                    binding.ivLyricsBackground.setImageDrawable(null)
-                    binding.ivLyricsBackground.colorFilter = null
-                    if (Build.VERSION.SDK_INT >= 31) {
-                        binding.ivLyricsBackground.setRenderEffect(null)
-                    }
-                    binding.coverContainer.visibility = View.VISIBLE
-                    binding.ivGlow.visibility = View.VISIBLE
-                    if (PlayerLayoutManager.currentStyle != "vinyl") {
-                        binding.ivCover.visibility = View.VISIBLE
-                    }
-                    binding.titleContainer.visibility = View.VISIBLE
-                    binding.waveformSeekbar.visibility = View.VISIBLE
-                    binding.timeRow.visibility = View.VISIBLE
-                    binding.controlsContainer.visibility = View.VISIBLE
-                    binding.bottomActions.visibility = View.VISIBLE
-                }
-            }
-            .start()
-    }
-
-    private fun updateMiniLyrics() {
-        if (miniLrcLines.isEmpty()) return
-        val pos = (requireActivity() as? com.musicdownloader.MainActivity)?.playbackService?.getCurrentPosition() ?: 0L
-        var currentIdx = -1
-        for (i in miniLrcLines.indices) {
-            if (miniLrcLines[i].timeMs <= pos) currentIdx = i else break
-        }
-        if (currentIdx < 0) return
-
-        binding.tvMiniLyricsCurrent.text = miniLrcLines[currentIdx].text
-        binding.tvMiniLyricsNext.text = if (currentIdx + 1 < miniLrcLines.size) miniLrcLines[currentIdx + 1].text else ""
-
-        if (currentIdx == lastMiniCurrentIdx) return
-
-        binding.miniLyricsContainer.post {
-            if (_binding == null) return@post
-            val currentLines = binding.tvMiniLyricsCurrent.lineCount.coerceIn(1, 2)
-            val nextText = binding.tvMiniLyricsNext.text?.toString().orEmpty()
-            val hasNext = nextText.isNotEmpty()
-
-            val containerLp = binding.miniLyricsContainer.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-            val currentLp = binding.tvMiniLyricsCurrent.layoutParams as ViewGroup.MarginLayoutParams
-            val nextLp = binding.tvMiniLyricsNext.layoutParams as ViewGroup.MarginLayoutParams
-
-            if (currentLines >= 2 && hasNext) {
-                containerLp.verticalBias = 0.89f
-                currentLp.topMargin = (2 * resources.displayMetrics.density).toInt()
-                nextLp.topMargin = (6 * resources.displayMetrics.density).toInt()
-            } else if (currentLines >= 2 && !hasNext) {
-                containerLp.verticalBias = 0.90f
-                currentLp.topMargin = (2 * resources.displayMetrics.density).toInt()
-                nextLp.topMargin = (2 * resources.displayMetrics.density).toInt()
-            } else {
-                containerLp.verticalBias = 1.0f
-                currentLp.topMargin = 0
-                nextLp.topMargin = (2 * resources.displayMetrics.density).toInt()
-            }
-
-            binding.miniLyricsContainer.layoutParams = containerLp
-            binding.tvMiniLyricsCurrent.layoutParams = currentLp
-            binding.tvMiniLyricsNext.layoutParams = nextLp
-        }
-
-        lastMiniCurrentIdx = currentIdx
-    }
-
     private fun updateGradientFromWaveform(progress: Int) {
         val waveEnabled = requireContext()
             .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean("show_wave_animation", true)
         waterVisualizer.setActive(waveEnabled && viewModel.isPlaying.value == true)
-    }
-
-    private fun applyLyricsBlur(blur: Boolean) {
-        // Blur effect removed - not critical for functionality
-        // Can be re-implemented later with compatible API
     }
 
     private fun showAddToPlaylistDialog(songFilePath: String) {
@@ -1236,12 +912,12 @@ class PlayerFragment : Fragment() {
                     b.waveformSeekbar.setProgress(progress.coerceIn(0, MAX_SEEK))
                     b.tvCurrentTime.text = formatTime(pos)
                     viewModel.setPosition(pos)
-                    updateMiniLyrics()
+                    lyricsHelper.updateMiniLyrics()
                     updateGradientFromWaveform(progress)
                     if (b.waveformSeekbar.getBarCount() > 0) {
                         waterVisualizer.setWaveformMask(b.waveformSeekbar.getBothBarsSilhouettePath(0))
                     }
-                    if (isLyricsVisible) {
+                    if (lyricsHelper.isLyricsOpen()) {
                         b.syncedLyricsView.updatePosition(pos)
                     }
                 }
@@ -1264,7 +940,8 @@ class PlayerFragment : Fragment() {
         waveformLayoutListener = null
         PlayerLayoutManager.stopVinylRotation(binding.root)
         PlayerLayoutManager.removeVinylViewIfAny(binding.root)
-        stopCoverBreathe()
+        animationHelper.cleanup()
+        lyricsHelper.cleanup()
         cancelSwipeAnimations()
         visualizerAttachJob?.cancel()
         audioVisualizerManager.stop()

@@ -34,7 +34,7 @@ import androidx.navigation.ui.setupWithNavController
 import coil.load
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import com.musicdownloader.data.MusicRepository
+import com.musicdownloader.data.LibraryRepository
 import com.musicdownloader.databinding.ActivityMainBinding
 import com.musicdownloader.model.Song
 import com.musicdownloader.ui.ArtworkLoader
@@ -103,7 +103,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        ArtworkLoader.init(MusicRepository(this).getAlbumArtCacheDir())
+        ArtworkLoader.init(this, LibraryRepository(this).getAlbumArtCacheDir())
 
         val primaryColor = ThemeManager.primaryColor
         val colorNav = ColorStateList(

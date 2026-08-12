@@ -105,6 +105,6 @@ class ProxyDownloader {
     }
 
     companion object {
-        private const val TAG = "MusicDownloader"
+        private const val TAG = "BeatOhm"
     }
 }
