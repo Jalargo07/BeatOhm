@@ -111,7 +111,7 @@
 
     </LinearLayout>
 
-    <com.musicdownloader.ui.WaveformSeekBar
+    <com.beatohm.ui.WaveformSeekBar
         android:id="@+id/waveform_seekbar"
         android:layout_width="0dp"
         android:layout_height="160dp"
@@ -421,7 +421,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <com.musicdownloader.ui.SyncedLyricsView
+        <com.beatohm.ui.SyncedLyricsView
             android:id="@+id/synced_lyrics_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"

@@ -7,19 +7,19 @@
 
     <fragment
         android:id="@+id/playerFragment"
-        android:name="com.musicdownloader.ui.PlayerFragment"
+        android:name="com.beatohm.ui.PlayerFragment"
         android:label="@string/player_title"
         tools:layout="@layout/fragment_player" />
 
     <fragment
         android:id="@+id/libraryFragment"
-        android:name="com.musicdownloader.ui.LibraryFragment"
+        android:name="com.beatohm.ui.LibraryFragment"
         android:label=""
         tools:layout="@layout/fragment_library" />
 
     <fragment
         android:id="@+id/downloadsFragment"
-        android:name="com.musicdownloader.ui.DownloadsFragment"
+        android:name="com.beatohm.ui.DownloadsFragment"
         android:label="@string/downloads_title"
         tools:layout="@layout/fragment_downloads">
         <action
@@ -29,7 +29,7 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="com.musicdownloader.ui.SettingsFragment"
+        android:name="com.beatohm.ui.SettingsFragment"
         android:label="@string/settings_title"
         tools:layout="@layout/fragment_settings">
         <action
@@ -39,13 +39,13 @@
 
     <fragment
         android:id="@+id/themeSelectionFragment"
-        android:name="com.musicdownloader.ui.ThemeSelectionFragment"
+        android:name="com.beatohm.ui.ThemeSelectionFragment"
         android:label="@string/theme_selector_title"
         tools:layout="@layout/fragment_theme_selection" />
 
     <fragment
         android:id="@+id/songListFragment"
-        android:name="com.musicdownloader.ui.SongListFragment"
+        android:name="com.beatohm.ui.SongListFragment"
         android:label="@string/songs">
         <argument
             android:name="folderPath"
@@ -59,7 +59,7 @@
 
     <fragment
         android:id="@+id/categoryListFragment"
-        android:name="com.musicdownloader.ui.CategoryListFragment"
+        android:name="com.beatohm.ui.CategoryListFragment"
         android:label="@string/categories">
         <argument
             android:name="category"
@@ -69,27 +69,27 @@
 
     <fragment
         android:id="@+id/favoritesFragment"
-        android:name="com.musicdownloader.ui.FavoritesFragment"
+        android:name="com.beatohm.ui.FavoritesFragment"
         android:label="@string/favorites" />
 
     <fragment
         android:id="@+id/playlistsFragment"
-        android:name="com.musicdownloader.ui.PlaylistsFragment"
+        android:name="com.beatohm.ui.PlaylistsFragment"
         android:label="@string/playlists_menu" />
 
     <fragment
         android:id="@+id/mostPlayedFragment"
-        android:name="com.musicdownloader.ui.MostPlayedFragment"
+        android:name="com.beatohm.ui.MostPlayedFragment"
         android:label="@string/most_played" />
 
     <fragment
         android:id="@+id/foldersFragment"
-        android:name="com.musicdownloader.ui.FoldersFragment"
+        android:name="com.beatohm.ui.FoldersFragment"
         android:label="@string/folders" />
 
     <fragment
         android:id="@+id/playlistDetailFragment"
-        android:name="com.musicdownloader.ui.PlaylistDetailFragment"
+        android:name="com.beatohm.ui.PlaylistDetailFragment"
         android:label="@string/playlists_menu">
         <argument
             android:name="playlist_id"

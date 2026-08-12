@@ -12,7 +12,7 @@ val secrets = Properties().apply {
 }
 
 android {
-    namespace = "com.musicdownloader"
+    namespace = "com.beatohm"
     compileSdk = 34
 
     defaultConfig {
