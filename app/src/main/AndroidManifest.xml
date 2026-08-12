@@ -50,6 +50,11 @@
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
+        <service
+            android:name=".ImportPlaylistService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <receiver
             android:name=".MusicWidgetProvider"
             android:exported="true">

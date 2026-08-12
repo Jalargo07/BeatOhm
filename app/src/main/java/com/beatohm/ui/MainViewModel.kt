@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.beatohm.DeviceUtils
 import com.beatohm.data.LocalSong
 import com.beatohm.data.MusicRepository
 import com.beatohm.downloader.AudioDownloader
@@ -212,7 +213,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun getDownloadDirectory(song: com.beatohm.model.Song? = null): File {
         val ctx = getApplication<Application>()
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val baseDir = File(dir, "MusicDownloader")
+        val baseDir = File(dir, DeviceUtils.MUSIC_FOLDER_NAME)
         if (song == null) {
             if (!baseDir.exists()) baseDir.mkdirs()
             Log.e(TAG, "Dir: ${baseDir.absolutePath}")
@@ -254,6 +255,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         startDownload(result.youtubeUrl)
     }
 
+    /**
+     * Add an imported track to the downloads list UI.
+     * Called by ImportPlaylistService when a track finishes importing.
+     */
+    fun addImportedTrack(title: String, artist: String, filePath: String) {
+        val song = com.beatohm.model.Song(
+            title = title,
+            artist = artist,
+            filePath = filePath
+        )
+        val state = DownloadState(
+            id = "import_${System.currentTimeMillis()}_${title.hashCode()}",
+            url = "",
+            song = song,
+            status = DownloadStatus.COMPLETED,
+            progress = 100,
+            filePath = filePath
+        )
+        addDownload(state)
+    }
+
     private fun addDownload(state: DownloadState) {
         val list = _downloads.value?.toMutableList() ?: mutableListOf()
         list.add(0, state)
@@ -285,5 +307,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "BeatOhm"
+
+        /** Shared instance set by the Activity so the import service can update the downloads list. */
+        var instance: MainViewModel? = null
+            private set
+    }
+
+    init {
+        instance = this
     }
 }

@@ -6,25 +6,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
-import androidx.lifecycle.lifecycleScope
+import com.beatohm.ImportPlaylistService
 import com.beatohm.R
 import com.beatohm.databinding.BottomSheetImportPlaylistBinding
 import com.beatohm.importer.DeezerImporter
-import com.beatohm.importer.PlaylistImportManager
 import com.beatohm.importer.SpotifyImporter
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ImportPlaylistBottomSheet : BottomSheetDialogFragment() {
 
     private var _binding: BottomSheetImportPlaylistBinding? = null
     private val binding get() = _binding!!
-
-    private lateinit var importManager: PlaylistImportManager
-    private var importJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,10 +30,13 @@ class ImportPlaylistBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        importManager = PlaylistImportManager(requireContext())
-
         setupListeners()
         checkForActiveSession()
+
+        arguments?.getString(ARG_URL)?.let { url ->
+            binding.etPlaylistUrl.setText(url)
+            detectPlatform(url)
+        }
     }
 
     private fun setupListeners() {
@@ -97,63 +92,21 @@ class ImportPlaylistBottomSheet : BottomSheetDialogFragment() {
         val url = binding.etPlaylistUrl.text?.toString()?.trim() ?: return
         if (url.isBlank()) return
 
-        binding.llProgress.visibility = View.VISIBLE
-        binding.btnImport.visibility = View.GONE
-        binding.btnCancel.visibility = View.VISIBLE
-        binding.etPlaylistUrl.isEnabled = false
-
-        importManager.onProgress = { completed, total, currentTrack ->
-            lifecycleScope.launch {
-                binding.progressBar.max = total
-                binding.progressBar.progress = completed
-                binding.tvProgress.text = getString(R.string.import_playlist_progress, completed, total, currentTrack)
-            }
-        }
-
-        importManager.onComplete = { imported, failed, skipped ->
-            lifecycleScope.launch {
-                Toast.makeText(
-                    requireContext(),
-                    getString(R.string.import_playlist_complete, imported, failed, skipped),
-                    Toast.LENGTH_LONG
-                ).show()
-                dismiss()
-            }
-        }
-
-        importJob = lifecycleScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    importManager.startImport(url)
-                }
-            } catch (e: Exception) {
-                Toast.makeText(
-                    requireContext(),
-                    getString(R.string.import_playlist_error, e.message),
-                    Toast.LENGTH_LONG
-                ).show()
-                dismiss()
-            }
-        }
+        ImportPlaylistService.start(requireContext(), url)
+        Toast.makeText(requireContext(), getString(R.string.import_playlist_start), Toast.LENGTH_SHORT).show()
+        dismiss()
     }
 
     private fun cancelImport() {
-        importManager.cancel()
-        importJob?.cancel()
+        val intent = android.content.Intent(requireContext(), ImportPlaylistService::class.java).apply {
+            action = ImportPlaylistService.ACTION_CANCEL
+        }
+        requireContext().startService(intent)
         dismiss()
     }
 
     private fun checkForActiveSession() {
-        lifecycleScope.launch {
-            val session = withContext(Dispatchers.IO) {
-                importManager.getActiveSession()
-            }
-            if (session != null && session.status == "ACTIVE") {
-                binding.tvPlatform.visibility = View.VISIBLE
-                binding.tvPlatform.text = getString(R.string.import_playlist_resume_available)
-                binding.btnImport.text = getString(R.string.import_playlist_resume)
-            }
-        }
+        // TODO: Check for active import session via service binding
     }
 
     override fun onDestroyView() {
@@ -163,9 +116,14 @@ class ImportPlaylistBottomSheet : BottomSheetDialogFragment() {
 
     companion object {
         const val TAG = "ImportPlaylistBottomSheet"
+        private const val ARG_URL = "playlist_url"
 
-        fun newInstance(): ImportPlaylistBottomSheet {
-            return ImportPlaylistBottomSheet()
+        fun newInstance(url: String? = null): ImportPlaylistBottomSheet {
+            return ImportPlaylistBottomSheet().apply {
+                arguments = Bundle().apply {
+                    putString(ARG_URL, url)
+                }
+            }
         }
     }
 }

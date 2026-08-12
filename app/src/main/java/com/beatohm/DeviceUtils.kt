@@ -4,6 +4,9 @@ import android.app.ActivityManager
 import android.content.Context
 
 object DeviceUtils {
+
+    const val MUSIC_FOLDER_NAME = "BeatOhm"
+
     /**
      * Returns optimal thread count based on device RAM.
      * - ≤3GB RAM → 2 threads (eMMC 5.1, low-end)

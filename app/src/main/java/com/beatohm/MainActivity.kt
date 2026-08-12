@@ -300,7 +300,7 @@ class MainActivity : AppCompatActivity() {
 
     fun getMusicDir(): java.io.File {
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val target = java.io.File(dir, "MusicDownloader")
+        val target = java.io.File(dir, DeviceUtils.MUSIC_FOLDER_NAME)
         if (!target.exists()) target.mkdirs()
         return target
     }

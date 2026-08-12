@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">BeatOhm</string>
     <string name="url_hint">Paste a YouTube / YouTube Music URL</string>
+    <string name="url_hint_unified">Paste a YouTube, Spotify or Deezer link…</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading…</string>
     <string name="extracting">Extracting information…</string>
@@ -120,7 +121,7 @@
     <string name="search_error">Search error</string>
     <string name="search_query_required">Enter a song name</string>
     <string name="download_url_required">Enter a URL</string>
-    <string name="download_url_invalid">Invalid YouTube URL</string>
+    <string name="download_url_invalid">Invalid URL. Use a YouTube, Spotify or Deezer link.</string>
     <string name="drag_handle">Drag to reorder</string>
     <string name="media_playback_channel_name">Music playback</string>
 
@@ -367,4 +368,17 @@
     <string name="import_playlist_progress">Importing %1$d of %2$d: %3$s</string>
     <string name="import_playlist_complete">Import complete: %1$d imported, %2$d failed, %3$d skipped</string>
     <string name="import_playlist_error">Import error: %1$s</string>
+
+    <!-- Import Playlist Service -->
+    <string name="import_channel_name">Playlist Import</string>
+    <string name="import_channel_description">Importing playlist from Spotify/Deezer</string>
+    <string name="import_notification_title">Importing Playlist</string>
+    <string name="import_notification_fetching">Fetching tracks…</string>
+    <string name="import_notification_progress">Importing %1$d of %2$d: %3$s</string>
+    <string name="import_notification_paused">Paused: %1$d of %2$d imported</string>
+    <string name="import_notification_complete">Import complete: %1$d of %2$d imported</string>
+    <string name="import_notification_complete_with_failures">Import complete: %1$d of %2$d imported, %3$d failed</string>
+    <string name="import_action_pause">Pause</string>
+    <string name="import_action_resume">Resume</string>
+    <string name="import_action_cancel">Cancel</string>
 </resources>

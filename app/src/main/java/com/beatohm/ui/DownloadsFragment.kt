@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.snackbar.Snackbar
 import com.beatohm.R
 import com.beatohm.databinding.FragmentDownloadsBinding
+import com.beatohm.importer.UrlDetector
 import com.beatohm.model.DownloadStatus
 import kotlinx.coroutines.launch
 
@@ -58,10 +59,6 @@ class DownloadsFragment : Fragment() {
         }
 
         binding.btnSearch.setOnClickListener { startSearch() }
-
-        binding.btnImportPlaylist.setOnClickListener {
-            ImportPlaylistBottomSheet.newInstance().show(childFragmentManager, ImportPlaylistBottomSheet.TAG)
-        }
 
         TutorialManager.showTutorial(
             requireActivity(),
@@ -139,10 +136,24 @@ class DownloadsFragment : Fragment() {
     private fun startDownload() {
         val url = binding.etUrl.text.toString().trim()
         if (url.isBlank()) { binding.etUrl.error = getString(R.string.download_url_required); return }
-        if (!url.matches(Regex("(https?://)?(www\\.|m\\.)?(youtube\\.com|youtu\\.be|music\\.youtube\\.com)/.*"))) {
-            binding.etUrl.error = getString(R.string.download_url_invalid); return
+
+        val detection = UrlDetector.detect(url)
+
+        when (detection.type) {
+            UrlDetector.Type.YOUTUBE_SONG -> {
+                viewModel.startDownload(url)
+                binding.etUrl.text?.clear()
+            }
+            UrlDetector.Type.YOUTUBE_PLAYLIST,
+            UrlDetector.Type.DEEZER_PLAYLIST,
+            UrlDetector.Type.SPOTIFY_PLAYLIST -> {
+                ImportPlaylistBottomSheet.newInstance(detection.url)
+                    .show(childFragmentManager, ImportPlaylistBottomSheet.TAG)
+                binding.etUrl.text?.clear()
+            }
+            UrlDetector.Type.UNKNOWN -> {
+                binding.etUrl.error = getString(R.string.download_url_invalid)
+            }
         }
-        viewModel.startDownload(url)
-        binding.etUrl.text?.clear()
     }
 }

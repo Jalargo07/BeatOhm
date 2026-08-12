@@ -3,6 +3,7 @@
 import android.content.Context
 import android.os.Environment
 import android.util.Log
+import com.beatohm.DeviceUtils
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -156,7 +157,7 @@ class LibraryRepository(private val context: Context) : ILibraryRepository {
 
     override fun getMusicDir(): File {
         val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val target = File(musicDir, "MusicDownloader")
+        val target = File(musicDir, DeviceUtils.MUSIC_FOLDER_NAME)
         if (!target.exists()) target.mkdirs()
         return target
     }

@@ -6,7 +6,7 @@
 
 **Descargá, procesá y escuchá tu música favorita — con decodificación Opus, metadata impecable, letras multi-fuente y un visualizador que moldea el audio en tiempo real.**
 
-[![Version](https://img.shields.io/badge/version-2.9-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.9--nightly.260812-blue.svg)]()
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-34-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
@@ -216,6 +216,35 @@ app/src/main/java/com/musicdownloader/
 ---
 
 ## Changelog
+
+### v2.9-nightly.260812
+
+**Playlist Import — Pipeline Real + Fixes**
+
+**Pipeline de descarga conectado:**
+- ProxyLoader.to → OkHttp download a `/Music/BeatOhm/Unknown/`
+- Metadata: iTunes + MusicBrainz (con fallback por título solo)
+- Lyrics: LRCLIB → Genius → lyrics.ovh (con metadata CORREGIDA de iTunes)
+- Tags ID3v2.3 escritos a mano byte-a-byte (sin jaudiotagger)
+- Archivo movido y renombrado a `/Music/BeatOhm/Artista - Cancion.mp3`
+- Song guardado en Room DB con lyrics para el player
+
+**Fixes:**
+- Deadlock corregido: `parentJob` ya no se pasa al manager
+- Cross-filesystem move: `copyTo()` en vez de `renameTo()` (cache → /storage/)
+- ID3 corrupto de loader.to: `stripId3Tags()` elimina ID3v2/ID3v1 antes de escribir
+- Lyrics ahora se buscan DESPUÉS de metadata corregida (no con datos raw de Spotify/Deezer)
+- Imported tracks aparecen en la lista de Downloads de la UI
+
+**UI — URL Auto-Detect:**
+- Un solo campo de URL detecta: YouTube canción, YouTube playlist, Spotify playlist, Deezer playlist
+- Botón "Import Playlist" eliminado (ya no hace falta)
+- Hint unificado: "Paste YouTube, Spotify or Deezer link…"
+
+**Carpeta unificada:**
+- `DeviceUtils.MUSIC_FOLDER_NAME = "BeatOhm"` — descargas normales e imports van a la misma carpeta
+
+---
 
 ### v2.9-nightly.260811
 

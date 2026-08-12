@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">BeatOhm</string>
     <string name="url_hint">Cole a URL do YouTube / YouTube Music</string>
+    <string name="url_hint_unified">Cole um link do YouTube, Spotify ou Deezer…</string>
     <string name="download">Baixar</string>
     <string name="downloading">Baixando...</string>
     <string name="extracting">Extraindo informações...</string>
@@ -120,7 +121,7 @@
     <string name="search_error">Erro na busca</string>
     <string name="search_query_required">Insira o nome de uma música</string>
     <string name="download_url_required">Insira uma URL</string>
-    <string name="download_url_invalid">URL do YouTube inválida</string>
+    <string name="download_url_invalid">URL inválida. Use um link do YouTube, Spotify ou Deezer.</string>
     <string name="drag_handle">Arrastar para reordenar</string>
     <string name="media_playback_channel_name">Reprodução de música</string>
 
@@ -361,4 +362,17 @@
     <string name="import_playlist_progress">Importando %1$d de %2$d: %3$s</string>
     <string name="import_playlist_complete">Importação concluída: %1$d importadas, %2$d falharam, %3$d ignoradas</string>
     <string name="import_playlist_error">Erro na importação: %1$s</string>
+
+    <!-- Import Playlist Service -->
+    <string name="import_channel_name">Importação de playlist</string>
+    <string name="import_channel_description">Importando playlist do Spotify/Deezer</string>
+    <string name="import_notification_title">Importando Playlist</string>
+    <string name="import_notification_fetching">Buscando músicas…</string>
+    <string name="import_notification_progress">Importando %1$d de %2$d: %3$s</string>
+    <string name="import_notification_paused">Pausado: %1$d de %2$d importadas</string>
+    <string name="import_notification_complete">Importação concluída: %1$d de %2$d importadas</string>
+    <string name="import_notification_complete_with_failures">Importação concluída: %1$d de %2$d importadas, %3$d falharam</string>
+    <string name="import_action_pause">Pausar</string>
+    <string name="import_action_resume">Retomar</string>
+    <string name="import_action_cancel">Cancelar</string>
 </resources>

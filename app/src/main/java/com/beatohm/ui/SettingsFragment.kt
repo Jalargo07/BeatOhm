@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.beatohm.BuildConfig
+import com.beatohm.DeviceUtils
 import com.beatohm.R
 import com.beatohm.databinding.FragmentSettingsBinding
 import com.beatohm.model.PatternToken
@@ -379,7 +380,7 @@ class SettingsFragment : Fragment() {
         val pattern = buildPatternString()
         val (subDir, fileName) = FolderPatternParser.resolvePattern(pattern, sampleSong)
         val path = buildString {
-            append("MusicDownloader")
+            append(DeviceUtils.MUSIC_FOLDER_NAME)
             if (subDir.isNotBlank()) {
                 append("/").append(subDir)
             }

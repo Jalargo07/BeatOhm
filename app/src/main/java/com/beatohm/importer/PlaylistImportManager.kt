@@ -2,10 +2,22 @@ package com.beatohm.importer
 
 import android.content.Context
 import android.util.Log
+import com.beatohm.DeviceUtils
 import com.beatohm.data.AppDatabase
+import com.beatohm.data.AudioTagWriter
+import com.beatohm.data.LocalSong
+import com.beatohm.downloader.ProxyDownloader
+import com.beatohm.metadata.LyricsFetcher
+import com.beatohm.metadata.MetadataFetcher
+import com.beatohm.model.Song
+import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.random.Random
@@ -42,8 +54,19 @@ class PlaylistImportManager(private val context: Context) {
     @Volatile
     private var isCancelled = false
 
+    private val proxyDownloader = ProxyDownloader()
+    private val metadataFetcher = MetadataFetcher()
+    private val lyricsFetcher = LyricsFetcher()
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
+
     var onProgress: ((completed: Int, total: Int, currentTrack: String) -> Unit)? = null
     var onComplete: ((imported: Int, failed: Int, skipped: Int) -> Unit)? = null
+    var onTrackCompleted: ((title: String, artist: String, filePath: String) -> Unit)? = null
 
     /**
      * Start importing a playlist from URL.
@@ -170,6 +193,8 @@ class PlaylistImportManager(private val context: Context) {
             val pendingTracks = trackStatusDao.getPendingTracks(sessionId, BATCH_SIZE)
             if (pendingTracks.isEmpty()) break
 
+            Log.d(TAG, "Batch: ${pendingTracks.size} pending tracks remaining")
+
             for (track in pendingTracks) {
                 currentCoroutineContext().ensureActive()
                 if (isCancelled) break
@@ -243,6 +268,7 @@ class PlaylistImportManager(private val context: Context) {
      */
     private suspend fun importSingleTrack(track: ImportTrackStatus, sessionId: Long) {
         val searchQuery = ImportedTrack(track.title, track.artist, track.album, track.durationSec).searchQuery
+        Log.d(TAG, "Importing track ${track.artist} - ${track.title} (query: $searchQuery)")
         val searchResults = searchYouTube(searchQuery)
 
         if (searchResults.isEmpty()) {
@@ -253,32 +279,44 @@ class PlaylistImportManager(private val context: Context) {
             ?: throw Exception("No suitable match found for: $searchQuery")
 
         val tempFile = downloadToTemp(bestMatch.url)
+        Log.d(TAG, "Downloaded to temp: ${tempFile.absolutePath} (${tempFile.length() / 1024}KB)")
 
         try {
-            // Run metadata + lyrics in parallel (Black hole #4: non-blocking)
-            coroutineScope {
-                val metadataDeferred = async { fetchMetadata(track) }
-                val lyricsDeferred = async { fetchLyrics(track) }
+            // Step 1: Fetch metadata FIRST (iTunes/MusicBrainz) to get correct artist/title
+            val metadata = fetchMetadata(track)
+            val finalMetadata = metadata ?: MetadataResult(
+                title = track.title,
+                artist = track.artist,
+                album = track.album,
+                genre = "",
+                year = "",
+                trackNumber = 0
+            )
 
-                val metadata = metadataDeferred.await()
-                val lyrics = lyricsDeferred.await()
+            // Step 2: Fetch lyrics using CORRECTED metadata (not raw Spotify/Deezer data)
+            val lyrics = fetchLyricsWithMetadata(finalMetadata.artist, finalMetadata.title)
 
-                val finalMetadata = metadata ?: MetadataResult(
-                    title = track.title,
-                    artist = track.artist,
-                    album = track.album,
-                    genre = "",
-                    year = "",
-                    trackNumber = 0
-                )
-                writeTags(tempFile, finalMetadata, lyrics)
+            // Step 3: Write tags with everything
+            writeTags(tempFile, finalMetadata, lyrics)
+            Log.d(TAG, "Tags written to: ${tempFile.absolutePath}")
 
-                val finalPath = moveToOrganizedFolder(tempFile, track, finalMetadata)
+            val finalPath = moveToOrganizedFolder(tempFile, track, finalMetadata)
 
-                trackStatusDao.markCompleted(track.id, finalPath)
+            // Step 4: Save to Room DB with lyrics so the player can show them
+            saveSongToDb(finalMetadata, lyrics, finalPath)
 
-                // Generate waveform in background (don't block)
-                launch { generateWaveform(finalPath) }
+            trackStatusDao.markCompleted(track.id, finalPath)
+
+            // Notify that this track completed (for UI updates in DownloadsFragment)
+            onTrackCompleted?.invoke(
+                finalMetadata.title,
+                finalMetadata.artist,
+                finalPath
+            )
+
+            // Generate waveform in background (don't block)
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                generateWaveform(finalPath)
             }
 
         } catch (e: Exception) {
@@ -288,7 +326,25 @@ class PlaylistImportManager(private val context: Context) {
     }
 
     private suspend fun searchYouTube(query: String): List<YouTubeSearchResult> {
-        return emptyList()
+        return try {
+            val extractor = com.beatohm.extractor.YouTubeExtractor()
+            val result = extractor.searchSongs(query)
+            if (result.isSuccess) {
+                result.getOrNull()?.map { searchResult ->
+                    YouTubeSearchResult(
+                        url = searchResult.youtubeUrl,
+                        title = searchResult.title,
+                        durationSec = searchResult.durationSeconds.toInt()
+                    )
+                } ?: emptyList()
+            } else {
+                Log.e(TAG, "YouTube search failed: ${result.exceptionOrNull()?.message}")
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "YouTube search error: ${e.message}")
+            emptyList()
+        }
     }
 
     /**
@@ -324,20 +380,133 @@ class PlaylistImportManager(private val context: Context) {
     }
 
     private suspend fun downloadToTemp(youtubeUrl: String): java.io.File {
-        val tempDir = java.io.File(context.cacheDir, "import_temp")
-        tempDir.mkdirs()
-        return java.io.File(tempDir, "${System.currentTimeMillis()}.opus")
+        val proxyResult = proxyDownloader.getDownloadUrl(youtubeUrl)
+        if (proxyResult.isFailure) {
+            throw Exception("Failed to get download URL: ${proxyResult.exceptionOrNull()?.message}")
+        }
+        val proxyUrl = proxyResult.getOrThrow()
+
+        // Download to /Music/BeatOhm/Unknown/ — tag here, then rename to final name
+        val musicDir = android.os.Environment.getExternalStoragePublicDirectory(
+            android.os.Environment.DIRECTORY_MUSIC
+        )
+        val stagingDir = java.io.File(musicDir, "${DeviceUtils.MUSIC_FOLDER_NAME}/Unknown")
+        stagingDir.mkdirs()
+        val tempFile = java.io.File(stagingDir, "${System.currentTimeMillis()}.mp3")
+
+        val request = Request.Builder()
+            .url(proxyUrl.url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .build()
+
+        val response = httpClient.newCall(request).execute()
+        val body = response.body ?: throw Exception("Empty response body")
+        val code = response.code
+
+        if (code != 200) {
+            response.close()
+            throw Exception("HTTP $code downloading audio")
+        }
+
+        FileOutputStream(tempFile).use { output ->
+            body.byteStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                }
+            }
+        }
+        response.close()
+
+        if (tempFile.length() == 0L) {
+            tempFile.delete()
+            throw Exception("Downloaded file is empty")
+        }
+
+        Log.d(TAG, "Downloaded ${tempFile.length() / 1024}KB to ${tempFile.name}")
+        return tempFile
     }
 
     private suspend fun fetchMetadata(track: ImportTrackStatus): MetadataResult? {
-        return null
+        return try {
+            val song = Song(
+                title = track.title,
+                artist = track.artist,
+                album = track.album ?: ""
+            )
+            val result = metadataFetcher.fetchFullMetadata(song)
+            if (result.isSuccess) {
+                val fetched = result.getOrThrow()
+                MetadataResult(
+                    title = fetched.title,
+                    artist = fetched.artist,
+                    album = fetched.album,
+                    genre = fetched.genre,
+                    year = fetched.year,
+                    trackNumber = fetched.trackNumber
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchMetadata error: ${e.message}")
+            null
+        }
     }
 
     private suspend fun fetchLyrics(track: ImportTrackStatus): String? {
-        return null
+        return try {
+            val result = lyricsFetcher.fetchLyrics(track.artist, track.title)
+            if (result.isSuccess) {
+                result.getOrThrow().plainText
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchLyrics error: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Fetch lyrics using corrected metadata (after iTunes/MusicBrainz lookup).
+     * Uses the clean artist/title instead of raw Spotify/Deezer data.
+     */
+    private suspend fun fetchLyricsWithMetadata(artist: String, title: String): String? {
+        return try {
+            Log.d(TAG, "fetchLyricsWithMetadata: '$artist' - '$title'")
+            val result = lyricsFetcher.fetchLyrics(artist, title)
+            if (result.isSuccess) {
+                val lyrics = result.getOrThrow().plainText
+                Log.d(TAG, "fetchLyricsWithMetadata OK: ${lyrics.length} chars")
+                lyrics
+            } else {
+                Log.d(TAG, "fetchLyricsWithMetadata: no lyrics found")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchLyricsWithMetadata error: ${e.message}")
+            null
+        }
     }
 
     private fun writeTags(file: java.io.File, metadata: MetadataResult, lyrics: String?) {
+        try {
+            val localSong = LocalSong(
+                id = file.absolutePath,
+                title = metadata.title,
+                artist = metadata.artist,
+                album = metadata.album,
+                genre = metadata.genre,
+                year = metadata.year,
+                trackNumber = metadata.trackNumber,
+                lyrics = lyrics ?: ""
+            )
+            AudioTagWriter.writeTags(file, localSong)
+        } catch (e: Exception) {
+            Log.e(TAG, "writeTags error: ${e.message}")
+        }
     }
 
     private fun moveToOrganizedFolder(
@@ -348,14 +517,57 @@ class PlaylistImportManager(private val context: Context) {
         val musicDir = android.os.Environment.getExternalStoragePublicDirectory(
             android.os.Environment.DIRECTORY_MUSIC
         )
-        val targetDir = java.io.File(musicDir, "BeatOhm")
-        targetDir.mkdirs()
-        val targetFile = java.io.File(targetDir, "${track.artist} - ${track.title}.opus")
-        tempFile.renameTo(targetFile)
+        val targetDir = java.io.File(musicDir, DeviceUtils.MUSIC_FOLDER_NAME)
+        if (!targetDir.exists()) targetDir.mkdirs()
+
+        val safeName = "${metadata.artist} - ${metadata.title}.${tempFile.extension}"
+            .replace(Regex("[/\\\\:*?\"<>|]"), "_")
+        val targetFile = java.io.File(targetDir, safeName)
+
+        if (targetFile.exists()) targetFile.delete()
+
+        // copyTo works across filesystems; renameTo does NOT on Android
+        tempFile.copyTo(targetFile, overwrite = true)
+        tempFile.delete()
+
+        Log.d(TAG, "Moved to: ${targetFile.absolutePath} (${targetFile.length() / 1024}KB)")
         return targetFile.absolutePath
     }
 
+    /**
+     * Save imported song to Room DB so the player can show lyrics and metadata.
+     */
+    private suspend fun saveSongToDb(metadata: MetadataResult, lyrics: String?, filePath: String) {
+        try {
+            val localSong = LocalSong(
+                id = filePath,
+                title = metadata.title,
+                artist = metadata.artist,
+                album = metadata.album,
+                genre = metadata.genre,
+                year = metadata.year,
+                trackNumber = metadata.trackNumber,
+                filePath = filePath,
+                lyrics = lyrics ?: ""
+            )
+            db.songDao().insertSong(localSong)
+            Log.d(TAG, "Saved to DB: ${metadata.artist} - ${metadata.title} (lyrics: ${(lyrics ?: "").length} chars)")
+        } catch (e: Exception) {
+            Log.e(TAG, "saveSongToDb error: ${e.message}")
+        }
+    }
+
     private suspend fun generateWaveform(path: String) {
+        try {
+            val waveform = com.beatohm.audio.WaveformExtractor.extract(path)
+            val waveformJson = Gson().toJson(waveform.toList())
+            val songId = db.songDao().getIdByPath(path)
+            if (songId != null) {
+                db.songDao().updateWaveform(songId, waveformJson)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "generateWaveform error: ${e.message}")
+        }
     }
 
     data class YouTubeSearchResult(
