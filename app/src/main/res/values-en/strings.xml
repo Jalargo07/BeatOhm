@@ -352,4 +352,19 @@
     <string name="regen_retry_failed">Retry failed (%1$d failed)</string>
     <string name="regen_channel_name">Metadata regeneration</string>
     <string name="regen_channel_description">Progress of song metadata regeneration</string>
+
+    <!-- Import Playlist -->
+    <string name="import_playlist_button">Import playlist</string>
+    <string name="import_playlist_title">Import Playlist</string>
+    <string name="import_playlist_hint">Paste a Spotify or Deezer URL</string>
+    <string name="import_playlist_detecting">Detecting platform…</string>
+    <string name="import_playlist_platform_deezer">Deezer</string>
+    <string name="import_playlist_platform_spotify">Spotify</string>
+    <string name="import_playlist_invalid_url">Invalid URL</string>
+    <string name="import_playlist_start">Import</string>
+    <string name="import_playlist_resume">Resume</string>
+    <string name="import_playlist_resume_available">You have an unfinished import</string>
+    <string name="import_playlist_progress">Importing %1$d of %2$d: %3$s</string>
+    <string name="import_playlist_complete">Import complete: %1$d imported, %2$d failed, %3$d skipped</string>
+    <string name="import_playlist_error">Import error: %1$s</string>
 </resources>

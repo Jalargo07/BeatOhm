@@ -346,4 +346,19 @@
     <string name="regen_retry_failed">Repetir falhadas (%1$d falharam)</string>
     <string name="regen_channel_name">Regeneração de metadados</string>
     <string name="regen_channel_description">Progresso da regeneração de metadados das músicas</string>
+
+    <!-- Import Playlist -->
+    <string name="import_playlist_button">Importar playlist</string>
+    <string name="import_playlist_title">Importar Playlist</string>
+    <string name="import_playlist_hint">Cole a URL do Spotify ou Deezer</string>
+    <string name="import_playlist_detecting">Detectando plataforma…</string>
+    <string name="import_playlist_platform_deezer">Deezer</string>
+    <string name="import_playlist_platform_spotify">Spotify</string>
+    <string name="import_playlist_invalid_url">URL inválida</string>
+    <string name="import_playlist_start">Importar</string>
+    <string name="import_playlist_resume">Continuar</string>
+    <string name="import_playlist_resume_available">Você tem uma importação inacabada</string>
+    <string name="import_playlist_progress">Importando %1$d de %2$d: %3$s</string>
+    <string name="import_playlist_complete">Importação concluída: %1$d importadas, %2$d falharam, %3$d ignoradas</string>
+    <string name="import_playlist_error">Erro na importação: %1$s</string>
 </resources>

@@ -23,6 +23,13 @@
 
 ### ⬇️ Descarga
 
+- **Importación masiva de playlists** — pegá una URL de Spotify o Deezer y descargá toda la playlist automáticamente.
+  - Paginación completa para playlists grandes (100+ tracks)
+  - Rate limiting inteligente (máx 2 descargas simultáneas)
+  - Reintentos con exponential backoff
+  - Progress bar "Importando X de N"
+  - Cancelación limpia
+  - Reanudación automática si la app se cierra
 - **YouTube / YouTube Music** — pegá cualquier link (playlist o canción individual) y descargá.
 - **Metadata automática** — InnerTube extrae título, artista y miniatura. Luego se enriquece con iTunes y MusicBrainz (álbum, género, año, número de track, carátula en alta resolución).
 - **Letras multi-fuente** — cascada de LRCLIB → Genius → lyrics.ovh con variantes de búsqueda. Soporte de letras sincronizadas (LRC).

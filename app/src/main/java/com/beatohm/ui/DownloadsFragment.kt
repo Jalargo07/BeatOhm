@@ -59,6 +59,10 @@ class DownloadsFragment : Fragment() {
 
         binding.btnSearch.setOnClickListener { startSearch() }
 
+        binding.btnImportPlaylist.setOnClickListener {
+            ImportPlaylistBottomSheet.newInstance().show(childFragmentManager, ImportPlaylistBottomSheet.TAG)
+        }
+
         TutorialManager.showTutorial(
             requireActivity(),
             "downloads",
