@@ -155,7 +155,13 @@ gh release create nightly-260810 --title "nightly-260810" --notes "Resumen..." -
 
 | Versión | Tipo | Estado | Fecha |
 |---------|------|--------|-------|
-| v2.7-stable | Stable | Latest | 2026-08-09 |
+| v2.10-stable | Stable | Latest | 2026-08-14 |
+| v2.9-stable | Stable | Archived | 2026-08-11 |
+| nightly-260812 | Nightly | Pre-release | 2026-08-12 |
+| nightly-260811 | Nightly | Pre-release | 2026-08-11 |
+| v2.8-stable | Stable | Archived | 2026-08-10 |
+| nightly-260810 | Nightly | Pre-release | 2026-08-10 |
+| v2.7-stable | Stable | Archived | 2026-08-09 |
 | nightly-260809 | Nightly | Pre-release | 2026-08-09 |
 | v2.6-stable | Stable | Archived | 2026-08-08 |
 | nightly-260808 | Nightly | Pre-release | 2026-08-08 |
