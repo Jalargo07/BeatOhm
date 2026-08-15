@@ -2,6 +2,8 @@
 
 # 🎵 BeatOhm
 
+<img src="docs/screenshots/beatohm_logo.png" alt="BeatOhm logo" width="400"/>
+
 ### Tu estudio de sonido personal. Audio moldea, BeatOhm lo hace visible.
 
 **Descargá, procesá y escuchá tu música favorita — con descargas en MP3, soporte multi-formato (MP3, M4A, FLAC, OGG, Opus, WAV), metadata impecable, letras multi-fuente y un visualizador que moldea el audio en tiempo real.**
