@@ -93,7 +93,7 @@ class PlayerAnimationHelper(
     }
 
     fun animateSongChange(
-        song: Song,
+        @Suppress("UNUSED_PARAMETER") song: Song,
         onSongUpdated: () -> Unit
     ) {
         if (!isActive) return

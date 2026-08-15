@@ -8,7 +8,8 @@ import com.beatohm.R
 data class IconPack(
     val id: String,
     val displayName: String,
-    val icons: Map<String, Int>
+    val icons: Map<String, Int>,
+    val isColorAware: Boolean = false,
 ) {
     fun getIcon(name: String, context: Context): Drawable? {
         val resId = icons[name] ?: return null
@@ -58,17 +59,24 @@ object IconPackManager {
     private val allPacks = mutableListOf<IconPack>()
 
     init {
-        allPacks.add(defaultPack())
-        allPacks.add(darknovaPack())
         allPacks.add(heroicPack())
+        allPacks.add(lucidePack())
+        allPacks.add(neonPack())
+        allPacks.add(glassPack())
+        allPacks.add(gradientPack())
+        allPacks.add(phosphorPack())
     }
 
     fun getAllPacks(): List<IconPack> = allPacks.toList()
 
     /**
      * Get ALL app icon resource IDs for the active icon pack.
-     * Replaces getPlayerIconResIds — returns ~30 entries covering
+     * Returns ~30 entries covering
      * player controls, bottom nav, library categories, downloads, mini player.
+     *
+     * Note: color-aware packs (isColorAware=true) do NOT use this map.
+     * Their drawables are built programmatically via [IconPackDrawableFactory.getDrawable],
+     * accessed through [getIcon] which delegates accordingly.
      */
     fun getAppIconResIds(packId: String): Map<String, Int> {
         val pack = getPackById(packId)
@@ -82,7 +90,7 @@ object IconPackManager {
             ICON_REPEAT to (pack.getIconResId(ICON_REPEAT) ?: R.drawable.ic_repeat),
             ICON_REPEAT_ONE to (pack.getIconResId(ICON_REPEAT_ONE) ?: R.drawable.ic_repeat_one),
             ICON_HEART to (pack.getIconResId(ICON_HEART) ?: R.drawable.ic_favorite),
-            ICON_HEART_BORDER to (pack.getIconResId(ICON_HEART_BORDER) ?: R.drawable.ic_bookmark_border),
+            ICON_HEART_BORDER to (pack.getIconResId(ICON_HEART_BORDER) ?: R.drawable.ic_favorite_border),
             ICON_VOLUME to (pack.getIconResId(ICON_VOLUME) ?: R.drawable.ic_volume),
             ICON_EQUALIZER to (pack.getIconResId(ICON_EQUALIZER) ?: R.drawable.ic_equalizer),
             ICON_QUEUE to (pack.getIconResId(ICON_QUEUE) ?: R.drawable.ic_queue_music),
@@ -105,12 +113,6 @@ object IconPackManager {
             ICON_FOLDER to (pack.getIconResId(ICON_FOLDER) ?: R.drawable.ic_folder),
         )
     }
-
-    /**
-     * @deprecated Use [getAppIconResIds] instead.
-     */
-    @Deprecated("Use getAppIconResIds", ReplaceWith("getAppIconResIds(packId)"))
-    fun getPlayerIconResIds(packId: String): Map<String, Int> = getAppIconResIds(packId)
 
     fun getBottomNavIconResIds(packId: String): Map<String, Int> {
         val all = getAppIconResIds(packId)
@@ -149,86 +151,22 @@ object IconPackManager {
     }
 
     fun getPackById(id: String): IconPack =
-        allPacks.find { it.id == id } ?: defaultPack()
+        allPacks.find { it.id == id } ?: lucidePack()
 
     fun getIcon(name: String, packId: String, context: Context): Drawable? {
         val pack = getPackById(packId)
+        if (pack.isColorAware) {
+            return IconPackDrawableFactory.getDrawable(
+                packId, name, context,
+                ThemeManager.accentColor, ThemeManager.secondaryColor
+            )
+        }
         return pack.getIcon(name, context)
     }
 
-    // ── Default Pack (Material) ──────────────────────────────────
+    fun isColorAwarePack(packId: String): Boolean = getPackById(packId).isColorAware
 
-    private fun defaultPack() = IconPack(
-        id = "default",
-        displayName = "Material",
-        icons = mapOf(
-            ICON_PLAY to R.drawable.ic_play,
-            ICON_PAUSE to R.drawable.ic_pause,
-            ICON_NEXT to R.drawable.ic_next,
-            ICON_PREV to R.drawable.ic_prev,
-            ICON_SHUFFLE to R.drawable.ic_shuffle,
-            ICON_REPEAT to R.drawable.ic_repeat,
-            ICON_REPEAT_ONE to R.drawable.ic_repeat_one,
-            ICON_HEART to R.drawable.ic_favorite,
-            ICON_HEART_BORDER to R.drawable.ic_bookmark_border,
-            ICON_SEARCH to R.drawable.ic_search,
-            ICON_SETTINGS to R.drawable.ic_settings,
-            ICON_VOLUME to R.drawable.ic_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_equalizer,
-            ICON_QUEUE to R.drawable.ic_queue_music,
-            ICON_LYRICS to R.drawable.ic_lyrics,
-            ICON_MUSIC_NOTE to R.drawable.ic_music_note,
-            ICON_BACK to R.drawable.ic_back,
-            ICON_PLAYER to R.drawable.ic_player,
-            ICON_LIBRARY to R.drawable.ic_library,
-            ICON_DOWNLOADS to R.drawable.ic_downloads,
-            ICON_MIC to R.drawable.ic_mic,
-            ICON_GENRES to R.drawable.ic_genres,
-            ICON_ALBUM to R.drawable.ic_album,
-            ICON_PLAYLIST to R.drawable.ic_playlist,
-            ICON_TRENDING to R.drawable.ic_trending_up,
-            ICON_FOLDER to R.drawable.ic_folder,
-        )
-    )
-
-    // ── Outline Pack ─────────────────────────────────────────────
-
-    private fun outlinePack() = IconPack(
-        id = "outline",
-        displayName = "Outline",
-        icons = mapOf(
-            ICON_PLAY to R.drawable.ic_play_outline,
-            ICON_PAUSE to R.drawable.ic_pause_outline,
-            ICON_NEXT to R.drawable.ic_next_outline,
-            ICON_PREV to R.drawable.ic_prev_outline,
-            ICON_SHUFFLE to R.drawable.ic_shuffle_outline,
-            ICON_REPEAT to R.drawable.ic_repeat_outline,
-            ICON_REPEAT_ONE to R.drawable.ic_repeat_outline,
-            ICON_HEART to R.drawable.ic_heart_outline,
-            ICON_HEART_BORDER to R.drawable.ic_heart_outline,
-            ICON_SEARCH to R.drawable.ic_search,
-            ICON_SETTINGS to R.drawable.ic_settings_outline,
-            ICON_VOLUME to R.drawable.ic_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_equalizer,
-            ICON_QUEUE to R.drawable.ic_queue_music,
-            ICON_LYRICS to R.drawable.ic_lyrics,
-            ICON_MUSIC_NOTE to R.drawable.ic_music_note,
-            ICON_BACK to R.drawable.ic_back,
-            ICON_PLAYER to R.drawable.ic_player,
-            ICON_LIBRARY to R.drawable.ic_library,
-            ICON_DOWNLOADS to R.drawable.ic_downloads,
-            ICON_MIC to R.drawable.ic_mic,
-            ICON_GENRES to R.drawable.ic_genres,
-            ICON_ALBUM to R.drawable.ic_album,
-            ICON_PLAYLIST to R.drawable.ic_playlist,
-            ICON_TRENDING to R.drawable.ic_trending_up,
-            ICON_FOLDER to R.drawable.ic_folder,
-        )
-    )
-
-    // ── Filled Pack ──────────────────────────────────────────────
+    // ── Heroic Pack ─────────────────────────────────────────────
 
     private fun heroicPack() = IconPack(
         id = "heroic",
@@ -264,151 +202,73 @@ object IconPackManager {
         )
     )
 
-    // ── BooWop Pack ──────────────────────────────────────────────
-    // Soft, rounded filled shapes — kawaii aesthetic
+    // ── Lucide Pack ─────────────────────────────────────────────
+    // Fine rounded line icons (MIT, lucide.dev) — tint normal
 
-    private fun boowopPack() = IconPack(
-        id = "boowop",
-        displayName = "BooWop",
+    private fun lucidePack() = IconPack(
+        id = "lucide",
+        displayName = "Lucide",
         icons = mapOf(
-            ICON_PLAY to R.drawable.ic_bn_play,
-            ICON_PAUSE to R.drawable.ic_bn_pause,
-            ICON_NEXT to R.drawable.ic_bn_next,
-            ICON_PREV to R.drawable.ic_bn_prev,
-            ICON_SHUFFLE to R.drawable.ic_bn_shuffle,
-            ICON_REPEAT to R.drawable.ic_bn_repeat,
-            ICON_REPEAT_ONE to R.drawable.ic_bn_repeat_one,
-            ICON_HEART to R.drawable.ic_bn_heart,
-            ICON_HEART_BORDER to R.drawable.ic_bn_heart_border,
-            ICON_SEARCH to R.drawable.ic_bn_search,
-            ICON_SETTINGS to R.drawable.ic_bn_settings,
-            ICON_VOLUME to R.drawable.ic_bn_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_bn_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_bn_equalizer,
-            ICON_QUEUE to R.drawable.ic_bn_queue,
-            ICON_LYRICS to R.drawable.ic_bn_lyrics,
-            ICON_MUSIC_NOTE to R.drawable.ic_bn_music_note,
-            ICON_BACK to R.drawable.ic_bn_back,
-            ICON_PLAYER to R.drawable.ic_bn_player,
-            ICON_LIBRARY to R.drawable.ic_bn_library,
-            ICON_DOWNLOADS to R.drawable.ic_bn_downloads,
-            ICON_MIC to R.drawable.ic_bn_mic,
-            ICON_GENRES to R.drawable.ic_bn_genres,
-            ICON_ALBUM to R.drawable.ic_bn_album,
-            ICON_PLAYLIST to R.drawable.ic_bn_playlist,
-            ICON_TRENDING to R.drawable.ic_bn_trending,
-            ICON_FOLDER to R.drawable.ic_bn_folder,
+            ICON_PLAY to R.drawable.ic_lucide_play,
+            ICON_PAUSE to R.drawable.ic_lucide_pause,
+            ICON_NEXT to R.drawable.ic_lucide_next,
+            ICON_PREV to R.drawable.ic_lucide_prev,
+            ICON_SHUFFLE to R.drawable.ic_lucide_shuffle,
+            ICON_REPEAT to R.drawable.ic_lucide_repeat,
+            ICON_REPEAT_ONE to R.drawable.ic_lucide_repeat_one,
+            ICON_HEART to R.drawable.ic_lucide_heart,
+            ICON_HEART_BORDER to R.drawable.ic_lucide_heart_border,
+            ICON_VOLUME to R.drawable.ic_lucide_volume,
+            ICON_EQUALIZER to R.drawable.ic_lucide_equalizer,
+            ICON_QUEUE to R.drawable.ic_lucide_queue,
+            ICON_LYRICS to R.drawable.ic_lucide_lyrics,
+            ICON_SEARCH to R.drawable.ic_lucide_search,
+            ICON_SETTINGS to R.drawable.ic_lucide_settings,
+            ICON_PLAYLIST_ADD to R.drawable.ic_lucide_playlist_add,
+            ICON_BACK to R.drawable.ic_lucide_back,
+            ICON_MUSIC_NOTE to R.drawable.ic_lucide_music_note,
+            ICON_PLAYER to R.drawable.ic_lucide_player,
+            ICON_LIBRARY to R.drawable.ic_lucide_library,
+            ICON_DOWNLOADS to R.drawable.ic_lucide_downloads,
+            ICON_MIC to R.drawable.ic_lucide_mic,
+            ICON_GENRES to R.drawable.ic_lucide_genres,
+            ICON_ALBUM to R.drawable.ic_lucide_album,
+            ICON_PLAYLIST to R.drawable.ic_lucide_playlist,
+            ICON_TRENDING to R.drawable.ic_lucide_trending,
+            ICON_FOLDER to R.drawable.ic_lucide_folder,
         )
     )
 
-    // ── DarkNova Pack ────────────────────────────────────────────
-    // Heavy geometric shapes, solid fills, extra thick strokes
-
-    private fun darknovaPack() = IconPack(
-        id = "darknova",
-        displayName = "DarkNova",
-        icons = mapOf(
-            ICON_PLAY to R.drawable.ic_bd_play,
-            ICON_PAUSE to R.drawable.ic_bd_pause,
-            ICON_NEXT to R.drawable.ic_bd_next,
-            ICON_PREV to R.drawable.ic_bd_prev,
-            ICON_SHUFFLE to R.drawable.ic_bd_shuffle,
-            ICON_REPEAT to R.drawable.ic_bd_repeat,
-            ICON_REPEAT_ONE to R.drawable.ic_bd_repeat_one,
-            ICON_HEART to R.drawable.ic_bd_heart,
-            ICON_HEART_BORDER to R.drawable.ic_bd_heart_border,
-            ICON_SEARCH to R.drawable.ic_bd_search,
-            ICON_SETTINGS to R.drawable.ic_bd_settings,
-            ICON_VOLUME to R.drawable.ic_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_equalizer,
-            ICON_QUEUE to R.drawable.ic_bd_queue,
-            ICON_LYRICS to R.drawable.ic_bd_lyrics,
-            ICON_MUSIC_NOTE to R.drawable.ic_bd_music_note,
-            ICON_BACK to R.drawable.ic_bd_back,
-            ICON_PLAYER to R.drawable.ic_bd_player,
-            ICON_LIBRARY to R.drawable.ic_bd_library,
-            ICON_DOWNLOADS to R.drawable.ic_bd_downloads,
-            ICON_MIC to R.drawable.ic_bd_mic,
-            ICON_GENRES to R.drawable.ic_bd_genres,
-            ICON_ALBUM to R.drawable.ic_bd_album,
-            ICON_PLAYLIST to R.drawable.ic_bd_playlist,
-            ICON_TRENDING to R.drawable.ic_bd_trending,
-            ICON_FOLDER to R.drawable.ic_bd_folder,
-        )
+    // ── Neon Pack (color-aware) ──────────────────────────────────
+    private fun neonPack() = IconPack(
+        id = "neon",
+        displayName = "Neón Glow 2.0",
+        icons = emptyMap(),
+        isColorAware = true,
     )
 
-    // ── Mononoki Pack ────────────────────────────────────────────
-    // Glowing outlines + neon fill
-
-    private fun mononokiPack() = IconPack(
-        id = "mononoki",
-        displayName = "Mononoki",
-        icons = mapOf(
-            ICON_PLAY to R.drawable.ic_nn_play,
-            ICON_PAUSE to R.drawable.ic_nn_pause,
-            ICON_NEXT to R.drawable.ic_nn_next,
-            ICON_PREV to R.drawable.ic_nn_prev,
-            ICON_SHUFFLE to R.drawable.ic_nn_shuffle,
-            ICON_REPEAT to R.drawable.ic_nn_repeat,
-            ICON_REPEAT_ONE to R.drawable.ic_nn_repeat_one,
-            ICON_HEART to R.drawable.ic_nn_heart,
-            ICON_HEART_BORDER to R.drawable.ic_nn_heart_border,
-            ICON_SEARCH to R.drawable.ic_nn_search,
-            ICON_SETTINGS to R.drawable.ic_nn_settings,
-            ICON_VOLUME to R.drawable.ic_nn_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_nn_equalizer,
-            ICON_QUEUE to R.drawable.ic_nn_queue,
-            ICON_LYRICS to R.drawable.ic_nn_lyrics,
-            ICON_MUSIC_NOTE to R.drawable.ic_nn_music_note,
-            ICON_BACK to R.drawable.ic_nn_back,
-            ICON_PLAYER to R.drawable.ic_nn_player,
-            ICON_LIBRARY to R.drawable.ic_nn_library,
-            ICON_DOWNLOADS to R.drawable.ic_nn_downloads,
-            ICON_MIC to R.drawable.ic_nn_mic,
-            ICON_GENRES to R.drawable.ic_nn_genres,
-            ICON_ALBUM to R.drawable.ic_nn_album,
-            ICON_PLAYLIST to R.drawable.ic_nn_playlist,
-            ICON_TRENDING to R.drawable.ic_nn_trending,
-            ICON_FOLDER to R.drawable.ic_nn_folder,
-        )
+    // ── Glass Pack (color-aware) ─────────────────────────────────
+    private fun glassPack() = IconPack(
+        id = "glass",
+        displayName = "Glassmorphism",
+        icons = emptyMap(),
+        isColorAware = true,
     )
 
-    // ── Mainstage Pack ───────────────────────────────────────────
-    // Ultra-thin geometric lines
-
-    private fun mainstagePack() = IconPack(
-        id = "mainstage",
-        displayName = "Mainstage",
-        icons = mapOf(
-            ICON_PLAY to R.drawable.ic_mn_play,
-            ICON_PAUSE to R.drawable.ic_mn_pause,
-            ICON_NEXT to R.drawable.ic_mn_next,
-            ICON_PREV to R.drawable.ic_mn_prev,
-            ICON_SHUFFLE to R.drawable.ic_mn_shuffle,
-            ICON_REPEAT to R.drawable.ic_mn_repeat,
-            ICON_REPEAT_ONE to R.drawable.ic_mn_repeat_one,
-            ICON_HEART to R.drawable.ic_mn_heart,
-            ICON_HEART_BORDER to R.drawable.ic_mn_heart_border,
-            ICON_SEARCH to R.drawable.ic_mn_search,
-            ICON_SETTINGS to R.drawable.ic_mn_settings,
-            ICON_VOLUME to R.drawable.ic_mn_volume,
-            ICON_PLAYLIST_ADD to R.drawable.ic_playlist_add,
-            ICON_EQUALIZER to R.drawable.ic_mn_equalizer,
-            ICON_QUEUE to R.drawable.ic_mn_queue,
-            ICON_LYRICS to R.drawable.ic_mn_lyrics,
-            ICON_MUSIC_NOTE to R.drawable.ic_mn_music_note,
-            ICON_BACK to R.drawable.ic_mn_back,
-            ICON_PLAYER to R.drawable.ic_mn_player,
-            ICON_LIBRARY to R.drawable.ic_mn_library,
-            ICON_DOWNLOADS to R.drawable.ic_mn_downloads,
-            ICON_MIC to R.drawable.ic_mn_mic,
-            ICON_GENRES to R.drawable.ic_mn_genres,
-            ICON_ALBUM to R.drawable.ic_mn_album,
-            ICON_PLAYLIST to R.drawable.ic_mn_playlist,
-            ICON_TRENDING to R.drawable.ic_mn_trending,
-            ICON_FOLDER to R.drawable.ic_mn_folder,
-        )
+    // ── Gradient Pack (color-aware) ──────────────────────────────
+    private fun gradientPack() = IconPack(
+        id = "gradient",
+        displayName = "Gradient Bold",
+        icons = emptyMap(),
+        isColorAware = true,
     )
+
+    // ── Phosphor Pack (color-aware) ──────────────────────────────
+    private fun phosphorPack() = IconPack(
+        id = "phosphor",
+        displayName = "Phosphor Duotone",
+        icons = emptyMap(),
+        isColorAware = true,
+    )
+
 }

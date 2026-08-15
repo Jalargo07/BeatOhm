@@ -68,6 +68,7 @@ class SyncedLyricsView @JvmOverloads constructor(
     private val autoScrollZone: Float
         get() = height / 3f
 
+    @Suppress("DEPRECATION")
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val lineSpacing = 42f * scaledDensity
     private val maxTextWidthMargin = 16f * scaledDensity
@@ -451,7 +452,7 @@ class SyncedLyricsView @JvmOverloads constructor(
         }
     }
 
-    private fun drawCenteredText(canvas: Canvas, text: String, cx: Float, y: Float, paint: TextPaint, maxWidth: Float) {
+    private fun drawCenteredText(canvas: Canvas, text: String, @Suppress("UNUSED_PARAMETER") cx: Float, y: Float, paint: TextPaint, maxWidth: Float) {
         val staticLayout = StaticLayout.Builder.obtain(
             text, 0, text.length, paint, maxWidth.toInt()
         )

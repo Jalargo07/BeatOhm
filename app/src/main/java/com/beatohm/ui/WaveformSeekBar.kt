@@ -315,9 +315,7 @@ class WaveformSeekBar @JvmOverloads constructor(
             val p2 = waterAnchorY[i + 1]
             val p3 = if (i + 2 < 3) waterAnchorY[i + 2] else waterAnchorY[2]
 
-            val cp1x = anchorX[i] + (anchorX[i + 1] - anchorX[i]) * 0.3f
             val cp1y = p1 + (p2 - p0) * 0.15f
-            val cp2x = anchorX[i + 1] - (anchorX[i + 1] - anchorX[i]) * 0.3f
             val cp2y = p2 - (p3 - p1) * 0.15f
 
             var x = anchorX[i]
@@ -485,7 +483,7 @@ class WaveformSeekBar @JvmOverloads constructor(
      * Returns a copy of the played bar silhouette path, translated to the
      * parent layout's coordinate space (for masking in WaterVisualizerDrawable).
      */
-    fun getPlayedSilhouettePath(parentLayoutTop: Int): Path {
+    fun getPlayedSilhouettePath(@Suppress("UNUSED_PARAMETER") parentLayoutTop: Int): Path {
         buildBarPaths()
         val translatedPath = Path(playedPath)
         val loc = IntArray(2)
@@ -498,7 +496,7 @@ class WaveformSeekBar @JvmOverloads constructor(
         return translatedPath
     }
 
-    fun getUnplayedSilhouettePath(parentLayoutTop: Int): Path {
+    fun getUnplayedSilhouettePath(@Suppress("UNUSED_PARAMETER") parentLayoutTop: Int): Path {
         buildBarPaths()
         val translatedPath = Path(unplayedPath)
         val loc = IntArray(2)

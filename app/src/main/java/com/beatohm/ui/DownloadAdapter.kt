@@ -39,17 +39,32 @@ class DownloadAdapter : ListAdapter<DownloadState, DownloadAdapter.ViewHolder>(D
             binding.tvSubtitle.text = song.artist.ifBlank { state.url }
             binding.tvMeta.text = metaText(state)
 
-            val musicNoteRes = IconPackManager.getDownloadIconResId(ThemeManager.currentIconPack)
+            val packId = ThemeManager.currentIconPack
+            val colorAware = IconPackManager.isColorAwarePack(packId)
+            val musicNoteRes = IconPackManager.getDownloadIconResId(packId)
+            val musicNoteDrawable = if (colorAware) IconPackManager.getIcon(IconPackManager.ICON_MUSIC_NOTE, packId, binding.root.context) else null
             if (song.thumbnailUrl.isNotBlank()) {
                 binding.ivCover.load(song.thumbnailUrl) {
-                    placeholder(musicNoteRes)
-                    error(musicNoteRes)
+                    crossfade(true)
+                    if (musicNoteDrawable != null) {
+                        placeholder(musicNoteDrawable)
+                        error(musicNoteDrawable)
+                    } else {
+                        placeholder(musicNoteRes)
+                        error(musicNoteRes)
+                    }
                 }
             } else if (state.filePath.isNotBlank() && File(state.filePath).exists()) {
                 binding.ivCover.tag = state.filePath
                 ArtworkLoader.loadArtFromAudioFile(binding.ivCover, state.filePath)
             } else {
-                binding.ivCover.setImageResource(musicNoteRes)
+                binding.ivCover.tag = null
+                if (musicNoteDrawable != null) {
+                    binding.ivCover.setImageDrawable(musicNoteDrawable)
+                    binding.ivCover.imageTintList = null
+                } else {
+                    binding.ivCover.setImageResource(musicNoteRes)
+                }
             }
 
             applyStatus(state)

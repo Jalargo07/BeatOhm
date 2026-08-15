@@ -75,7 +75,7 @@ object ThemeManager {
     /**
      * Apply a theme from the database by ID (used after importing).
      */
-    suspend fun applyThemeFromDb(context: Context, theme: UserTheme) {
+    suspend fun applyThemeFromDb(@Suppress("UNUSED_PARAMETER") context: Context, theme: UserTheme) {
         activeTheme = theme
         prefs?.edit()?.putLong(KEY_ACTIVE_THEME_ID, theme.id)?.apply()
     }
@@ -253,17 +253,25 @@ object ThemeManager {
         get() {
             val raw = activeTheme?.iconPackId ?: "default"
             return when (raw) {
-                "neon" -> {
-                    migrateIconPackId("mononoki")
-                    "mononoki"
+                "default" -> {
+                    migrateIconPackId("lucide")
+                    "lucide"
                 }
-                "minimal" -> {
-                    migrateIconPackId("mainstage")
-                    "mainstage"
+                "darknova" -> {
+                    migrateIconPackId("lucide")
+                    "lucide"
                 }
-                "bold" -> {
-                    migrateIconPackId("darknova")
-                    "darknova"
+                "boowop" -> {
+                    migrateIconPackId("lucide")
+                    "lucide"
+                }
+                "mononoki" -> {
+                    migrateIconPackId("lucide")
+                    "lucide"
+                }
+                "mainstage" -> {
+                    migrateIconPackId("lucide")
+                    "lucide"
                 }
                 else -> raw
             }

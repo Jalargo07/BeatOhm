@@ -25,11 +25,10 @@
             android:id="@+id/iv_grid_icon"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:background="@drawable/bg_circle_primary"
+            android:background="@drawable/bg_circle_tonal"
             android:contentDescription="@string/categories"
             android:padding="12dp"
-            android:src="@drawable/ic_music_note"
-            app:tint="@color/on_primary" />
+            android:src="@drawable/ic_music_note" />
 
         <TextView
             android:id="@+id/tv_grid_name"

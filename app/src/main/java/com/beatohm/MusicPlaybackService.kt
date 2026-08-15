@@ -96,6 +96,7 @@ class MusicPlaybackService : MediaSessionService() {
                     controllerInfo: MediaSession.ControllerInfo,
                     intent: Intent
                 ): Boolean {
+                    @Suppress("DEPRECATION")
                     val keyCode = (intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? KeyEvent)?.keyCode
                     return when (keyCode) {
                         KeyEvent.KEYCODE_MEDIA_NEXT -> {
@@ -161,18 +162,21 @@ class MusicPlaybackService : MediaSessionService() {
                     .setShowActionsInCompactView(0, 1, 2)
             )
 
+        @Suppress("DEPRECATION")
         builder.addAction(Notification.Action.Builder(
             android.R.drawable.ic_media_previous,
             getString(R.string.previous),
             pendingIntentFor(ACTION_PREV)
         ).build())
 
+        @Suppress("DEPRECATION")
         builder.addAction(Notification.Action.Builder(
             playPauseIcon,
             if (player.isPlaying) getString(R.string.pause) else getString(R.string.play),
             pendingIntentFor(ACTION_PLAY_PAUSE)
         ).build())
 
+        @Suppress("DEPRECATION")
         builder.addAction(Notification.Action.Builder(
             android.R.drawable.ic_media_next,
             getString(R.string.next),

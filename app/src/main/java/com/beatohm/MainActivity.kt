@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -39,6 +41,7 @@ import com.beatohm.databinding.ActivityMainBinding
 import com.beatohm.model.Song
 import com.beatohm.ui.ArtworkLoader
 import com.beatohm.ui.MainViewModel
+import com.beatohm.ui.PlayerFragment
 import com.beatohm.ui.PlayerViewModel
 import com.beatohm.ui.ThemeManager
 import com.beatohm.ui.IconPackManager
@@ -110,7 +113,8 @@ class MainActivity : AppCompatActivity() {
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf(-android.R.attr.state_checked)),
             intArrayOf(primaryColor, ContextCompat.getColor(this, R.color.text_secondary))
         )
-        binding.bottomNav.itemIconTintList = colorNav
+        val packId = ThemeManager.currentIconPack
+        binding.bottomNav.itemIconTintList = if (IconPackManager.isColorAwarePack(packId)) null else colorNav
         binding.bottomNav.itemTextColor = colorNav
 
         ViewModelProvider(this)[MainViewModel::class.java]
@@ -165,7 +169,7 @@ class MainActivity : AppCompatActivity() {
         val swipeThreshold = 100 * resources.displayMetrics.density
         var miniTouchStartY = 0f
 
-        miniPlayerContainer.setOnTouchListener { v, event ->
+        miniPlayerContainer.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     miniTouchStartY = event.y
@@ -205,11 +209,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         playerViewModel.isPlaying.observe(this) { playing ->
-            val miniIcons = IconPackManager.getMiniPlayerIconResIds(ThemeManager.currentIconPack)
-            findViewById<ImageButton>(R.id.btn_mini_play_pause).setImageResource(
-                if (playing) miniIcons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
-                else miniIcons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
-            )
+            val packId = ThemeManager.currentIconPack
+            val btnMiniPlay = findViewById<ImageButton>(R.id.btn_mini_play_pause)
+            val glyphColor = PlayerFragment.adaptiveGlyphColor(ThemeManager.accentColor)
+
+            btnMiniPlay.backgroundTintList = ColorStateList.valueOf(ThemeManager.accentColor)
+
+            if (IconPackManager.isColorAwarePack(packId)) {
+                val key = if (playing) IconPackManager.ICON_PAUSE else IconPackManager.ICON_PLAY
+                btnMiniPlay.setImageDrawable(
+                    IconPackManager.getIcon(key, packId, this)
+                )
+            } else {
+                val miniIcons = IconPackManager.getMiniPlayerIconResIds(packId)
+                btnMiniPlay.setImageResource(
+                    if (playing) miniIcons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
+                    else miniIcons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
+                )
+            }
+            btnMiniPlay.imageTintList = ColorStateList.valueOf(glyphColor)
             if (playing) {
                 miniHandler.post(miniProgressUpdate)
             } else {
@@ -332,15 +350,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyBottomNavIcons() {
-        val navIcons = IconPackManager.getBottomNavIconResIds(ThemeManager.currentIconPack)
-        binding.bottomNav.menu.findItem(R.id.playerFragment)?.setIcon(
-            navIcons[IconPackManager.ICON_PLAYER] ?: R.drawable.ic_player
-        )
-        binding.bottomNav.menu.findItem(R.id.libraryFragment)?.setIcon(
-            navIcons[IconPackManager.ICON_LIBRARY] ?: R.drawable.ic_library
-        )
-        binding.bottomNav.menu.findItem(R.id.downloadsFragment)?.setIcon(
-            navIcons[IconPackManager.ICON_DOWNLOADS] ?: R.drawable.ic_downloads
-        )
+        val packId = ThemeManager.currentIconPack
+        val colorAware = IconPackManager.isColorAwarePack(packId)
+        val navIcons = IconPackManager.getBottomNavIconResIds(packId)
+
+        val playerItem = binding.bottomNav.menu.findItem(R.id.playerFragment)
+        val libraryItem = binding.bottomNav.menu.findItem(R.id.libraryFragment)
+        val downloadsItem = binding.bottomNav.menu.findItem(R.id.downloadsFragment)
+
+        if (colorAware) {
+            playerItem?.icon = IconPackManager.getIcon(IconPackManager.ICON_PLAYER, packId, this)
+            playerItem?.iconTintList = null
+            libraryItem?.icon = IconPackManager.getIcon(IconPackManager.ICON_LIBRARY, packId, this)
+            libraryItem?.iconTintList = null
+            downloadsItem?.icon = IconPackManager.getIcon(IconPackManager.ICON_DOWNLOADS, packId, this)
+            downloadsItem?.iconTintList = null
+        } else {
+            playerItem?.setIcon(navIcons[IconPackManager.ICON_PLAYER] ?: R.drawable.ic_player)
+            libraryItem?.setIcon(navIcons[IconPackManager.ICON_LIBRARY] ?: R.drawable.ic_library)
+            downloadsItem?.setIcon(navIcons[IconPackManager.ICON_DOWNLOADS] ?: R.drawable.ic_downloads)
+        }
     }
 }

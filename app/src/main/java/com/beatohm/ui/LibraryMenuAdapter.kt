@@ -8,9 +8,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.beatohm.databinding.ItemLibraryFolderBinding
 import com.beatohm.databinding.ItemLibraryGridBinding
 import com.beatohm.databinding.ItemLibrarySectionBinding
+import android.content.res.ColorStateList
 import java.io.File
 
-data class LibraryCategory(val id: String, val labelRes: Int, val iconRes: Int, val count: Int = 0)
+data class LibraryCategory(val id: String, val labelRes: Int, val iconRes: Int, val count: Int = 0, val iconKey: String = "")
 
 sealed interface LibraryMenuItem {
     val id: String
@@ -54,7 +55,18 @@ class LibraryMenuAdapter(
                 val vh = holder as CategoryViewHolder
                 val category = item.category
                 vh.binding.tvGridName.text = vh.binding.root.context.getString(category.labelRes)
-                vh.binding.ivGridIcon.setImageResource(category.iconRes)
+                val ctx = vh.binding.root.context
+                val packId = ThemeManager.currentIconPack
+                if (IconPackManager.isColorAwarePack(packId) && category.iconKey.isNotBlank()) {
+                    vh.binding.ivGridIcon.setImageDrawable(
+                        IconPackManager.getIcon(category.iconKey, packId, ctx)
+                    )
+                    vh.binding.ivGridIcon.imageTintList = null
+                } else {
+                    vh.binding.ivGridIcon.setImageResource(category.iconRes)
+                    vh.binding.ivGridIcon.imageTintList =
+                        ColorStateList.valueOf(ThemeManager.accentColor)
+                }
                 vh.binding.root.tag = category.id
                 if (category.count > 0) {
                     vh.binding.tvGridCount.visibility = android.view.View.VISIBLE

@@ -77,7 +77,7 @@ object AudioTagWriter {
             if (song.year.isNotBlank()) frames.add(createTextFrame("TDRC", song.year))
             if (song.trackNumber > 0) frames.add(createTextFrame("TRCK", song.trackNumber.toString()))
             if (song.lyrics.isNotBlank()) {
-                frames.add(createUnsynchronizedLyrics("USLT", song.lyrics))
+                frames.add(createUnsynchronizedLyrics(song.lyrics))
             }
 
             val totalFrameSize = frames.sumOf { it.size }
@@ -159,7 +159,7 @@ object AudioTagWriter {
     /**
      * Create an ID3v2.3 unsynchronized lyrics frame (USLT).
      */
-    private fun createUnsynchronizedLyrics(id: String, lyrics: String): ByteArray {
+    private fun createUnsynchronizedLyrics(lyrics: String): ByteArray {
         val descBytes = ByteArray(0) // empty description
         val lyricsBytes = lyrics.toByteArray(StandardCharsets.UTF_8)
         // encoding(1) + lang(3) + desc(1+0) + lyrics

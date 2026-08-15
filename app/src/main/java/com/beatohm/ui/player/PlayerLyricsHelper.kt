@@ -161,7 +161,7 @@ class PlayerLyricsHelper(
         }
     }
 
-    private fun applyLyricsBlur(visible: Boolean) {
+    private fun applyLyricsBlur(@Suppress("UNUSED_PARAMETER") visible: Boolean) {
         // Blur effect removed - not critical for functionality
         // Can be re-implemented later with compatible API
     }

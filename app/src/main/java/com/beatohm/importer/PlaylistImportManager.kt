@@ -205,7 +205,7 @@ class PlaylistImportManager(private val context: Context) {
                     trackStatusDao.markDownloading(track.id)
 
                     try {
-                        val success = importSingleTrackWithRetry(track, sessionId)
+                        val success = importSingleTrackWithRetry(track)
 
                         if (success) {
                             completedCount++
@@ -239,11 +239,10 @@ class PlaylistImportManager(private val context: Context) {
      */
     private suspend fun importSingleTrackWithRetry(
         track: ImportTrackStatus,
-        sessionId: Long,
         attempt: Int = 0
     ): Boolean {
         return try {
-            importSingleTrack(track, sessionId)
+            importSingleTrack(track)
             true
         } catch (e: CancellationException) {
             throw e
@@ -253,7 +252,7 @@ class PlaylistImportManager(private val context: Context) {
                 val jitterMs = Random.nextLong(0, 1000)
                 Log.w(TAG, "Track failed (attempt ${attempt + 1}), retrying in ${backoffMs + jitterMs}ms: ${e.message}")
                 delay(backoffMs + jitterMs)
-                importSingleTrackWithRetry(track, sessionId, attempt + 1)
+                importSingleTrackWithRetry(track, attempt + 1)
             } else {
                 Log.e(TAG, "Track failed after $MAX_RETRIES retries: ${track.artist} - ${track.title}")
                 trackStatusDao.markFailed(track.id, e.message ?: "Max retries exceeded")
@@ -266,7 +265,7 @@ class PlaylistImportManager(private val context: Context) {
      * Import a single track: search YouTube → download → metadata → tags → save.
      * (Black hole #2: scoring, Black hole #4: parallel metadata)
      */
-    private suspend fun importSingleTrack(track: ImportTrackStatus, sessionId: Long) {
+    private suspend fun importSingleTrack(track: ImportTrackStatus) {
         val searchQuery = ImportedTrack(track.title, track.artist, track.album, track.durationSec).searchQuery
         Log.d(TAG, "Importing track ${track.artist} - ${track.title} (query: $searchQuery)")
         val searchResults = searchYouTube(searchQuery)
@@ -300,7 +299,7 @@ class PlaylistImportManager(private val context: Context) {
             writeTags(tempFile, finalMetadata, lyrics)
             Log.d(TAG, "Tags written to: ${tempFile.absolutePath}")
 
-            val finalPath = moveToOrganizedFolder(tempFile, track, finalMetadata)
+            val finalPath = moveToOrganizedFolder(tempFile, finalMetadata)
 
             // Step 4: Save to Room DB with lyrics so the player can show them
             saveSongToDb(finalMetadata, lyrics, finalPath)
@@ -433,7 +432,7 @@ class PlaylistImportManager(private val context: Context) {
             val song = Song(
                 title = track.title,
                 artist = track.artist,
-                album = track.album ?: ""
+                album = track.album
             )
             val result = metadataFetcher.fetchFullMetadata(song)
             if (result.isSuccess) {
@@ -511,18 +510,36 @@ class PlaylistImportManager(private val context: Context) {
 
     private fun moveToOrganizedFolder(
         tempFile: java.io.File,
-        track: ImportTrackStatus,
         metadata: MetadataResult
     ): String {
         val musicDir = android.os.Environment.getExternalStoragePublicDirectory(
             android.os.Environment.DIRECTORY_MUSIC
         )
-        val targetDir = java.io.File(musicDir, DeviceUtils.MUSIC_FOLDER_NAME)
-        if (!targetDir.exists()) targetDir.mkdirs()
 
-        val safeName = "${metadata.artist} - ${metadata.title}.${tempFile.extension}"
-            .replace(Regex("[/\\\\:*?\"<>|]"), "_")
-        val targetFile = java.io.File(targetDir, safeName)
+        // Use the same folder pattern as normal downloads (user-configurable in Settings)
+        val pattern = context.getSharedPreferences(
+            com.beatohm.util.FolderPatternParser.PREFS_NAME,
+            android.content.Context.MODE_PRIVATE
+        ).getString(
+            com.beatohm.util.FolderPatternParser.KEY_FOLDER_PATTERN,
+            com.beatohm.util.FolderPatternParser.DEFAULT_PATTERN
+        ) ?: com.beatohm.util.FolderPatternParser.DEFAULT_PATTERN
+
+        val song = Song(
+            title = metadata.title,
+            artist = metadata.artist,
+            album = metadata.album,
+            genre = metadata.genre,
+            year = metadata.year,
+            trackNumber = metadata.trackNumber
+        )
+
+        val (subDir, fileName) = com.beatohm.util.FolderPatternParser.resolvePattern(pattern, song)
+
+        val targetDir = java.io.File(musicDir, "${DeviceUtils.MUSIC_FOLDER_NAME}/$subDir")
+        targetDir.mkdirs()
+
+        val targetFile = java.io.File(targetDir, "$fileName.${tempFile.extension}")
 
         if (targetFile.exists()) targetFile.delete()
 

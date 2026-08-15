@@ -394,7 +394,7 @@ class WaterVisualizerDrawable : Drawable() {
 
     // === Glow on crest ===
 
-    private fun drawGlow(canvas: Canvas, h: Float) {
+    private fun drawGlow(canvas: Canvas, @Suppress("UNUSED_PARAMETER") h: Float) {
         val energy = averageEnergy()
         if (energy < 0.01f && !active) return
         val glowAlpha = (20 + (energy * 60 * if (active) 1f else 0.3f)).toInt().coerceIn(0, 70)

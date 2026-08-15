@@ -25,11 +25,10 @@
             android:id="@+id/iv_folder_icon"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:background="@drawable/bg_circle_primary"
+            android:background="@drawable/bg_circle_tonal"
             android:contentDescription="@string/folders"
             android:padding="12dp"
-            android:src="@drawable/ic_folder"
-            app:tint="@color/on_primary" />
+            android:src="@drawable/ic_folder" />
 
         <LinearLayout
             android:layout_width="0dp"

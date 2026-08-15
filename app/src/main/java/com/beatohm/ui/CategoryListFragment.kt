@@ -286,7 +286,8 @@ class CategoryListFragment : Fragment() {
 class CategoryAdapter(
     private val onItemClick: (String) -> Unit,
     private val onItemLongClick: ((CategoryItem) -> Unit)? = null,
-    private val defaultIconRes: Int = R.drawable.ic_album
+    private val defaultIconRes: Int = R.drawable.ic_album,
+    private val defaultDrawable: android.graphics.drawable.Drawable? = null
 ) : ListAdapter<CategoryItem, CategoryAdapter.ViewHolder>(CategoryDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -308,8 +309,13 @@ class CategoryAdapter(
             if (isImageExtension(item.coverPath)) {
                 cover.load(File(item.coverPath)) {
                     crossfade(true)
-                    placeholder(defaultIconRes)
-                    error(defaultIconRes)
+                    if (defaultDrawable != null) {
+                        placeholder(defaultDrawable)
+                        error(defaultDrawable)
+                    } else {
+                        placeholder(defaultIconRes)
+                        error(defaultIconRes)
+                    }
                 }
             } else {
                 ArtworkLoader.loadArtFromAudioFile(cover, item.coverPath)
@@ -321,7 +327,12 @@ class CategoryAdapter(
         } else {
             cover.visibility = View.VISIBLE
             cover.tag = null
-            cover.setImageResource(defaultIconRes)
+            if (defaultDrawable != null) {
+                cover.setImageDrawable(defaultDrawable)
+                cover.imageTintList = null
+            } else {
+                cover.setImageResource(defaultIconRes)
+            }
         }
 
         holder.itemView.setOnClickListener { onItemClick(item.name) }

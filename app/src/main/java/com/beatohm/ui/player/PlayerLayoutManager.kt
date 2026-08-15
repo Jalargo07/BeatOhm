@@ -183,12 +183,12 @@ object PlayerLayoutManager {
     /**
      * Start vinyl rotation animation if style is "vinyl" and playing.
      */
-    fun startVinylRotation(view: View) {
+    fun startVinylRotation(@Suppress("UNUSED_PARAMETER") view: View) {
         if (currentStyle != "vinyl") return
         vinylRecordView?.setPlaying(true)
     }
 
-    fun stopVinylRotation(view: View) {
+    fun stopVinylRotation(@Suppress("UNUSED_PARAMETER") view: View) {
         if (currentStyle != "vinyl") return
         vinylRecordView?.setPlaying(false)
     }
@@ -257,7 +257,7 @@ object PlayerLayoutManager {
         removeVinylView(root)
     }
 
-    private fun removeVinylView(root: ConstraintLayout) {
+    private fun removeVinylView(@Suppress("UNUSED_PARAMETER") root: ConstraintLayout) {
         vinylRecordView?.let { vinyl ->
             vinyl.cleanup()
             (vinyl.parent as? ViewGroup)?.removeView(vinyl)

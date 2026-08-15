@@ -211,7 +211,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun getDownloadDirectory(song: com.beatohm.model.Song? = null): File {
-        val ctx = getApplication<Application>()
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
         val baseDir = File(dir, DeviceUtils.MUSIC_FOLDER_NAME)
         if (song == null) {

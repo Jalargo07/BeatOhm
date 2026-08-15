@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PorterDuff
@@ -13,6 +14,7 @@ import android.graphics.PorterDuffColorFilter
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.media.AudioManager
 import android.os.Bundle
@@ -139,6 +141,7 @@ class PlayerFragment : Fragment() {
         setupSwipeGesture()
         lyricsHelper.setupLyricsSwipe()
         applyIconPack()
+        setupPlayGlow()
 
         lifecycleScope.launch {
             audioVisualizerManager.levels.collect { bands ->
@@ -264,8 +267,7 @@ class PlayerFragment : Fragment() {
         binding.tvArtist.text = ""
         binding.ivCover.setImageResource(R.drawable.ic_music_note)
         binding.pbCover.visibility = View.GONE
-        binding.btnFavorite.setImageResource(R.drawable.ic_bookmark_border)
-        binding.btnFavorite.colorFilter = null
+        applyFavoriteButtonIcon(false)
         binding.ivGlow.animate().alpha(0f).setDuration(200).withEndAction {
             if (_binding != null) binding.ivGlow.visibility = View.INVISIBLE
         }.start()
@@ -284,11 +286,23 @@ class PlayerFragment : Fragment() {
 
     private fun observePlaybackState() {
         viewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
-            val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
-            binding.btnPlayPause.setImageResource(
-                if (playing) icons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
-                else icons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
-            )
+            val packId = ThemeManager.currentIconPack
+            val colorAware = IconPackManager.isColorAwarePack(packId)
+            val icons = IconPackManager.getAppIconResIds(packId)
+            val glyphColor = adaptiveGlyphColor(ThemeManager.accentColor)
+
+            if (colorAware) {
+                val key = if (playing) IconPackManager.ICON_PAUSE else IconPackManager.ICON_PLAY
+                binding.btnPlayPause.setImageDrawable(
+                    IconPackManager.getIcon(key, packId, requireContext())
+                )
+            } else {
+                binding.btnPlayPause.setImageResource(
+                    if (playing) icons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
+                    else icons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
+                )
+            }
+            binding.btnPlayPause.imageTintList = ColorStateList.valueOf(glyphColor)
             if (playing) {
                 animationHelper.animateCoverPlaying()
                 binding.waveformSeekbar.setWaterActive(true)
@@ -321,21 +335,26 @@ class PlayerFragment : Fragment() {
         }
 
         viewModel.repeatMode.observe(viewLifecycleOwner) { mode ->
-            val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
-            when (mode) {
-                PlayerViewModel.RepeatMode.ALL -> {
-                    binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT] ?: R.drawable.ic_repeat)
-                    binding.btnRepeat.alpha = 1f
-                }
-                PlayerViewModel.RepeatMode.ONE -> {
-                    binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT_ONE] ?: R.drawable.ic_repeat_one)
-                    binding.btnRepeat.alpha = 1f
-                }
-                PlayerViewModel.RepeatMode.OFF -> {
-                    binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT] ?: R.drawable.ic_repeat)
-                    binding.btnRepeat.alpha = 0.4f
-                }
+            val packId = ThemeManager.currentIconPack
+            val colorAware = IconPackManager.isColorAwarePack(packId)
+            val icons = IconPackManager.getAppIconResIds(packId)
+            val repeatKey = when (mode) {
+                PlayerViewModel.RepeatMode.ONE -> IconPackManager.ICON_REPEAT_ONE
+                else -> IconPackManager.ICON_REPEAT
             }
+            val repeatFallback = when (mode) {
+                PlayerViewModel.RepeatMode.ONE -> R.drawable.ic_repeat_one
+                else -> R.drawable.ic_repeat
+            }
+            if (colorAware) {
+                binding.btnRepeat.setImageDrawable(
+                    IconPackManager.getIcon(repeatKey, packId, requireContext())
+                )
+            } else {
+                binding.btnRepeat.setImageResource(icons[repeatKey] ?: repeatFallback)
+            }
+            binding.btnRepeat.imageTintList = ColorStateList.valueOf(adaptiveGlyphColor(ThemeManager.accentColor))
+            binding.btnRepeat.alpha = if (mode == PlayerViewModel.RepeatMode.OFF) 0.4f else 1f
         }
     }
 
@@ -348,22 +367,26 @@ class PlayerFragment : Fragment() {
 
     private fun currentDurationMs(): Long = viewModel.duration.value ?: 0L
 
+    private fun applyFavoriteButtonIcon(isFavorite: Boolean) {
+        val packId = ThemeManager.currentIconPack
+        val colorAware = IconPackManager.isColorAwarePack(packId)
+        if (colorAware) {
+            binding.btnFavorite.setImageDrawable(IconPackManager.getIcon(IconPackManager.ICON_HEART, packId, requireContext()))
+            binding.btnFavorite.imageTintList = null
+            binding.btnFavorite.colorFilter = null
+        } else {
+            val icons = IconPackManager.getAppIconResIds(packId)
+            binding.btnFavorite.setImageResource(icons[IconPackManager.ICON_HEART] ?: R.drawable.ic_favorite)
+            binding.btnFavorite.colorFilter = PorterDuffColorFilter(ThemeManager.accentColor, PorterDuff.Mode.SRC_IN)
+        }
+        binding.btnFavorite.alpha = if (isFavorite) 1f else 0.35f
+    }
+
     private fun updateFavoriteIcon(filePath: String) {
         lifecycleScope.launch {
             val song = repository.getSongById(filePath)
             val isFav = song?.isFavorite ?: false
-            binding.btnFavorite.setImageResource(
-                if (isFav) R.drawable.ic_bookmark
-                else R.drawable.ic_bookmark_border
-            )
-            binding.btnFavorite.colorFilter = if (isFav) {
-                PorterDuffColorFilter(
-                    ThemeManager.accentColor,
-                    PorterDuff.Mode.SRC_IN
-                )
-            } else {
-                null
-            }
+            applyFavoriteButtonIcon(isFav)
         }
     }
 
@@ -602,7 +625,7 @@ class PlayerFragment : Fragment() {
 
     private fun setupControls() {
         binding.btnPlayPause.setOnClickListener {
-            val song = viewModel.currentSong.value ?: return@setOnClickListener
+            viewModel.currentSong.value ?: return@setOnClickListener
             val activity = requireActivity() as? com.beatohm.MainActivity ?: return@setOnClickListener
             val service = activity.playbackService
             if (service == null) return@setOnClickListener
@@ -674,6 +697,11 @@ class PlayerFragment : Fragment() {
                     repository.setFavorite(path, newFav)
                     updateFavoriteIcon(path)
                     if (newFav) animationHelper.animateFavoriteHeart()
+                    Toast.makeText(
+                        requireContext(),
+                        if (newFav) R.string.added_to_favorites else R.string.removed_from_favorites,
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -701,7 +729,7 @@ class PlayerFragment : Fragment() {
             binding.controlsContainer.animate().alpha(1f).setDuration(120).start()
         }
 
-        binding.waveformSeekbar.setOnTouchListener { v, event ->
+        binding.waveformSeekbar.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     binding.controlsContainer.animate().cancel()
@@ -857,7 +885,7 @@ class PlayerFragment : Fragment() {
         binding.ivCoverPreview.animate().cancel()
     }
 
-    private fun updateGradientFromWaveform(progress: Int) {
+    private fun updateGradientFromWaveform(@Suppress("UNUSED_PARAMETER") progress: Int) {
         val waveEnabled = requireContext()
             .getSharedPreferences(FolderPatternParser.PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean("show_wave_animation", true)
@@ -955,25 +983,86 @@ class PlayerFragment : Fragment() {
         private const val MAX_SEEK = 1000
         private const val PALETTE_DURATION = 2000L
         private const val PALETTE_SIZE = 128
+
+        /**
+         * Returns BLACK or WHITE for maximum contrast against [bgColor],
+         * targeting WCAG 4.5:1 minimum. Uses relative luminance formula.
+         */
+        fun adaptiveGlyphColor(bgColor: Int): Int {
+            fun srgbToLinear(c: Int): Double {
+                val s = c / 255.0
+                return if (s <= 0.04045) s / 12.92
+                else Math.pow((s + 0.055) / 1.055, 2.4)
+            }
+            val r = Color.red(bgColor)
+            val g = Color.green(bgColor)
+            val b = Color.blue(bgColor)
+            val luminance = 0.2126 * srgbToLinear(r) +
+                    0.7152 * srgbToLinear(g) +
+                    0.0722 * srgbToLinear(b)
+            val contrastWhite = 1.05 / (luminance + 0.05)
+            val contrastBlack = (luminance + 0.05) / 0.05
+            return if (contrastWhite >= contrastBlack && contrastWhite >= 4.5)
+                Color.WHITE else Color.BLACK
+        }
     }
 
     /**
      * Apply the active icon pack's icons to player control buttons.
      */
     private fun applyIconPack() {
-        val icons = IconPackManager.getPlayerIconResIds(ThemeManager.currentIconPack)
+        val packId = ThemeManager.currentIconPack
+        val colorAware = IconPackManager.isColorAwarePack(packId)
+        val icons = IconPackManager.getAppIconResIds(packId)
         val isPlaying = viewModel.isPlaying.value == true
+        val glyphColor = adaptiveGlyphColor(ThemeManager.accentColor)
 
-        binding.btnPlayPause.setImageResource(
-            if (isPlaying) icons[IconPackManager.ICON_PAUSE] ?: R.drawable.ic_pause
-            else icons[IconPackManager.ICON_PLAY] ?: R.drawable.ic_play
+        fun applyIcon(imageView: android.widget.ImageView, key: String, fallback: Int) {
+            if (colorAware) {
+                imageView.setImageDrawable(IconPackManager.getIcon(key, packId, requireContext()))
+                imageView.imageTintList = null
+            } else {
+                imageView.setImageResource(icons[key] ?: fallback)
+            }
+        }
+
+        applyIcon(binding.btnPlayPause,
+            if (isPlaying) IconPackManager.ICON_PAUSE else IconPackManager.ICON_PLAY,
+            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play)
+        binding.btnPlayPause.imageTintList = ColorStateList.valueOf(glyphColor)
+        applyIcon(binding.btnNext, IconPackManager.ICON_NEXT, R.drawable.ic_next)
+        binding.btnNext.imageTintList = ColorStateList.valueOf(glyphColor)
+        applyIcon(binding.btnPrev, IconPackManager.ICON_PREV, R.drawable.ic_prev)
+        binding.btnPrev.imageTintList = ColorStateList.valueOf(glyphColor)
+        applyIcon(binding.btnShuffle, IconPackManager.ICON_SHUFFLE, R.drawable.ic_shuffle)
+        binding.btnShuffle.imageTintList = ColorStateList.valueOf(glyphColor)
+        applyIcon(binding.btnRepeat, IconPackManager.ICON_REPEAT, R.drawable.ic_repeat)
+        binding.btnRepeat.imageTintList = ColorStateList.valueOf(glyphColor)
+        applyIcon(binding.btnEqualizer, IconPackManager.ICON_EQUALIZER, R.drawable.ic_equalizer)
+        applyIcon(binding.btnQueue, IconPackManager.ICON_QUEUE, R.drawable.ic_queue_music)
+        applyIcon(binding.btnLyrics, IconPackManager.ICON_LYRICS, R.drawable.ic_lyrics)
+        applyIcon(binding.btnAddPlaylist, IconPackManager.ICON_PLAYLIST_ADD, R.drawable.ic_playlist_add)
+    }
+
+    private fun setupPlayGlow() {
+        val accentColor = ThemeManager.accentColor
+        val glowColor = Color.argb(
+            90,
+            Color.red(accentColor),
+            Color.green(accentColor),
+            Color.blue(accentColor)
         )
-        binding.btnNext.setImageResource(icons[IconPackManager.ICON_NEXT] ?: R.drawable.ic_next)
-        binding.btnPrev.setImageResource(icons[IconPackManager.ICON_PREV] ?: R.drawable.ic_prev)
-        binding.btnShuffle.setImageResource(icons[IconPackManager.ICON_SHUFFLE] ?: R.drawable.ic_shuffle)
-        binding.btnRepeat.setImageResource(icons[IconPackManager.ICON_REPEAT] ?: R.drawable.ic_repeat)
-        binding.btnEqualizer.setImageResource(icons[IconPackManager.ICON_EQUALIZER] ?: R.drawable.ic_equalizer)
-        binding.btnQueue.setImageResource(icons[IconPackManager.ICON_QUEUE] ?: R.drawable.ic_queue_music)
-        binding.btnLyrics.setImageResource(icons[IconPackManager.ICON_LYRICS] ?: R.drawable.ic_lyrics)
+        val glowDrawable = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(glowColor)
+        }
+        binding.ivPlayGlow.background = glowDrawable
+
+        val accentTint = ColorStateList.valueOf(accentColor)
+        binding.btnPlayPause.backgroundTintList = accentTint
+        binding.btnShuffle.backgroundTintList = accentTint
+        binding.btnPrev.backgroundTintList = accentTint
+        binding.btnNext.backgroundTintList = accentTint
+        binding.btnRepeat.backgroundTintList = accentTint
     }
 }

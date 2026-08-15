@@ -353,14 +353,14 @@ class LibraryFragment : Fragment() {
         fun getCategories(): List<LibraryCategory> {
             val icons = IconPackManager.getLibraryCategoryIconResIds(ThemeManager.currentIconPack)
             return listOf(
-                LibraryCategory("songs", R.string.songs, icons[IconPackManager.ICON_MUSIC_NOTE] ?: R.drawable.ic_music_note),
-                LibraryCategory("artists", R.string.by_artist, icons[IconPackManager.ICON_MIC] ?: R.drawable.ic_mic),
-                LibraryCategory("genres", R.string.by_genre, icons[IconPackManager.ICON_GENRES] ?: R.drawable.ic_genres),
-                LibraryCategory("albums", R.string.albums, icons[IconPackManager.ICON_ALBUM] ?: R.drawable.ic_album),
-                LibraryCategory("playlists", R.string.playlists_menu, icons[IconPackManager.ICON_PLAYLIST] ?: R.drawable.ic_playlist),
-                LibraryCategory("favorites", R.string.favorites, icons[IconPackManager.ICON_HEART] ?: R.drawable.ic_favorite),
-                LibraryCategory("most_played", R.string.most_played, icons[IconPackManager.ICON_TRENDING] ?: R.drawable.ic_trending_up),
-                LibraryCategory("folders", R.string.folders, icons[IconPackManager.ICON_FOLDER] ?: R.drawable.ic_folder)
+                LibraryCategory("songs", R.string.songs, icons[IconPackManager.ICON_MUSIC_NOTE] ?: R.drawable.ic_music_note, iconKey = IconPackManager.ICON_MUSIC_NOTE),
+                LibraryCategory("artists", R.string.by_artist, icons[IconPackManager.ICON_MIC] ?: R.drawable.ic_mic, iconKey = IconPackManager.ICON_MIC),
+                LibraryCategory("genres", R.string.by_genre, icons[IconPackManager.ICON_GENRES] ?: R.drawable.ic_genres, iconKey = IconPackManager.ICON_GENRES),
+                LibraryCategory("albums", R.string.albums, icons[IconPackManager.ICON_ALBUM] ?: R.drawable.ic_album, iconKey = IconPackManager.ICON_ALBUM),
+                LibraryCategory("playlists", R.string.playlists_menu, icons[IconPackManager.ICON_PLAYLIST] ?: R.drawable.ic_playlist, iconKey = IconPackManager.ICON_PLAYLIST),
+                LibraryCategory("favorites", R.string.favorites, icons[IconPackManager.ICON_HEART] ?: R.drawable.ic_favorite, iconKey = IconPackManager.ICON_HEART),
+                LibraryCategory("most_played", R.string.most_played, icons[IconPackManager.ICON_TRENDING] ?: R.drawable.ic_trending_up, iconKey = IconPackManager.ICON_TRENDING),
+                LibraryCategory("folders", R.string.folders, icons[IconPackManager.ICON_FOLDER] ?: R.drawable.ic_folder, iconKey = IconPackManager.ICON_FOLDER)
             )
         }
     }

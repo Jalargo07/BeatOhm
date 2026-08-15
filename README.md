@@ -4,9 +4,9 @@
 
 ### Tu estudio de sonido personal. Audio moldea, BeatOhm lo hace visible.
 
-**Descargá, procesá y escuchá tu música favorita — con decodificación Opus, metadata impecable, letras multi-fuente y un visualizador que moldea el audio en tiempo real.**
+**Descargá, procesá y escuchá tu música favorita — con descargas en MP3, soporte multi-formato (MP3, M4A, FLAC, OGG, Opus, WAV), metadata impecable, letras multi-fuente y un visualizador que moldea el audio en tiempo real.**
 
-[![Version](https://img.shields.io/badge/version-2.9--nightly.260812-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.10--stable-blue.svg)]()
 [![minSdk](https://img.shields.io/badge/minSdk-24-green.svg)]()
 [![targetSdk](https://img.shields.io/badge/targetSdk-34-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-purple.svg)]()
@@ -18,6 +18,35 @@
 <br/>
 
 </div>
+
+## Capturas
+
+**Reproductor** — waveform en tiempo real, letras sincronizadas y cola de reproducción.
+
+| | |
+|---|---|
+| ![Reproductor con waveform](docs/screenshots/player_waveform.png) | ![Letras sincronizadas](docs/screenshots/player_lyrics.png) |
+| ![Cola de reproducción](docs/screenshots/player_queue.png) | ![Ecualizador de 5 bandas](docs/screenshots/equalizer.png) |
+
+**Biblioteca** — explorá canciones, álbumes, artistas, favoritos y playlists.
+
+| | |
+|---|---|
+| ![Biblioteca](docs/screenshots/library.png) | ![Favoritos](docs/screenshots/favorites.png) |
+
+**Descargas** — importá playlists completas de Spotify o Deezer con un link.
+
+| | |
+|---|---|
+| ![Importar playlist de Spotify](docs/screenshots/import_playlist_spotify.png) | ![Importación exitosa](docs/screenshots/import_download_success.png) |
+
+**Configuración** — packs de iconos, idioma y preferencias.
+
+| | |
+|---|---|
+| ![Configuración](docs/screenshots/settings.png) | |
+
+---
 
 ## Características principales
 
@@ -216,6 +245,40 @@ app/src/main/java/com/musicdownloader/
 ---
 
 ## Changelog
+
+### v2.10-stable
+
+**6 Icon Packs — identidad visual propia**
+
+- **Heroic** — pack bold relleno (antes "Filled") con identidad visual propia
+- **Lucide** — 27 iconos inspirados en lucide.dev, drawables XML
+- **Neon** — glow neón con paths SVG escalados y validados (36+ flags de arco corregidos)
+- **Glass** — estilo cristal con paths SVG escalados y validados
+- **Gradient** — degradados con paths SVG escalados y validados
+- **Phosphor** — duotone real desde SVGs oficiales de phosphoricons.com (27 iconKeys, paths escalados; genres → guitarra)
+- Tint dinámico del tema en todos los packs (sin naranja estático en play/prev/next/shuffle/repeat)
+
+**Reproductor Premium**
+
+- Botón play rediseñado: glow de acento (80dp) con contraste WCAG 4.5:1 (`adaptiveGlyphColor`)
+- Tint adaptativo en los 5 botones de control según el color del tema
+- Botón favorito: corazón del pack relleno (mismo que la categoría Favoritos de la biblioteca), estado favorito diferenciado por brillo (alpha) + toast "Añadida/Eliminada de favoritos"
+- Mini player con tint adaptativo en play/pause
+
+**Iconografía**
+
+- `IconPackDrawableFactory` — drawables programáticos para packs color-aware (Neon, Glass, Gradient, Phosphor) con caché por pack/icono/color
+- `IconPackManager` unificado: 27 iconKeys canónicos, fallbacks consistentes
+- Pack legacy removido (72 drawables `ic_bd_*`/`ic_bn_*`/`ic_mn_*`/`ic_nn_*` eliminados)
+
+**Calidad**
+
+- Warning cleanup completo (lint): 0 warnings en build
+- `validate_paths.py` — script que valida los 4 packs SVG (pasa OK)
+- Métodos huérfanos eliminados (`attach()` en AudioVisualizerManager)
+- `getPlayerIconResIds` reemplazado por `getAppIconResIds` (3 call sites)
+
+---
 
 ### v2.9-nightly.260812
 

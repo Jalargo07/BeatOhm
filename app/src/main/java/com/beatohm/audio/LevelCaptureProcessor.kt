@@ -72,7 +72,6 @@ class LevelCaptureProcessor : BaseAudioProcessor() {
 
                 // Mezclamos L+R para obtener una señal mono (capturar todo)
                 val sampleMono = (sampleL + sampleR) / 2f
-                val absMono = abs(sampleMono)
 
                 // --- 1. TREBLE (>4kHz) ---
                 trebleLpState += trebleHpAlpha * (sampleMono - trebleLpState)

@@ -336,16 +336,24 @@ class SettingsFragment : Fragment() {
     private fun setupIconPackChips() {
         val chipGroup = binding.chipGroupIconPack
         when (ThemeManager.currentIconPack) {
-            "darknova" -> chipGroup.check(R.id.chip_icon_bold)
             "heroic" -> chipGroup.check(R.id.chip_icon_heroic)
-            else -> chipGroup.check(R.id.chip_icon_material)
+            "lucide" -> chipGroup.check(R.id.chip_icon_lucide)
+            "neon" -> chipGroup.check(R.id.chip_icon_neon)
+            "glass" -> chipGroup.check(R.id.chip_icon_glass)
+            "gradient" -> chipGroup.check(R.id.chip_icon_gradient)
+            "phosphor" -> chipGroup.check(R.id.chip_icon_phosphor)
+            else -> chipGroup.check(R.id.chip_icon_lucide)
         }
         chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val packId = when (checkedIds.first()) {
-                R.id.chip_icon_bold -> "darknova"
                 R.id.chip_icon_heroic -> "heroic"
-                else -> "default"
+                R.id.chip_icon_lucide -> "lucide"
+                R.id.chip_icon_neon -> "neon"
+                R.id.chip_icon_glass -> "glass"
+                R.id.chip_icon_gradient -> "gradient"
+                R.id.chip_icon_phosphor -> "phosphor"
+                else -> "lucide"
             }
             val current = ThemeManager.activeTheme ?: return@setOnCheckedStateChangeListener
             val updated = current.copy(iconPackId = packId)

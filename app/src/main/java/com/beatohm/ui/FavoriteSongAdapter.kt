@@ -29,7 +29,10 @@ class FavoriteSongAdapter(
         b.tvFavTitle.text = song.title
         b.tvFavArtist.text = song.artist.ifBlank { b.root.context.getString(R.string.unknown_artist) }
 
-        val icons = IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)
+        val packId = ThemeManager.currentIconPack
+        val colorAware = IconPackManager.isColorAwarePack(packId)
+        val icons = IconPackManager.getAppIconResIds(packId)
+        val ctx = b.root.context
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
             b.ivFavCover.tag = null
             b.ivFavCover.load(File(song.thumbnailUrl)) {
@@ -45,10 +48,16 @@ class FavoriteSongAdapter(
             b.ivFavCover.setImageResource(R.drawable.ic_player)
         }
 
-        b.btnFavToggle.setImageResource(
-            if (song.isFavorite) icons[IconPackManager.ICON_HEART] ?: R.drawable.ic_favorite
-            else icons[IconPackManager.ICON_HEART_BORDER] ?: R.drawable.ic_favorite_border
-        )
+        val favIconKey = if (song.isFavorite) IconPackManager.ICON_HEART else IconPackManager.ICON_HEART_BORDER
+        val favFallback = if (song.isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite_border
+        if (colorAware) {
+            b.btnFavToggle.setImageDrawable(
+                IconPackManager.getIcon(favIconKey, packId, ctx)
+            )
+            b.btnFavToggle.imageTintList = null
+        } else {
+            b.btnFavToggle.setImageResource(icons[favIconKey] ?: favFallback)
+        }
 
         b.root.setOnClickListener { onPlay(song) }
         b.btnFavPlay.setOnClickListener { onPlay(song) }

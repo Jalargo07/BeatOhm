@@ -456,20 +456,33 @@ class SongItemAdapter(
         holder.title.text = song.title
         holder.artist.text = song.artist.ifBlank { holder.itemView.context.getString(R.string.unknown_artist) }
 
-        val playerRes = IconPackManager.getAppIconResIds(ThemeManager.currentIconPack)[IconPackManager.ICON_PLAYER] ?: R.drawable.ic_player
+        val packId = ThemeManager.currentIconPack
+        val colorAware = IconPackManager.isColorAwarePack(packId)
+        val playerRes = IconPackManager.getAppIconResIds(packId)[IconPackManager.ICON_PLAYER] ?: R.drawable.ic_player
+        val playerDrawable = if (colorAware) IconPackManager.getIcon(IconPackManager.ICON_PLAYER, packId, holder.itemView.context) else null
         if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
             holder.thumbnail.tag = null
             holder.thumbnail.load(File(song.thumbnailUrl)) {
                 crossfade(true)
-                placeholder(playerRes)
-                error(playerRes)
+                if (playerDrawable != null) {
+                    placeholder(playerDrawable)
+                    error(playerDrawable)
+                } else {
+                    placeholder(playerRes)
+                    error(playerRes)
+                }
             }
         } else if (song.filePath.isNotBlank() && File(song.filePath).exists()) {
             holder.thumbnail.tag = song.filePath
             ArtworkLoader.loadArtFromAudioFile(holder.thumbnail, song.filePath)
         } else {
             holder.thumbnail.tag = null
-            holder.thumbnail.setImageResource(playerRes)
+            if (playerDrawable != null) {
+                holder.thumbnail.setImageDrawable(playerDrawable)
+                holder.thumbnail.imageTintList = null
+            } else {
+                holder.thumbnail.setImageResource(playerRes)
+            }
         }
 
         holder.checkBox.setOnCheckedChangeListener(null)

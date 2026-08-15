@@ -11,11 +11,6 @@ class AudioVisualizerManager {
     val levels: StateFlow<FloatArray> = _levels.asStateFlow()
     val isActive: Boolean get() = _isActive
 
-    fun attach(unused: Int = 0): Boolean {
-        _isActive = true
-        return true
-    }
-
     fun start() {
         _isActive = true
     }

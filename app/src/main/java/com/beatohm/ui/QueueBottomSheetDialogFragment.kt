@@ -261,20 +261,33 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
 
         private fun loadArtwork(iv: ImageView, song: Song) {
-            val musicNoteRes = IconPackManager.getDownloadIconResId(ThemeManager.currentIconPack)
+            val packId = ThemeManager.currentIconPack
+            val colorAware = IconPackManager.isColorAwarePack(packId)
+            val musicNoteRes = IconPackManager.getDownloadIconResId(packId)
+            val musicNoteDrawable = if (colorAware) IconPackManager.getIcon(IconPackManager.ICON_MUSIC_NOTE, packId, iv.context) else null
             if (song.thumbnailUrl.isNotBlank() && File(song.thumbnailUrl).exists()) {
                 iv.tag = null
                 iv.load(File(song.thumbnailUrl)) {
                     crossfade(true)
-                    placeholder(musicNoteRes)
-                    error(musicNoteRes)
+                    if (musicNoteDrawable != null) {
+                        placeholder(musicNoteDrawable)
+                        error(musicNoteDrawable)
+                    } else {
+                        placeholder(musicNoteRes)
+                        error(musicNoteRes)
+                    }
                 }
             } else if (song.filePath.isNotBlank() && File(song.filePath).exists()) {
                 iv.tag = song.filePath
                 ArtworkLoader.loadArtFromAudioFile(iv, song.filePath)
             } else {
                 iv.tag = null
-                iv.setImageResource(musicNoteRes)
+                if (musicNoteDrawable != null) {
+                    iv.setImageDrawable(musicNoteDrawable)
+                    iv.imageTintList = null
+                } else {
+                    iv.setImageResource(musicNoteRes)
+                }
             }
         }
 

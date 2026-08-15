@@ -8,10 +8,7 @@
     </item>
     <item>
         <shape android:shape="oval">
-            <gradient
-                android:angle="45"
-                android:endColor="@color/secondary"
-                android:startColor="@color/primary" />
+            <solid android:color="#FFFFFF" />
         </shape>
     </item>
 </ripple>

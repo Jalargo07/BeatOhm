@@ -411,25 +411,46 @@
                     app:selectionRequired="true">
 
                     <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_material"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_default" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chip_icon_bold"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_icon_pack_darknova" />
-
-                    <com.google.android.material.chip.Chip
                         android:id="@+id/chip_icon_heroic"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/settings_icon_pack_heroic" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_icon_lucide"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_icon_pack_lucide" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_icon_neon"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_icon_pack_neon" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_icon_glass"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_icon_pack_glass" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_icon_gradient"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_icon_pack_gradient" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_icon_phosphor"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_icon_pack_phosphor" />
 
                 </com.google.android.material.chip.ChipGroup>
 
