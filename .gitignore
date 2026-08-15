@@ -33,7 +33,9 @@ REVIEW*.md
 MANUAL_*.md
 PLAYER_REDESIGN_PLAN.md
 UI_UX_SPRINT_PLAN.md
-docs/
+docs/*
+!docs/screenshots/
+!docs/screenshots/*
 tasks/
 Guia.md
 design-system/
