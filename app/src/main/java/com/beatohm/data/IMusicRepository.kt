@@ -31,6 +31,11 @@ interface IMusicRepository {
     suspend fun deleteSong(song: LocalSong)
     suspend fun incrementPlayCount(songId: String)
 
+    // Playback scoring
+    suspend fun recordPlaybackEvent(songId: String, timestamp: Long, score: Int)
+    fun getTopPlayedSongs(sinceTimestamp: Long, limit: Int = 100): Flow<List<LocalSong>>
+    suspend fun getSongIdByPath(path: String): String?
+
     // Enrichment
     suspend fun enrichMetadataGradually(
         songs: List<LocalSong>,

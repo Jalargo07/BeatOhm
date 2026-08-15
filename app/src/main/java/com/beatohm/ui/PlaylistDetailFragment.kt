@@ -56,7 +56,7 @@ class PlaylistDetailFragment : Fragment() {
                         vm.setPlaylist(songs.map { it.toSong() }, if (index >= 0) index else 0)
                         val path = song.filePath
                         if (path.isNotBlank()) {
-                            service.playFile(path)
+                            service.playFile(path, isManual = true)
                         }
                     }
                 }

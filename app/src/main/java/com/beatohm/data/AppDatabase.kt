@@ -21,9 +21,10 @@ import java.lang.reflect.Field
         UserTheme::class,
         RegenStatus::class,
         ImportSession::class,
-        ImportTrackStatus::class
+        ImportTrackStatus::class,
+        PlaybackEvent::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun regenStatusDao(): RegenStatusDao
     abstract fun importSessionDao(): ImportSessionDao
     abstract fun importTrackStatusDao(): ImportTrackStatusDao
+    abstract fun playbackEventDao(): PlaybackEventDao
 
     companion object {
         @Volatile
@@ -124,13 +126,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS playback_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        songId TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        score INTEGER NOT NULL,
+                        FOREIGN KEY (songId) REFERENCES songs(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_playback_events_songId ON playback_events(songId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_playback_events_timestamp ON playback_events(timestamp)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "music_downloader_db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {

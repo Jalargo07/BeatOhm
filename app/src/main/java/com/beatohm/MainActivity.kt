@@ -338,10 +338,6 @@ class MainActivity : AppCompatActivity() {
                 requestPermissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             }
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-        }
     }
 
     override fun onDestroy() {

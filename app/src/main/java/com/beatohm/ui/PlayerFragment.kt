@@ -14,7 +14,6 @@ import android.graphics.PorterDuffColorFilter
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.media.AudioManager
 import android.os.Bundle
@@ -141,7 +140,7 @@ class PlayerFragment : Fragment() {
         setupSwipeGesture()
         lyricsHelper.setupLyricsSwipe()
         applyIconPack()
-        setupPlayGlow()
+        applyAccentTints()
 
         lifecycleScope.launch {
             audioVisualizerManager.levels.collect { bands ->
@@ -641,7 +640,7 @@ class PlayerFragment : Fragment() {
             val nextSong = viewModel.nextSong() ?: return@setOnClickListener
             val path = nextSong.filePath.ifBlank { nextSong.youtubeUrl }
             if (path.isNotBlank()) {
-                service.playFile(path)
+                service.playFile(path, isManual = true)
             }
         }
 
@@ -651,7 +650,7 @@ class PlayerFragment : Fragment() {
             val prevSong = viewModel.prevSong() ?: return@setOnClickListener
             val path = prevSong.filePath.ifBlank { prevSong.youtubeUrl }
             if (path.isNotBlank()) {
-                service.playFile(path)
+                service.playFile(path, isManual = true)
             }
         }
 
@@ -853,7 +852,7 @@ class PlayerFragment : Fragment() {
         val song = if (direction > 0) viewModel.nextSong() else viewModel.prevSong()
         if (song != null) {
             val path = song.filePath.ifBlank { song.youtubeUrl }
-            if (path.isNotBlank()) service.playFile(path)
+            if (path.isNotBlank()) service.playFile(path, isManual = true)
         } else {
             binding.ivCover.translationX = 0f
             binding.ivCover.alpha = 1f
@@ -1044,20 +1043,8 @@ class PlayerFragment : Fragment() {
         applyIcon(binding.btnAddPlaylist, IconPackManager.ICON_PLAYLIST_ADD, R.drawable.ic_playlist_add)
     }
 
-    private fun setupPlayGlow() {
+    private fun applyAccentTints() {
         val accentColor = ThemeManager.accentColor
-        val glowColor = Color.argb(
-            90,
-            Color.red(accentColor),
-            Color.green(accentColor),
-            Color.blue(accentColor)
-        )
-        val glowDrawable = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(glowColor)
-        }
-        binding.ivPlayGlow.background = glowDrawable
-
         val accentTint = ColorStateList.valueOf(accentColor)
         binding.btnPlayPause.backgroundTintList = accentTint
         binding.btnShuffle.backgroundTintList = accentTint

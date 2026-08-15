@@ -384,4 +384,9 @@
     <string name="import_action_pause">Pause</string>
     <string name="import_action_resume">Resume</string>
     <string name="import_action_cancel">Cancel</string>
+
+    <!-- Most Played - Period Filter -->
+    <string name="period_all">All time</string>
+    <string name="period_this_month">This month</string>
+    <string name="empty_most_played">Play songs to see your ranking</string>
 </resources>

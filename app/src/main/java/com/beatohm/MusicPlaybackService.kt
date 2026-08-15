@@ -14,7 +14,6 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.util.Log
 import android.view.KeyEvent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -40,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class MusicPlaybackService : MediaSessionService() {
 
@@ -58,6 +58,10 @@ class MusicPlaybackService : MediaSessionService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var durationCheckRunnable: Runnable? = null
     private var widgetTickerRunnable: Runnable? = null
+
+    // Tracking de reproducción actual para scoring
+    private var _trackedPath: String = ""
+    private var _trackedIsManual: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
@@ -231,8 +235,11 @@ class MusicPlaybackService : MediaSessionService() {
         vm.setPlaying(player.isPlaying)
     }
 
-    fun playFile(filePath: String) {
+    fun playFile(filePath: String, isManual: Boolean = false) {
         if (filePath.isBlank()) return
+
+        recordPreviousSongScore()
+
         playerViewModel?.setDuration(0L)
 
         val orderedQueue = buildOrderedQueue()
@@ -254,10 +261,50 @@ class MusicPlaybackService : MediaSessionService() {
         player.play()
         startWidgetTicker()
 
-        val path = filePath
-        playbackScope.launch {
-            try { MusicRepository(applicationContext).incrementPlayCount(path) } catch (_: Exception) {}
+        _trackedPath = filePath
+        _trackedIsManual = isManual
+    }
+
+    private fun recordScoreForPath(path: String, isManual: Boolean) {
+        if (path.isBlank()) return
+
+        val songId = runBlocking(Dispatchers.IO) {
+            MusicRepository(applicationContext).getSongIdByPath(path)
         }
+        if (songId == null) return
+
+        val position = player.currentPosition
+        val duration = player.duration
+        if (duration <= 0) return
+
+        val progress = (position.toFloat() / duration).coerceIn(0f, 1f)
+        val progressScore = when {
+            progress < 0.25f -> 0
+            progress < 0.50f -> 1
+            progress < 0.90f -> 2
+            else -> 3
+        }
+
+        if (progressScore == 0) return
+
+        val bonus = if (isManual) 1 else 0
+        val totalScore = progressScore + bonus
+
+        playbackScope.launch {
+            try {
+                MusicRepository(applicationContext).recordPlaybackEvent(
+                    songId = songId,
+                    timestamp = System.currentTimeMillis(),
+                    score = totalScore
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun recordPreviousSongScore() {
+        recordScoreForPath(_trackedPath, _trackedIsManual)
+        _trackedPath = ""
+        _trackedIsManual = false
     }
 
     private fun buildOrderedQueue(): List<Song> {
@@ -363,7 +410,7 @@ class MusicPlaybackService : MediaSessionService() {
     private fun advanceSong(next: Boolean) {
         val song = (if (next) playerViewModel?.nextSong() else playerViewModel?.prevSong()) ?: return
         val path = song.filePath.ifBlank { song.youtubeUrl }
-        if (path.isNotBlank()) playFile(path)
+        if (path.isNotBlank()) playFile(path, isManual = true)
     }
 
     private fun checkAndSetDuration(retriesLeft: Int = 5) {
@@ -404,6 +451,11 @@ class MusicPlaybackService : MediaSessionService() {
                     checkAndSetDuration()
                 }
                 if (playbackState == Player.STATE_ENDED) {
+                    if (player.hasNextMediaItem()) {
+                        recordScoreForPath(_trackedPath, _trackedIsManual)
+                        _trackedPath = ""
+                        _trackedIsManual = false
+                    }
                     val queueSize = playerViewModel?.playlist?.value?.size ?: 0
                     // Solo delegar al ViewModel cuando ExoPlayer no puede avanzar solo (fin real
                     // de su cola). Si hay siguiente item, ExoPlayer auto-avanza y el sync del
@@ -419,6 +471,11 @@ class MusicPlaybackService : MediaSessionService() {
                 updateNotification()
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                     syncViewModelToExoPlayer()
+                    val currentMediaId = mediaItem?.mediaId
+                    if (!currentMediaId.isNullOrBlank()) {
+                        _trackedPath = currentMediaId
+                        _trackedIsManual = false
+                    }
                 }
             }
         })

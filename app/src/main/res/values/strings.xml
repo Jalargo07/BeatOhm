@@ -386,4 +386,9 @@
     <string name="import_action_pause">Pausar</string>
     <string name="import_action_resume">Reanudar</string>
     <string name="import_action_cancel">Cancelar</string>
+
+    <!-- Most Played - Period Filter -->
+    <string name="period_all">Todos</string>
+    <string name="period_this_month">Este mes</string>
+    <string name="empty_most_played">Escuchá canciones para ver tu ranking</string>
 </resources>

@@ -28,6 +28,7 @@ class MusicRepository(
 ) : IMusicRepository {
 
     private val dao = AppDatabase.getInstance(context).songDao()
+    private val playbackEventDao = AppDatabase.getInstance(context).playbackEventDao()
     private val metadataFetcher = MetadataFetcher()
     private val lyricsFetcher = LyricsFetcher()
 
@@ -62,6 +63,16 @@ class MusicRepository(
     override suspend fun insertSong(song: LocalSong) = dao.insertSong(song)
     override suspend fun deleteSong(song: LocalSong) = dao.deleteSong(song)
     override suspend fun incrementPlayCount(songId: String) = dao.incrementPlayCount(songId)
+
+    override suspend fun recordPlaybackEvent(songId: String, timestamp: Long, score: Int) {
+        playbackEventDao.insert(PlaybackEvent(songId = songId, timestamp = timestamp, score = score))
+    }
+
+    override fun getTopPlayedSongs(sinceTimestamp: Long, limit: Int): Flow<List<LocalSong>> {
+        return playbackEventDao.getTopSongsByScore(sinceTimestamp, limit)
+    }
+
+    override suspend fun getSongIdByPath(path: String): String? = dao.getIdByPath(path)
 
     /**
      * Gradually enriches songs missing metadata (artist, album, duration) in the background.

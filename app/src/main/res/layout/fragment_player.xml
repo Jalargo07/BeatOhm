@@ -195,29 +195,16 @@
             android:padding="10dp"
             android:src="@drawable/ic_prev" />
 
-        <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        <ImageButton
+            android:id="@+id/btn_play_pause"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp">
-
-            <ImageView
-                android:id="@+id/iv_play_glow"
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no" />
-
-            <ImageButton
-                android:id="@+id/btn_play_pause"
-                android:layout_width="68dp"
-                android:layout_height="68dp"
-                android:background="@drawable/bg_play_pause_premium"
-                android:contentDescription="@string/play"
-                android:elevation="6dp"
-                android:src="@drawable/ic_play" />
-
-        </FrameLayout>
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_play_pause_premium"
+            android:contentDescription="@string/play"
+            android:elevation="6dp"
+            android:src="@drawable/ic_play" />
 
         <ImageButton
             android:id="@+id/btn_next"

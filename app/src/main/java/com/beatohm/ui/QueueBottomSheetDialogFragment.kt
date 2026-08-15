@@ -50,7 +50,7 @@ class QueueBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 val activity = requireActivity() as? MainActivity ?: return@QueueSongAdapter
                 val service = activity.playbackService ?: return@QueueSongAdapter
                 playerViewModel.playAtDisplay(index)
-                service.playFile(song.filePath)
+                service.playFile(song.filePath, isManual = true)
                 dismiss()
             },
             onRemove = { index -> playerViewModel.removeFromQueue(index) },

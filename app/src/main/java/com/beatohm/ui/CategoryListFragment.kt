@@ -86,7 +86,7 @@ class CategoryListFragment : Fragment() {
                     songs.map { it.toSong() },
                     if (index >= 0) index else 0
                 )
-                service.playFile(song.filePath)
+                service.playFile(song.filePath, isManual = true)
             }
         })
 
