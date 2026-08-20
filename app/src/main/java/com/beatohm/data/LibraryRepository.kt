@@ -4,13 +4,12 @@ import android.content.Context
 import android.os.Environment
 import android.util.Log
 import com.beatohm.DeviceUtils
+import com.beatohm.network.NetworkModule
 import java.io.File
 import java.io.FileOutputStream
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 
 class LibraryRepository(private val context: Context) : ILibraryRepository {
@@ -141,11 +140,7 @@ class LibraryRepository(private val context: Context) : ILibraryRepository {
         try {
             if (dest.exists()) return
             val request = Request.Builder().url(url).get().build()
-            val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .build()
-            client.newCall(request).execute().use { resp ->
+            NetworkModule.client.newCall(request).execute().use { resp ->
                 if (resp.isSuccessful) {
                     val bytes = resp.body?.bytes() ?: return
                     dest.parentFile?.mkdirs()

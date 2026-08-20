@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.beatohm.DeviceUtils
 import com.beatohm.data.AppDatabase
-import com.beatohm.data.AudioTagWriter
 import com.beatohm.data.LocalSong
+import com.beatohm.data.TagWriteCoordinator
 import com.beatohm.downloader.ProxyDownloader
 import com.beatohm.metadata.LyricsFetcher
 import com.beatohm.metadata.MetadataFetcher
@@ -14,10 +14,9 @@ import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import okhttp3.OkHttpClient
+import com.beatohm.network.NetworkModule
 import okhttp3.Request
 import java.io.FileOutputStream
-import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.random.Random
@@ -51,18 +50,19 @@ class PlaylistImportManager(private val context: Context) {
     private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
     private var importJob: Job? = null
+    private var importScope: CoroutineScope? = null
     @Volatile
     private var isCancelled = false
 
     private val proxyDownloader = ProxyDownloader()
     private val metadataFetcher = MetadataFetcher()
     private val lyricsFetcher = LyricsFetcher()
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(300, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    private val tagWriteCoordinator = TagWriteCoordinator()
+    private val httpClient = NetworkModule.newClient(
+        connectTimeoutSec = 30,
+        readTimeoutSec = 300,
+        writeTimeoutSec = 300
+    )
 
     var onProgress: ((completed: Int, total: Int, currentTrack: String) -> Unit)? = null
     var onComplete: ((imported: Int, failed: Int, skipped: Int) -> Unit)? = null
@@ -107,7 +107,7 @@ class PlaylistImportManager(private val context: Context) {
         trackStatusDao.insertAll(trackEntities)
         sessionDao.updateProgress(sessionId, 0, 0)
 
-        importJob = parentJob ?: CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+        importJob = parentJob ?: CoroutineScope(Dispatchers.IO + SupervisorJob()).also { importScope = it }.launch {
             try {
                 processImport(sessionId, tracks.size)
             } catch (e: CancellationException) {
@@ -141,6 +141,8 @@ class PlaylistImportManager(private val context: Context) {
         isCancelled = true
         importJob?.cancel()
         importJob = null
+        importScope?.cancel()
+        importScope = null
     }
 
     /**
@@ -176,6 +178,10 @@ class PlaylistImportManager(private val context: Context) {
             SpotifyImporter.canHandle(url) -> {
                 val id = SpotifyImporter.extractPlaylistId(url)
                 return if (id != null) SpotifyImporter to id else null
+            }
+            YouTubeImporter.canHandle(url) -> {
+                val id = YouTubeImporter.extractPlaylistId(url)
+                return if (id != null) YouTubeImporter to id else null
             }
         }
         return null
@@ -314,7 +320,7 @@ class PlaylistImportManager(private val context: Context) {
             )
 
             // Generate waveform in background (don't block)
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            importScope?.launch {
                 generateWaveform(finalPath)
             }
 
@@ -398,25 +404,23 @@ class PlaylistImportManager(private val context: Context) {
             .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             .build()
 
-        val response = httpClient.newCall(request).execute()
-        val body = response.body ?: throw Exception("Empty response body")
-        val code = response.code
+        httpClient.newCall(request).execute().use { response ->
+            val body = response.body ?: throw Exception("Empty response body")
 
-        if (code != 200) {
-            response.close()
-            throw Exception("HTTP $code downloading audio")
-        }
+            if (!response.isSuccessful) {
+                throw Exception("HTTP ${response.code} downloading audio")
+            }
 
-        FileOutputStream(tempFile).use { output ->
-            body.byteStream().use { input ->
-                val buffer = ByteArray(8192)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
+            FileOutputStream(tempFile).use { output ->
+                body.byteStream().use { input ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                    }
                 }
             }
         }
-        response.close()
 
         if (tempFile.length() == 0L) {
             tempFile.delete()
@@ -434,16 +438,24 @@ class PlaylistImportManager(private val context: Context) {
                 artist = track.artist,
                 album = track.album
             )
+            // ADAPTACIÓN MÍNIMA POR COMPILACIÓN (T4): la firma nueva devuelve el
+            // MetadataResult del paquete metadata (nombre completo para no chocar con
+            // el MetadataResult interno de este manager). T5 refina este manejo.
             val result = metadataFetcher.fetchFullMetadata(song)
-            if (result.isSuccess) {
-                val fetched = result.getOrThrow()
+            val candidate = when (result) {
+                is com.beatohm.metadata.MetadataResult.ClearMatch -> result.candidate
+                is com.beatohm.metadata.MetadataResult.AmbiguousMatches ->
+                    result.candidates.maxByOrNull { it.score }
+                com.beatohm.metadata.MetadataResult.NoMatch -> null
+            }
+            if (candidate != null) {
                 MetadataResult(
-                    title = fetched.title,
-                    artist = fetched.artist,
-                    album = fetched.album,
-                    genre = fetched.genre,
-                    year = fetched.year,
-                    trackNumber = fetched.trackNumber
+                    title = candidate.title,
+                    artist = candidate.artist,
+                    album = candidate.album,
+                    genre = candidate.genre,
+                    year = candidate.year,
+                    trackNumber = 0
                 )
             } else {
                 null
@@ -490,7 +502,7 @@ class PlaylistImportManager(private val context: Context) {
         }
     }
 
-    private fun writeTags(file: java.io.File, metadata: MetadataResult, lyrics: String?) {
+    private suspend fun writeTags(file: java.io.File, metadata: MetadataResult, lyrics: String?) {
         try {
             val localSong = LocalSong(
                 id = file.absolutePath,
@@ -502,7 +514,7 @@ class PlaylistImportManager(private val context: Context) {
                 trackNumber = metadata.trackNumber,
                 lyrics = lyrics ?: ""
             )
-            AudioTagWriter.writeTags(file, localSong)
+            tagWriteCoordinator.writeMetadata(file, localSong)
         } catch (e: Exception) {
             Log.e(TAG, "writeTags error: ${e.message}")
         }

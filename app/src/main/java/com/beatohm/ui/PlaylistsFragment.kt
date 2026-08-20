@@ -54,7 +54,7 @@ class PlaylistsFragment : Fragment() {
             AlertDialog.Builder(requireContext())
                 .setTitle(getString(R.string.nueva_playlist))
                 .setView(input)
-                .setPositiveButton("Crear") { _, _ ->
+                .setPositiveButton(getString(R.string.crear)) { _, _ ->
                     val name = input.text.toString().trim()
                     if (name.isNotBlank()) {
                         lifecycleScope.launch {
@@ -62,7 +62,7 @@ class PlaylistsFragment : Fragment() {
                         }
                     }
                 }
-                .setNegativeButton("Cancelar", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show()
         }
 

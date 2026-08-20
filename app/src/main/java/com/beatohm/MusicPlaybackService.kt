@@ -28,7 +28,9 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.beatohm.audio.EqualizerEffect
 import com.beatohm.audio.LevelCaptureProcessor
+import com.beatohm.data.AppDatabase
 import com.beatohm.data.EqualizerRepository
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.model.Song
 import com.beatohm.ui.PlayerViewModel
@@ -39,7 +41,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class MusicPlaybackService : MediaSessionService() {
 
@@ -268,11 +269,6 @@ class MusicPlaybackService : MediaSessionService() {
     private fun recordScoreForPath(path: String, isManual: Boolean) {
         if (path.isBlank()) return
 
-        val songId = runBlocking(Dispatchers.IO) {
-            MusicRepository(applicationContext).getSongIdByPath(path)
-        }
-        if (songId == null) return
-
         val position = player.currentPosition
         val duration = player.duration
         if (duration <= 0) return
@@ -292,7 +288,15 @@ class MusicPlaybackService : MediaSessionService() {
 
         playbackScope.launch {
             try {
-                MusicRepository(applicationContext).recordPlaybackEvent(
+                val songId = MusicRepository(
+                    applicationContext,
+                    metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(applicationContext).metadataCandidateDao())
+                ).getSongIdByPath(path) ?: return@launch
+
+                MusicRepository(
+                    applicationContext,
+                    metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(applicationContext).metadataCandidateDao())
+                ).recordPlaybackEvent(
                     songId = songId,
                     timestamp = System.currentTimeMillis(),
                     score = totalScore

@@ -137,8 +137,8 @@
 |------------|-----------|---------|----------|
 | **Lenguaje** | Kotlin | — | 100% Kotlin |
 | **UI** | XML + ViewBinding | — | Layouts declarativos |
-| **Reproductor** | Media3 ExoPlayer | 1.3.1 | Motor de audio, MediaSession |
-| **Base de datos** | Room | 2.6.1 | Persistencia (songs, playlists, waveformData, themes) |
+| **Reproductor** | Media3 ExoPlayer | 1.4.1 | Motor de audio, MediaSession |
+| **Base de datos** | Room | 2.6.1 | Persistencia (songs, playlists, themes, regen, imports, candidates, playback events) — DB v11 |
 | **Networking** | OkHttp | 4.12.0 | Descargas, APIs |
 | **JSON** | Gson | 2.10.1 | Parseo de respuestas API |
 | **Tags** | JAudioTagger + vorbis-java | 3.0.1 + 0.8 | Escritura de tags ID3 y Vorbis Comments |
@@ -147,6 +147,43 @@
 | **DSP** | IIR Filters | — | 3-band frequency separation (bass/mid/treble) |
 | **Design** | Material Components | 1.11.0 | Material 3, bottom sheets |
 | **Palette** | Palette | 1.0.0 | Colores dinámicos desde carátula |
+
+---
+
+## Testing
+
+### Unit tests
+
+Tests puros de lógica de negocio (sin Android framework):
+
+```bash
+.\gradlew.bat :app:testDebugUnitTest --no-daemon --console=plain
+```
+
+Cobertura:
+- `MetadataCleaningTest` — limpieza de títulos, artistas, normalización
+- `FolderPatternParserTest` — sanitización de nombres de archivo
+- `TagWriteCounterLogicTest` — lógica de contador de escrituras
+- `MetadataFetcherScoringTest` — scoring, dedup, umbrales
+
+### Integration tests (Room)
+
+Tests de instrumentación (requieren emulador/dispositivo):
+
+```bash
+.\gradlew.bat :app:connectedDebugAndroidTest --no-daemon --console=plain
+```
+
+Cobertura:
+- `MetadataCandidateRoomTest` — insert, status transitions, delete operations
+
+### Manual testing
+
+Ver `docs/MANUAL_TEST_MATRIX.md` para la matriz completa de testing manual por dispositivo y feature.
+
+### Diagnostics
+
+Ver `docs/DIAGNOSTICS.md` para guía de diagnóstico de metadata, ads y DB.
 
 ---
 
@@ -176,24 +213,31 @@ Descargá el APK desde [GitHub Releases](https://github.com/Jalargo07/Music-down
 ## Estructura del proyecto
 
 ```
-app/src/main/java/com/musicdownloader/
-├── MainActivity.kt
-├── MusicPlaybackService.kt
-├── PlaylistDetailActivity.kt
-├── MetadataRegenService.kt          # Foreground Service para regen
-├── DeviceUtils.kt                    # DRY: getOptimalThreadCount() centralizado
+app/src/main/java/com/beatohm/
+├── BeatOhmApplication.kt           # Application init (TagWriteCounter, InMobi)
+├── MainActivity.kt                  # NavHost + BottomNav + mini player
+├── MusicPlaybackService.kt          # Media3 playback + notification
+├── PlaylistDetailActivity.kt        # DEPRECATED — use PlaylistDetailFragment
+├── MetadataRegenService.kt          # Foreground service: metadata regen
+├── ImportPlaylistService.kt         # Foreground service: playlist import
+├── MusicWidgetProvider.kt           # Home screen widget
+├── DeviceUtils.kt                   # DRY: getOptimalThreadCount(), MUSIC_FOLDER_NAME
+│
+├── ads/
+│   ├── TagWriteCounter.kt           # Free write limit (100 tags)
+│   └── InMobiManager.kt             # InMobi Ads SDK wrapper
 │
 ├── audio/
-│   ├── WaveformExtractor.kt         # Stroboscopic: seekTo + 3 sub-muestras + RMS/Peak
+│   ├── WaveformExtractor.kt         # Stroboscopic: seekTo + RMS/Peak
 │   ├── LevelCaptureProcessor.kt     # DSP: 3-band IIR filter → 5 anchors
 │   └── AudioVisualizerManager.kt    # Consume LevelCaptureProcessor → StateFlow
 │
 ├── data/
-│   ├── AppDatabase.kt               # Room DB v7
-│   ├── LocalSong.kt                 # Entidad con waveformData
+│   ├── AppDatabase.kt               # Room DB v11 (10 entities)
+│   ├── LocalSong.kt                 # Song entity
 │   ├── SongDao.kt                   # DAO (40+ queries)
 │   ├── IMusicRepository.kt          # Interface (Dependency Inversion)
-│   ├── MusicRepository.kt           # Enrichment + CRUD (~200 líneas)
+│   ├── MusicRepository.kt           # Enrichment + merge + lyrics
 │   ├── IWaveformRepository.kt       # Interface
 │   ├── WaveformRepository.kt        # Waveform extraction
 │   ├── IRegenRepository.kt          # Interface
@@ -202,31 +246,69 @@ app/src/main/java/com/musicdownloader/
 │   ├── LibraryRepository.kt         # Scan, folders, covers
 │   ├── PlaylistRepository.kt        # Playlists
 │   ├── AudioTagWriter.kt            # Tags ID3 + Vorbis Comments
-│   └── AudioTagReader.kt            # Read tags
+│   ├── OpusTagWriter.kt             # Opus-specific tag writer
+│   ├── TagWriteLimitReachedException.kt
+│   ├── PlaybackEvent.kt             # Playback scoring entity
+│   ├── PlaybackEventDao.kt
+│   ├── RegenStatus.kt               # Regen tracking entity
+│   ├── RegenStatusDao.kt
+│   ├── MetadataCandidateEntity.kt   # Ambiguous metadata candidates
+│   ├── MetadataCandidateDao.kt
+│   ├── MetadataCandidateRepository.kt
+│   ├── Playlist.kt / PlaylistSong.kt / PlaylistWithSongs.kt
+│   ├── UserTheme.kt / ThemeDao.kt / ThemeExporter.kt / PresetThemes.kt
+│   ├── TagWriteCoordinator.kt       # Single entry point for all tag writes
+│   └── EqualizerRepository.kt       # EQ presets persistence
+│
+├── importer/
+│   ├── UrlDetector.kt               # URL type auto-detection
+│   ├── ImportedTrack.kt             # Data model for imported tracks
+│   ├── IPlaylistImporter.kt         # Interface (Dependency Inversion)
+│   ├── SpotifyImporter.kt           # Spotify via embed endpoint
+│   ├── DeezerImporter.kt            # Deezer free API
+│   ├── YouTubeImporter.kt           # YouTube via Innertube
+│   ├── PlaylistImportManager.kt     # Core orchestrator
+│   ├── ImportSession.kt / ImportTrackStatus.kt  # Room entities
+│   ├── ImportSessionDao.kt / ImportTrackStatusDao.kt
+│   └── ImportPlaylistBottomSheet.kt  # UI for import progress
 │
 ├── ui/
 │   ├── PlayerFragment.kt            # Reproductor premium
-│   ├── PlayerAnimationHelper.kt     # SRP: animaciones del player
-│   ├── PlayerLyricsHelper.kt        # SRP: letras del player
+│   ├── PlayerAnimationHelper.kt     # SRP: cover animations
+│   ├── PlayerLyricsHelper.kt        # SRP: lyrics panel
 │   ├── WaveformSeekBar.kt           # Waveform real con scroll, fling
-│   ├── WaterVisualizerDrawable.kt   # Ola animada con spring physics
+│   ├── WaterVisualizerDrawable.kt   # Water surface with spring physics
 │   ├── DynamicGradientDrawable.kt   # Gradient animado desde Palette
-│   ├── GlowDrawable.kt              # Efecto de brillo dual-layer
+│   ├── GlowDrawable.kt              # Album art glow
 │   ├── SyncedLyricsView.kt          # Letras sincronizadas
 │   ├── QueueBottomSheetDialogFragment.kt
 │   ├── LibraryFragment.kt
-│   ├── LibraryViewModel.kt          # Scan + enrichment orchestration
-│   ├── SongListFragment.kt          # Lista con multi-selección
+│   ├── LibraryViewModel.kt
+│   ├── SongListFragment.kt
+│   ├── FavoritesFragment.kt
+│   ├── MostPlayedFragment.kt
+│   ├── CategoryListFragment.kt
+│   ├── FoldersFragment.kt
+│   ├── PlaylistsFragment.kt
+│   ├── PlaylistDetailFragment.kt
 │   ├── DownloadsFragment.kt
+│   ├── EqualizerBottomSheet.kt
+│   ├── VerticalSeekBar.kt
 │   ├── TutorialManager.kt
 │   ├── ThemeManager.kt
 │   ├── ArtworkLoader.kt
+│   ├── SongSelectorAdapter.kt
+│   ├── MainViewModel.kt
+│   ├── IconPackManager.kt
+│   ├── IconPackDrawableFactory.kt
 │   └── player/
 │       └── PlayerLayoutManager.kt   # Estilos de layout (vinyl, etc.)
 │
 ├── metadata/
 │   ├── MetadataFetcher.kt           # iTunes + MusicBrainz
-│   └── LyricsFetcher.kt             # LRCLIB → Genius → lyrics.ovh
+│   ├── LyricsFetcher.kt             # LRCLIB → Genius → lyrics.ovh
+│   ├── MetadataResult.kt            # Fetch result types
+│   └── MetadataCleaning.kt          # Name normalization
 │
 ├── downloader/
 │   ├── AudioDownloader.kt           # Descarga + conversión + tags

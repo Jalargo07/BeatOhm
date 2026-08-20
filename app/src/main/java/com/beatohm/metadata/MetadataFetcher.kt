@@ -1,301 +1,321 @@
 ﻿package com.beatohm.metadata
 
 import android.util.Log
-import com.google.gson.Gson
-import com.google.gson.JsonParser
+import androidx.annotation.VisibleForTesting
 import com.beatohm.model.Song
-import com.beatohm.network.NetworkModule
+import com.beatohm.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Request
-import java.net.URLEncoder
-import java.text.Normalizer
+import kotlin.math.abs
 
+/**
+ * Orquesta la búsqueda de metadata sobre las 5 fuentes (Last.fm → iTunes → Spotify →
+ * Deezer → MusicBrainz, en ese orden) y decide el resultado con un scoring de confianza.
+ *
+ * ## Flujo de búsqueda en 3 fases
+ *
+ * 1. **Fase 1 — artista + título**: consulta los 5 providers con artist+title y ACUMULA
+ *    todos los candidatos. Si el mejor candidato supera [THRESHOLD_EARLY_EXIT] (0.85),
+ *    se hace early exit → [MetadataResult.ClearMatch]. No hay early exit intermedio:
+ *    se acumulan todos los candidatos de las 5 fuentes antes de decidir.
+ *
+ * 2. **Fase 2 — título + album + duration** (sin artista): solo se ejecuta si
+ *    `song.album` no está en blanco O `song.duration > 0`. Consulta con `artist = ""`
+ *    y `ExtraTags(song.album)` para que los providers incluyan el album en la query.
+ *
+ * 3. **Fase 3 — solo título**: SIEMPRE se ejecuta. Consulta con `artist = ""` y el
+ *    título. Providers que traen duration (iTunes, Deezer, Spotify) contribuyen al
+ *    scoring; los que no (Last.fm, MusicBrainz) dan duration=0 → neutro en el score.
+ *
+ * ## Re-rank final
+ * Se combinan TODOS los candidatos de las 3 fases, se deduplican por title+artist
+ * normalizados, se scorean con [scoreCandidate] (que incluye duration scoring con
+ * tiers), y se decide con [decideMatch].
+ *
+ * ## Umbrales
+ * - [THRESHOLD_EARLY_EXIT] (0.85): early exit en Fase 1.
+ * - [THRESHOLD_CLEAR] (0.60): mejor candidato → [MetadataResult.ClearMatch].
+ * - [THRESHOLD_CANDIDATE] (0.40): candidatos viables → [MetadataResult.AmbiguousMatches].
+ * - < 0.40 → [MetadataResult.NoMatch].
+ */
 class MetadataFetcher {
 
     companion object {
         private const val TAG = "MetadataFetcher"
-    }
 
-    private val client = NetworkModule.client
+        /** Score para early exit en Fase 1: mejor candidato ≥ 85% → ClearMatch inmediato. */
+        const val THRESHOLD_EARLY_EXIT = 0.85f
 
-    private val gson = Gson()
+        /** Score mínimo para considerar un match "claro" (enriquecer automático). */
+        const val THRESHOLD_CLEAR = 0.60f
 
-    /**
-     * Limpia el título que viene de iTunes eliminando sufijos de YouTube.
-     * Ejemplos:
-     *   "Bohemian Rhapsody (Official Video)" → "Bohemian Rhapsody"
-     *   "Shape of You [Lyrics]" → "Shape of You"
-     *   "Blinding Lights (Remix 2024)" → "Blinding Lights"
-     *   "Havana ft. Young Thug" → "Havana" (ft. se maneja aparte en el artista)
-     */
-    fun cleanTitle(title: String): String {
-        var clean = title
-        // Remover paréntesis y corchetes con contenido: (Official Video), [Lyrics], (Audio), (Live), etc.
-        clean = clean.replace(Regex("\\s*[\\(\\[].*?[\\)\\]]"), "")
-        // Remover "ft.", "feat.", "featuring" y lo que siga (a menos que esté al inicio)
-        clean = clean.replace(Regex("\\s+(?:ft\\.?|feat\\.?|featuring)\\s+.*$", RegexOption.IGNORE_CASE), "")
-        // Remover " - Official Video", " - Lyrics", etc. (guion largo o corto)
-        clean = clean.replace(Regex("\\s*[-–—]\\s*(?:Official|Lyrics|Audio|Live|HD|4K|Explicit|Clean|Remix|Cover|Version|Version).*", RegexOption.IGNORE_CASE), "")
-        // Remover "MV", "M/V" al final
-        clean = clean.replace(Regex("\\s+(?:MV|M/V)$"), "")
-        // Remover year al final si es "(2024)" o "[2024]"
-        clean = clean.replace(Regex("\\s*[\\(\\[]\\d{4}[\\)\\]]$"), "")
-        // Remover texto después de "|" (pipe de canales: "Song | The Cypher Effect")
-        clean = clean.replace(Regex("\\s*\\|.*$"), "")
-        // Remover nombres de canales/series conocidos
-        clean = clean.replace(Regex("\\s*(?:The\\s+)?(?:Cypher\\s+Effect|Mic\\s+Check\\s+Session|Freestyle|Batalla|Red\\s+Bull|Audiomack|SoundCloud).*", RegexOption.IGNORE_CASE), "")
-        return clean.trim()
+        /** Score mínimo para que un candidato sea válido (AmbiguousMatches). */
+        const val THRESHOLD_CANDIDATE = 0.40f
+
+        /** Orden de consulta de fuentes (PLAN.md decisión #1). */
+        private val PROVIDERS = listOf(
+            LastFmProvider,
+            ITunesProvider,
+            SpotifyProvider,
+            DeezerProvider,
+            MusicBrainzProvider
+        )
     }
 
     /**
-     * Limpia el artista de iTunes: remueve " - Topic", "VEVO", etc.
+     * Busca metadata completa para [song] sobre las 5 fuentes y devuelve un
+     * [MetadataResult]:
+     * - [MetadataResult.ClearMatch]: mejor candidato superó [THRESHOLD_CLEAR] (o
+     *   [THRESHOLD_EARLY_EXIT] en Fase 1).
+     * - [MetadataResult.AmbiguousMatches]: varios candidatos plausibles (score
+     *   >= [THRESHOLD_CANDIDATE] pero < [THRESHOLD_CLEAR]).
+     * - [MetadataResult.NoMatch]: ningún candidato alcanzó [THRESHOLD_CANDIDATE].
+     *
+     * El scoring usa [scoreCandidate] con duration tiers: ±20s bonus máximo,
+     * ±30s bonus medio, ±60s neutro, >60s penalty severo (×0.3). Providers
+     * sin duration (Last.fm, MusicBrainz) dan duration=0 → neutro (no penaliza).
      */
-    fun cleanArtist(artist: String): String {
-        var clean = artist
-        // Remover " - Topic" (canal de YouTube genérico)
-        clean = clean.replace(Regex("\\s*-?\\s*Topic$"), "")
-        // Remover "VEVO"
-        clean = clean.replace(Regex("\\s*VEVO$", RegexOption.IGNORE_CASE), "")
-        return clean.trim()
-    }
-
-    suspend fun fetchFullMetadata(song: Song): Result<Song> = withContext(Dispatchers.IO) {
+    suspend fun fetchFullMetadata(song: Song): MetadataResult = withContext(Dispatchers.IO) {
         try {
-            Log.e(TAG, "fetchFullMetadata INICIO: '${song.artist}' - '${song.title}'")
+            AppLogger.d(TAG, "fetchFullMetadata start: artist=${song.artist.length}ch, title=${song.title.length}ch")
 
-            // Attempt 1: artist + title (cleaned)
-            val metadata = searchItunes(song.artist, song.title)
-            if (metadata != null) {
-                val cleaned = song.copy(
-                    title = cleanTitle(metadata.trackName ?: song.title),
-                    artist = cleanArtist(metadata.artistName ?: song.artist),
-                    album = metadata.collectionName ?: "",
-                    genre = metadata.primaryGenreName ?: "",
-                    year = extractYear(metadata.releaseDate ?: ""),
-                    trackNumber = metadata.trackNumber ?: 0,
-                    thumbnailUrl = metadata.artworkUrl ?: song.thumbnailUrl
-                )
-                Log.e(TAG, "fetchFullMetadata iTunes OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
-                return@withContext Result.success(cleaned)
+            val usableArtist = cleanChannelName(song.artist).isNotBlank()
+            val allCandidates = mutableListOf<MetadataCandidate>()
+
+            // ── FASE 1: artista + título en las 5 fuentes ──────────────────
+            if (usableArtist) {
+                val extraTags = ExtraTags(song.album, song.genre)
+                val phase1 = queryProviders(song.artist, song.title, extraTags, "Fase 1")
+                allCandidates += phase1
+
+                // Early exit: si el MEJOR candidato de Fase 1 ≥ 85%, devolver ya
+                val scored1 = phase1.map { it.copy(score = scoreCandidate(it, song)) }
+                val bestPhase1 = scored1.maxByOrNull { it.score }
+                if (bestPhase1 != null && bestPhase1.score >= THRESHOLD_EARLY_EXIT) {
+                    AppLogger.d(TAG, "Fase 1 early exit: score=${bestPhase1.score}")
+                    return@withContext MetadataResult.ClearMatch(bestPhase1)
+                }
+                AppLogger.d(TAG, "Fase 1 done: ${phase1.size} candidates, best=${bestPhase1?.score ?: 0f}")
+            } else {
+                Log.d(TAG, "Fase 1 SKIP: artist not usable after cleanChannelName")
             }
 
-            // Attempt 2: MusicBrainz with artist + title
-            Log.e(TAG, "fetchFullMetadata iTunes sin resultado, intentando MusicBrainz...")
-            val mbMetadata = searchMusicBrainz(song.artist, song.title)
-            if (mbMetadata != null) {
-                val cleaned = song.copy(
-                    title = mbMetadata.title ?: song.title,
-                    artist = mbMetadata.artist ?: song.artist,
-                    album = mbMetadata.album ?: "",
-                    genre = mbMetadata.genre ?: "",
-                    year = mbMetadata.year ?: ""
-                )
-                Log.e(TAG, "fetchFullMetadata MusicBrainz OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
-                return@withContext Result.success(cleaned)
+            // ── FASE 2: título + album + duration (sin artista) ────────────
+            if (song.album.isNotBlank() || song.duration > 0) {
+                Log.d(TAG, "Fase 2: no artist, album=${song.album.length}ch, duration=${song.duration}ms")
+                val extraTags2 = ExtraTags(song.album)
+                val phase2 = queryProviders("", song.title, extraTags2, "Fase 2")
+                allCandidates += phase2
+                Log.d(TAG, "Fase 2 done: ${phase2.size} candidates accumulated")
+            } else {
+                Log.d(TAG, "Fase 2 SKIP: no album or duration")
             }
 
-            // Attempt 3: iTunes with ONLY title (no artist) — fallback cuando el artista es basura del canal
-            Log.e(TAG, "fetchFullMetadata ambos fallaron, intentando iTunes solo con título...")
-            val titleOnlyResult = searchItunes("", song.title)
-            if (titleOnlyResult != null) {
-                val cleaned = song.copy(
-                    title = cleanTitle(titleOnlyResult.trackName ?: song.title),
-                    artist = cleanArtist(titleOnlyResult.artistName ?: song.artist),
-                    album = titleOnlyResult.collectionName ?: "",
-                    genre = titleOnlyResult.primaryGenreName ?: "",
-                    year = extractYear(titleOnlyResult.releaseDate ?: ""),
-                    trackNumber = titleOnlyResult.trackNumber ?: 0,
-                    thumbnailUrl = titleOnlyResult.artworkUrl ?: song.thumbnailUrl
-                )
-                Log.e(TAG, "fetchFullMetadata iTunes (title-only) OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
-                return@withContext Result.success(cleaned)
+            // ── FASE 3: solo título ────────────────────────────────────────
+            Log.d(TAG, "Fase 3: title only (${song.title.length}ch)")
+            val phase3 = queryProviders("", song.title, ExtraTags(), "Fase 3")
+            allCandidates += phase3
+            Log.d(TAG, "Fase 3 done: ${phase3.size} candidates, total=${allCandidates.size}")
+
+            // ── RE-RANK FINAL ──────────────────────────────────────────────
+            val deduplicated = deduplicateCandidates(allCandidates)
+            Log.d(TAG, "Re-rank: ${allCandidates.size} total → ${deduplicated.size} after dedup")
+
+            val scored = deduplicated
+                .map { it.copy(score = scoreCandidate(it, song)) }
+                .sortedByDescending { it.score }
+
+            if (scored.isNotEmpty()) {
+                Log.d(TAG, "Top candidate: score=${scored.first().score} [${scored.first().source}]")
             }
 
-            // Attempt 4: MusicBrainz with ONLY title
-            Log.e(TAG, "fetchFullMetadata iTunes title-only falló, intentando MusicBrainz solo con título...")
-            val mbTitleOnly = searchMusicBrainz("", song.title)
-            if (mbTitleOnly != null) {
-                val cleaned = song.copy(
-                    title = mbTitleOnly.title ?: song.title,
-                    artist = mbTitleOnly.artist ?: song.artist,
-                    album = mbTitleOnly.album ?: "",
-                    genre = mbTitleOnly.genre ?: "",
-                    year = mbTitleOnly.year ?: ""
-                )
-                Log.e(TAG, "fetchFullMetadata MusicBrainz (title-only) OK: '${cleaned.artist}' - '${cleaned.title}' [${cleaned.album}]")
-                return@withContext Result.success(cleaned)
-            }
-
-            Log.e(TAG, "fetchFullMetadata SIN RESULTADO para '${song.artist}' - '${song.title}'")
-            // Apply cleaning even when no metadata found — cleans channel names, playlists, etc.
-            val cleanedSong = song.copy(
-                artist = cleanArtist(cleanChannelName(song.artist)),
-                title = cleanTitle(song.title)
-            )
-            Log.e(TAG, "fetchFullMetadata cleaned fallback: '${cleanedSong.artist}' - '${cleanedSong.title}'")
-            Result.success(cleanedSong)
+            decideMatch(scored)
         } catch (e: Exception) {
             Log.e(TAG, "fetchFullMetadata ERROR: ${e.message}", e)
-            Result.success(song)
+            MetadataResult.NoMatch
         }
     }
 
-    private fun searchItunes(artist: String, title: String): ITunesResult? {
-        try {
-            val cleanArtist = cleanChannelName(artist)
-            val cleanTitle = cleanTitle(title)
-            Log.e(TAG, "searchItunes: artist='$artist' → '$cleanArtist', title='$title' → '$cleanTitle'")
-            val query = if (cleanArtist.isNotBlank()) {
-                URLEncoder.encode("$cleanArtist $cleanTitle", "UTF-8")
+    /**
+     * Consulta todos los providers en orden ([PROVIDERS]) con la misma firma y acumula
+     * los candidatos crudos de cada uno. Cada candidato pasa por limpieza
+     * ([MetadataCandidate.cleaned]) antes de sumarse al acumulado.
+     *
+     * La deduplicación NO se hace aquí: se acumulan todos los candidatos crudos de
+     * esta fase y la dedup global ocurre al final de [fetchFullMetadata] para evitar
+     * que candidatos de fuentes distintas se pierdan prematuramente.
+     */
+    private suspend fun queryProviders(
+        artist: String,
+        title: String,
+        extraTags: ExtraTags,
+        phase: String
+    ): List<MetadataCandidate> {
+        val candidates = mutableListOf<MetadataCandidate>()
+        for (provider in PROVIDERS) {
+            Log.d(TAG, "$phase: querying ${provider.source}...")
+            val raw = provider.search(artist, title, extraTags)
+            if (raw.isEmpty()) {
+                Log.d(TAG, "$phase: ${provider.source} no results")
             } else {
-                URLEncoder.encode(cleanTitle, "UTF-8")
+                val cleaned = raw.map { it.cleaned() }
+                Log.d(TAG, "$phase: ${provider.source} → ${cleaned.size} candidate(s)")
+                candidates += cleaned
             }
-            Log.e(TAG, "searchItunes query: '$query'")
-            val url = "https://itunes.apple.com/search?term=$query&entity=song&limit=3"
-            val request = Request.Builder().url(url).get().build()
-            val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return null
-            val json = JsonParser.parseString(body).asJsonObject
-            val results = json.getAsJsonArray("results")
-            if (results != null && results.size() > 0) {
-                val best = results.first().asJsonObject
-                val trackName = best.get("trackName")?.asString
-                val artistName = best.get("artistName")?.asString
-                val collectionName = best.get("collectionName")?.asString
-                val primaryGenreName = best.get("primaryGenreName")?.asString
-                val releaseDate = best.get("releaseDate")?.asString
-                val trackNumber = best.get("trackNumber")?.asInt
-                val artworkUrl100 = best.get("artworkUrl100")?.asString
-
-                if (isGoodMatch(artist, artistName ?: "", title, trackName ?: "")) {
-                    return ITunesResult(
-                        trackName = trackName,
-                        artistName = artistName,
-                        collectionName = collectionName,
-                        primaryGenreName = primaryGenreName,
-                        releaseDate = releaseDate,
-                        trackNumber = trackNumber,
-                        artworkUrl = artworkUrl100?.replace("100x100bb", "600x600bb")
-                    )
-                }
-            }
-        } catch (_: Exception) {}
-        return null
-    }
-
-    private fun searchMusicBrainz(artist: String, title: String): MusicBrainzResult? {
-        try {
-            val cleanArtist = cleanChannelName(artist)
-            val cleanTitle = cleanTitle(title)
-            Log.e(TAG, "searchMusicBrainz: artist='$artist' → '$cleanArtist', title='$title' → '$cleanTitle'")
-            val query = if (cleanArtist.isNotBlank()) {
-                URLEncoder.encode("artist:\"$cleanArtist\" AND recording:\"$cleanTitle\"", "UTF-8")
-            } else {
-                URLEncoder.encode("recording:\"$cleanTitle\"", "UTF-8")
-            }
-            Log.e(TAG, "searchMusicBrainz query: '$query'")
-            val url = "https://musicbrainz.org/ws/2/recording/?query=$query&fmt=json&limit=3"
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "BeatOhm/1.0 (alejo@email.com)")
-                .get()
-                .build()
-            val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return null
-            val json = JsonParser.parseString(body).asJsonObject
-            val recordings = json.getAsJsonArray("recordings")
-            if (recordings != null && recordings.size() > 0) {
-                val rec = recordings.first().asJsonObject
-                val recTitle = rec.get("title")?.asString ?: return null
-                val artistCredit = rec.getAsJsonArray("artist-credit")
-                val recArtist = artistCredit?.first()?.asJsonObject?.get("name")?.asString ?: ""
-                val releases = rec.getAsJsonArray("releases")
-                var album = ""
-                var year = ""
-                var genre = ""
-                if (releases != null && releases.size() > 0) {
-                    val release = releases.first().asJsonObject
-                    album = release.get("title")?.asString ?: ""
-                    val date = release.get("date")?.asString ?: ""
-                    year = extractYear(date)
-                    val tags = release.getAsJsonArray("tags")
-                    if (tags != null && tags.size() > 0) {
-                        val bestTag = tags.first().asJsonObject
-                        genre = bestTag.get("name")?.asString?.replaceFirstChar { it.uppercase() } ?: ""
-                    }
-                }
-                return MusicBrainzResult(
-                    title = recTitle,
-                    artist = recArtist,
-                    album = album,
-                    year = year,
-                    genre = genre
-                )
-            }
-        } catch (_: Exception) {}
-        return null
-    }
-
-    private fun isGoodMatch(
-        expectedArtist: String, actualArtist: String,
-        expectedTitle: String, actualTitle: String
-    ): Boolean {
-        val eArtist = normalizeForMatch(cleanChannelName(expectedArtist))
-        val aArtist = normalizeForMatch(actualArtist)
-        val eTitle = normalizeForMatch(expectedTitle)
-        val aTitle = normalizeForMatch(actualTitle)
-        return (aArtist.contains(eArtist) || eArtist.contains(aArtist)) &&
-               (aTitle.contains(eTitle) || eTitle.contains(aTitle))
+        }
+        return candidates
     }
 
     /**
-     * Limpia sufijos de canales de YouTube del artista para mejorar el match con iTunes.
-     * Ej: "La Mosca Oficial" → "La Mosca", "BersuitTV" → "Bersuit", "elvecindariocalle13" → "calle13"
+     * Elimina candidatos duplicados que representan la misma canción llegada
+     * de fuentes distintas (ej. Last.fm + Deezer + iTunes para "Besos En Guerra"
+     * de Morat). Agrupa por clave normalizada `title|artist` y conserva el
+     * candidato con mayor score de cada grupo.
+     *
+     * Se ejecuta UNA sola vez al final de [fetchFullMetadata], después de
+     * acumular candidatos de las 3 fases, para que el scoring global (con
+     * duration) determine qué candidato conservar de cada grupo.
      */
-    private fun cleanChannelName(artist: String): String {
-        var clean = artist
-        // Remover paréntesis/corchetes con contenido: "(Oficial)", "[Official]", etc.
-        clean = clean.replace(Regex("\\s*[\\(\\[].*?[\\)\\]]"), "")
-        // Remover nombres de playlists: "Letras Trap & Más", "Lyrics & Vibes", etc.
-        clean = clean.replace(Regex("^\\s*(?:Letras?|Lyrics?|Canciones?|Songs?|Músicas?|Music)\\b.*", RegexOption.IGNORE_CASE), "")
-        // Remover "En Español", "En vivo", "En Directo", "En Concierto" al final
-        clean = clean.replace(Regex("\\s+En\\s+(?:Español|Espanol|Vivo|Directo|Concierto)$", RegexOption.IGNORE_CASE), "")
-        // Remover sufijos comunes de canales
-        clean = clean.replace(Regex("\\s+(?:Oficial|Official|VEVO|Music|Videos|Audio|HD|4K|Latino|Realidad|Records|Entertainment|Productions|Studios)$", RegexOption.IGNORE_CASE), "")
-        // Remover "TV" al final (BersuitTV, NickyJamTV, etc.)
-        clean = clean.replace(Regex("TV$"), "")
-        // Remover prefijos de canales concatenados: "elvecindariocalle13", "lamoscatsetsé"
-        clean = clean.replace(Regex("^(?:el|la|los|las)(?=[a-záéíóúñ])", RegexOption.IGNORE_CASE), "")
-        Log.e(TAG, "cleanChannelName: '$artist' → '$clean'")
-        return clean.trim()
+    @VisibleForTesting
+    internal fun deduplicateCandidates(candidates: List<MetadataCandidate>): List<MetadataCandidate> {
+        return candidates.groupBy {
+            "${normalizeForMatch(it.title)}|${normalizeForMatch(it.artist)}"
+        }.mapValues { (_, group) ->
+            group.maxByOrNull { it.score }!!
+        }.values.toList()
     }
 
-    private fun normalizeForMatch(text: String): String {
-        return Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
-            .replace(Regex("\\p{InCombiningDiacriticalMarks}"), "")
-            .filter { it.isLetterOrDigit() }
+    /**
+     * Calcula el score de confianza de [candidate] contra [song] (0.0 – 1.0).
+     *
+     * ## Pesos
+     * | Componente | Peso  | Match              | Neutral (dato ausente) |
+     * |------------|-------|--------------------|------------------------|
+     * | TITLE      | 0.35  | 0.35               | —                      |
+     * | ARTIST     | 0.30  | 0.30               | 0.15 (artista blank)   |
+     * | ALBUM      | 0.10  | 0.10               | 0.05 (album blank)     |
+     * | YEAR       | 0.05  | 0.05               | 0.025 (año blank)      |
+     * | DURATION   | 0.20  | tiers (ver abajo)  | 0.10 (duration=0)      |
+     *
+     * ## Duration tiers (el factor más potente)
+     * - ≤ 20 s de diferencia → +0.20 (bonus máximo)
+     * - ≤ 30 s → +0.10 (bonus medio)
+     * - ≤ 60 s → +0.0 (neutro)
+     * - > 60 s → score × 0.3 (penalty severo: evita matchear canciones distintas
+     *   con el mismo título, ej. "La Tierra" de Ekhymosis vs Ivete Sangalo)
+     * - duration = 0 en candidato o canción → +0.10 (neutro: no gana ni pierde)
+     *
+     * ## Penalty de artista
+     * Si `song.artist` es usable Y el artista del candidato NO contiene al
+     * esperado (normalizado) → score × 0.5.
+     *
+     * @return Score en rango [0.0, 1.0].
+     */
+    @VisibleForTesting
+    internal fun scoreCandidate(candidate: MetadataCandidate, song: Song): Float {
+        val usableArtist = cleanChannelName(song.artist).isNotBlank()
+
+        var score = 0f
+
+        // ── TITLE (0.35) ──────────────────────────────────────────────────
+        if (isGoodMatch(song.title, candidate.title)) score += 0.35f
+
+        // ── ARTIST (0.30) ─────────────────────────────────────────────────
+        if (usableArtist) {
+            if (isGoodMatch(song.artist, candidate.artist)) {
+                score += 0.30f
+            }
+            // Penalty: artista del candidato no contiene al de la canción
+            val songNorm = normalizeForMatch(song.artist)
+            val candidateNorm = normalizeForMatch(candidate.artist)
+            if (songNorm.isNotBlank() && candidateNorm.isNotBlank() &&
+                !candidateNorm.contains(songNorm)) {
+                score *= 0.5f
+            }
+        } else {
+            score += 0.15f  // neutral: 0.30 × 0.5
+        }
+
+        // ── ALBUM (0.10) ──────────────────────────────────────────────────
+        if (song.album.isNotBlank()) {
+            if (isGoodMatch(song.album, candidate.album)) score += 0.10f
+        } else {
+            score += 0.05f  // neutral
+        }
+
+        // ── YEAR (0.05) ───────────────────────────────────────────────────
+        if (song.year.isNotBlank() && candidate.year.isNotBlank()) {
+            if (song.year == candidate.year) score += 0.05f
+        } else {
+            score += 0.025f  // neutral
+        }
+
+        // ── DURATION (0.20) — el factor más potente ───────────────────────
+        if (candidate.duration > 0 && song.duration > 0) {
+            val diff = abs(candidate.duration - song.duration)
+            when {
+                diff <= 20_000L -> score += 0.20f  // ±20s: bonus máximo
+                diff <= 30_000L -> score += 0.10f  // ±30s: bonus medio
+                diff <= 60_000L -> { /* neutro: +0 */ }
+                else -> score *= 0.3f               // >60s: penalty severo
+            }
+        } else {
+            score += 0.10f  // duration=0: neutro (no gana ni pierde)
+        }
+
+        return score.coerceIn(0f, 1f)
     }
 
-    private fun extractYear(date: String): String {
-        return date.take(4).filter { it.isDigit() }
+    /**
+     * Decide el [MetadataResult] a partir de los candidatos ya scored y ordenados:
+     * - Mejor score >= [THRESHOLD_CLEAR] (0.60) → [MetadataResult.ClearMatch].
+     * - Mejor score >= [THRESHOLD_CANDIDATE] (0.40) → [MetadataResult.AmbiguousMatches]
+     *   con todos los candidatos que alcancen el umbral.
+     * - Ningún candidato alcanza 0.40 → [MetadataResult.NoMatch].
+     *
+     * **Importante**: los candidatos que llegan aquí ya pasaron por
+     * [deduplicateCandidates], así que si quedan 2+ con score >= 0.60 son
+     * CANCIONES DISTINTAS (ej. "El Huracán" de 3 artistas), no la misma
+     * canción de 3 fuentes.
+     */
+    @VisibleForTesting
+    internal fun decideMatch(candidates: List<MetadataCandidate>): MetadataResult {
+        if (candidates.isEmpty()) return MetadataResult.NoMatch
+
+        val bestScore = candidates.first().score
+
+        if (bestScore >= THRESHOLD_CLEAR) {
+            return MetadataResult.ClearMatch(candidates.first())
+        }
+
+        val viable = candidates.filter { it.score >= THRESHOLD_CANDIDATE }
+        return if (viable.isNotEmpty()) {
+            MetadataResult.AmbiguousMatches(viable)
+        } else {
+            MetadataResult.NoMatch
+        }
     }
 
-    private data class ITunesResult(
-        val trackName: String?,
-        val artistName: String?,
-        val collectionName: String?,
-        val primaryGenreName: String?,
-        val releaseDate: String?,
-        val trackNumber: Int?,
-        val artworkUrl: String?
+    /**
+     * Aplica limpieza a los campos de un candidato crudo antes del scoring:
+     * [cleanTitle] sobre el título y `cleanArtist(cleanChannelName())` sobre el artista
+     * (mismo comportamiento que el código viejo al construir el Song enriquecido).
+     */
+    @VisibleForTesting
+    internal fun MetadataCandidate.cleaned(): MetadataCandidate = copy(
+        title = cleanTitle(title),
+        artist = cleanArtist(cleanChannelName(artist))
     )
 
-    private data class MusicBrainzResult(
-        val title: String?,
-        val artist: String?,
-        val album: String?,
-        val year: String?,
-        val genre: String?
-    )
+    /**
+     * Compara dos strings normalizados (NFD + lowercase + letterOrDigit) y devuelve
+     * true si uno contiene al otro. `false` si alguno queda vacío tras normalizar
+     * (evita matches triviales contra strings vacíos).
+     */
+    @VisibleForTesting
+    internal fun isGoodMatch(expected: String, actual: String): Boolean {
+        val e = normalizeForMatch(expected)
+        val a = normalizeForMatch(actual)
+        return e.isNotBlank() && a.isNotBlank() && (a.contains(e) || e.contains(a))
+    }
 }

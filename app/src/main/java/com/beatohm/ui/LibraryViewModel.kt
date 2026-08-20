@@ -7,11 +7,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.beatohm.data.AppDatabase
 import com.beatohm.data.LocalSong
 import com.beatohm.data.ILibraryRepository
 import com.beatohm.data.IMusicRepository
 import com.beatohm.data.IWaveformRepository
 import com.beatohm.data.LibraryRepository
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.WaveformRepository
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +28,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         val withLyrics: Boolean = false
     )
 
-    private val repo: IMusicRepository = MusicRepository(application)
+    private val repo: IMusicRepository = MusicRepository(
+        application,
+        metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(application).metadataCandidateDao())
+    )
     private val libraryRepo: ILibraryRepository = LibraryRepository(application)
     private val waveformRepo: IWaveformRepository = WaveformRepository(application)
 
@@ -60,6 +65,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 // Phase 1: Show existing DB songs immediately
                 _allSongs.postValue(repo.getAllSongsNow())
+
+                // Data integrity: limpia duplicados huérfanos ANTES de fastScan(), porque
+                // cleanupDuplicates() (dentro de fastScan) borra las filas huérfanas, lo que
+                // dispara ON DELETE CASCADE en playback_events (FK real) perdiendo su ranking,
+                // y deja referencias colgantes en playlist_songs/regen_status (sin FK, no hay
+                // cascade). Acá se migran primero esas referencias a la fila real gemela.
+                repo.cleanOrphanDuplicateSongs()
 
                 // Phase 2: Fast scan — find new files, insert to DB with minimal metadata
                 val result = libraryRepo.fastScan()

@@ -20,7 +20,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.beatohm.R
+import com.beatohm.data.AppDatabase
 import com.beatohm.data.LocalSong
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.toSong
 import com.beatohm.databinding.FragmentLibraryBinding
@@ -48,7 +50,10 @@ class LibraryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         libraryViewModel = ViewModelProvider(requireActivity())[LibraryViewModel::class.java]
-        repository = MusicRepository(requireContext())
+        repository = MusicRepository(
+            requireContext(),
+            metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(requireContext()).metadataCandidateDao())
+        )
 
         adapter = LibraryMenuAdapter(
             onCategoryClick = { category -> navigateToCategory(category) },

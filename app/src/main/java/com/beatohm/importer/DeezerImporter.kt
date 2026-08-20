@@ -1,12 +1,11 @@
 package com.beatohm.importer
 
 import android.util.Log
+import com.beatohm.network.NetworkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * Imports playlists from Deezer API (free, no auth required).
@@ -20,10 +19,7 @@ object DeezerImporter : IPlaylistImporter {
     private const val BASE_URL = "https://api.deezer.com/playlist"
     private const val MAX_PER_PAGE = 100
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = NetworkModule.client
 
     /**
      * Check if URL is a Deezer playlist.

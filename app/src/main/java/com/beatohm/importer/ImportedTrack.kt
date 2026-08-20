@@ -7,7 +7,7 @@ data class ImportedTrack(
     val durationSec: Int
 ) {
     /**
-     * Search query for YouTube: "Artist - Title Audio"
+     * Search query for YouTube: "Artist - Title Audio" or just "Title Audio" if no artist
      */
-    val searchQuery: String get() = "$artist - $title Audio"
+    val searchQuery: String get() = if (artist.isNotBlank()) "$artist - $title Audio" else "$title Audio"
 }

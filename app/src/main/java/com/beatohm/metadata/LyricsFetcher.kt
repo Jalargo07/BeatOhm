@@ -2,8 +2,9 @@
 
 import android.util.Log
 import com.google.gson.JsonParser
-import com.beatohm.BuildConfig
 import com.beatohm.network.NetworkModule
+import com.beatohm.util.ApiKeyProvider
+import com.beatohm.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -22,51 +23,51 @@ class LyricsFetcher {
 
     suspend fun fetchLyrics(artist: String, title: String): Result<LyricsResult> =
         withContext(Dispatchers.IO) {
-            Log.e(TAG, "fetchLyrics INICIO: '$artist' - '$title'")
+            AppLogger.d(TAG, "fetchLyrics start: artist=${artist.length}ch, title=${title.length}ch")
             val variants = searchVariants(artist, title)
-            Log.e(TAG, "fetchLyrics variantes: ${variants.size}")
+            AppLogger.d(TAG, "fetchLyrics variants: ${variants.size}")
             for ((i, variant) in variants.withIndex()) {
                 val (a, t) = variant
-                Log.e(TAG, "fetchLyrics variante $i: '$a' - '$t'")
+                AppLogger.d(TAG, "fetchLyrics variant $i: ${a.length}/${t.length}ch")
                 val lrclib = fetchFromLrclib(a, t)
                 if (lrclib.isSuccess) {
-                    Log.e(TAG, "fetchLyrics OK via LRCLIB: ${lrclib.getOrThrow().plainText.length} chars")
+                    AppLogger.d(TAG, "fetchLyrics OK via LRCLIB: ${lrclib.getOrThrow().plainText.length} chars")
                     return@withContext lrclib
                 }
-                Log.e(TAG, "fetchLyrics LRCLIB fallo: ${lrclib.exceptionOrNull()?.message}")
+                Log.d(TAG, "fetchLyrics LRCLIB failed: ${lrclib.exceptionOrNull()?.message}")
                 val genius = fetchFromGenius(a, t)
                 if (genius.isSuccess) {
-                    Log.e(TAG, "fetchLyrics OK via Genius: ${genius.getOrThrow().plainText.length} chars")
+                    AppLogger.d(TAG, "fetchLyrics OK via Genius: ${genius.getOrThrow().plainText.length} chars")
                     return@withContext genius
                 }
-                Log.e(TAG, "fetchLyrics Genius fallo: ${genius.exceptionOrNull()?.message}")
+                Log.d(TAG, "fetchLyrics Genius failed: ${genius.exceptionOrNull()?.message}")
                 val ovh = fetchFromLyricsOvh(a, t)
                 if (ovh.isSuccess) {
-                    Log.e(TAG, "fetchLyrics OK via lyrics.ovh: ${ovh.getOrThrow().plainText.length} chars")
+                    AppLogger.d(TAG, "fetchLyrics OK via lyrics.ovh: ${ovh.getOrThrow().plainText.length} chars")
                     return@withContext ovh
                 }
-                Log.e(TAG, "fetchLyrics lyrics.ovh fallo: ${ovh.exceptionOrNull()?.message}")
+                Log.d(TAG, "fetchLyrics lyrics.ovh failed: ${ovh.exceptionOrNull()?.message}")
             }
             // Retry una vez si todos fallaron por DNS/transitorio
-            Log.e(TAG, "fetchLyrics retry para '$artist' - '$title'")
+            AppLogger.d(TAG, "fetchLyrics retry for ${artist.length}/${title.length}ch")
             kotlinx.coroutines.delay(2000)
             val (a, t) = variants.first()
             val retryLrclib = fetchFromLrclib(a, t)
             if (retryLrclib.isSuccess) {
-                Log.e(TAG, "fetchLyrics retry OK via LRCLIB: ${retryLrclib.getOrThrow().plainText.length} chars")
+                AppLogger.d(TAG, "fetchLyrics retry OK via LRCLIB: ${retryLrclib.getOrThrow().plainText.length} chars")
                 return@withContext retryLrclib
             }
             val retryGenius = fetchFromGenius(a, t)
             if (retryGenius.isSuccess) {
-                Log.e(TAG, "fetchLyrics retry OK via Genius: ${retryGenius.getOrThrow().plainText.length} chars")
+                AppLogger.d(TAG, "fetchLyrics retry OK via Genius: ${retryGenius.getOrThrow().plainText.length} chars")
                 return@withContext retryGenius
             }
             val retryOvh = fetchFromLyricsOvh(a, t)
             if (retryOvh.isSuccess) {
-                Log.e(TAG, "fetchLyrics retry OK via lyrics.ovh: ${retryOvh.getOrThrow().plainText.length} chars")
+                AppLogger.d(TAG, "fetchLyrics retry OK via lyrics.ovh: ${retryOvh.getOrThrow().plainText.length} chars")
                 return@withContext retryOvh
             }
-            Log.e(TAG, "fetchLyrics SIN RESULTADO para '$artist' - '$title'")
+            AppLogger.d(TAG, "fetchLyrics no result for ${artist.length}/${title.length}ch")
             Result.failure(Exception("Lyrics not found"))
         }
 
@@ -89,11 +90,11 @@ class LyricsFetcher {
                 val plain = json.get("plainLyrics")?.asString?.takeIf { it.isNotBlank() }
                 when {
                     synced != null -> {
-                        Log.e(TAG, "LRCLIB SYNCED LRC (${synced.length} chars): '${synced.take(120)}...'")
+                        Log.d(TAG, "LRCLIB SYNCED LRC: ${synced.length} chars")
                         Result.success(LyricsResult(plainText = synced, syncedLrc = synced))
                     }
                     plain != null -> {
-                        Log.e(TAG, "LRCLIB PLAIN TEXT (${plain.length} chars): '${plain.take(120)}...'")
+                        Log.d(TAG, "LRCLIB PLAIN TEXT: ${plain.length} chars")
                         Result.success(LyricsResult(plainText = plain, syncedLrc = null))
                     }
                     else -> Result.failure(Exception("LRCLIB sin letras"))
@@ -105,15 +106,16 @@ class LyricsFetcher {
     }
 
     private fun fetchFromGenius(artist: String, title: String): Result<LyricsResult> {
-        if (BuildConfig.GENIUS_ACCESS_TOKEN.isBlank()) {
-            return Result.failure(Exception("Genius token vacio"))
+        val token = ApiKeyProvider.geniusToken()
+        if (token == null) {
+            return Result.failure(Exception("Genius token not configured"))
         }
         return try {
             val q = URLEncoder.encode("$artist $title", "UTF-8")
             val url = "https://api.genius.com/search?q=$q"
             val searchRequest = Request.Builder()
                 .url(url)
-                .header("Authorization", "Bearer ${BuildConfig.GENIUS_ACCESS_TOKEN}")
+                .header("Authorization", "Bearer $token")
                 .build()
             val songUrl = client.newCall(searchRequest).execute().use { response ->
                 if (response.code != 200) return@use null

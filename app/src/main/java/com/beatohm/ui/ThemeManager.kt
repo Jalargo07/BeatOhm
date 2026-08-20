@@ -10,7 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 object ThemeManager {
 
@@ -38,14 +37,15 @@ object ThemeManager {
         prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         db = AppDatabase.getInstance(ctx)
 
-        // Load active theme from Room synchronously (single fast read)
+        // Set a safe default immediately; async load below updates it if found.
+        activeTheme = PresetThemes.getDefault()
+
         val themeId = prefs?.getLong(KEY_ACTIVE_THEME_ID, -1) ?: -1
         if (themeId > 0) {
-            val theme = runBlocking { db?.themeDao()?.getById(themeId) }
-            if (theme != null) activeTheme = theme
-        }
-        if (activeTheme == null) {
-            activeTheme = PresetThemes.getDefault()
+            scope.launch {
+                val theme = db?.themeDao()?.getById(themeId)
+                if (theme != null) activeTheme = theme
+            }
         }
     }
 

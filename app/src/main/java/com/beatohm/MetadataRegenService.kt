@@ -11,9 +11,14 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.beatohm.data.AppDatabase
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.RegenRepository
+import com.beatohm.data.TagWriteLimitReachedException
 import com.beatohm.data.WaveformRepository
+import com.beatohm.data.toSong
+import com.beatohm.metadata.MetadataFetcher
+import com.beatohm.metadata.MetadataResult
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -42,9 +48,11 @@ class MetadataRegenService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var regenJob: Job? = null
     @Volatile private var isPaused = false
+    private val limitDialogShown = java.util.concurrent.atomic.AtomicBoolean(false)
     private lateinit var repository: MusicRepository
     private lateinit var regenRepo: RegenRepository
     private lateinit var waveformRepo: WaveformRepository
+    private val metadataFetcher by lazy { MetadataFetcher() }
     private val dao by lazy { AppDatabase.getInstance(this).songDao() }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -52,7 +60,7 @@ class MetadataRegenService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        repository = MusicRepository(this)
+        repository = MusicRepository(this, metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(this).metadataCandidateDao()))
         regenRepo = RegenRepository(this)
         waveformRepo = WaveformRepository(this)
     }
@@ -117,14 +125,29 @@ class MetadataRegenService : Service() {
             val failedIds = mutableListOf<String>()
             val failedReasons = mutableMapOf<String, String>()
 
-            regenRepo.markPending(songIds.toList())
-            regenRepo.startRegenProgress(songIds.size)
+            // Skip songs already marked as SUCCESS in a previous run (checkpoint resilience)
+            val alreadySuccess = regenRepo.getSuccessIds(songIds.toList())
+            val pendingSongIds = songIds.filter { it !in alreadySuccess }
+            if (alreadySuccess.isNotEmpty()) {
+                Log.d(TAG, "Skipping ${alreadySuccess.size} already-successful songs from checkpoint")
+            }
+
+            if (pendingSongIds.isEmpty()) {
+                Log.d(TAG, "All songs already processed successfully, finishing")
+                regenRepo.finishRegenProgress()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+
+            regenRepo.markPending(pendingSongIds)
+            regenRepo.startRegenProgress(pendingSongIds.size)
 
             val threads = DeviceUtils.getOptimalThreadCount(this@MetadataRegenService)
             val semaphore = Semaphore(threads)
             val done = AtomicInteger(0)
-            val total = songIds.size
-            val batches = songIds.toList().chunked(10)
+            val total = pendingSongIds.size
+            val batches = pendingSongIds.chunked(10)
 
             Log.d(TAG, "Processing $total songs with $threads threads (batched by 10)")
 
@@ -137,6 +160,13 @@ class MetadataRegenService : Service() {
                             if (isPaused) {
                                 updateNotificationPaused(done.get(), total)
                                 while (isPaused) {
+                                    // Check if user reset the counter
+                                    if (limitResetPending.compareAndSet(true, false)) {
+                                        Log.d(TAG, "Limit reset detected — unpausing ALL threads")
+                                        limitDialogShown.set(false)
+                                        isPaused = false
+                                        break
+                                    }
                                     delay(500)
                                     if (!isActive) return@async
                                 }
@@ -158,33 +188,79 @@ class MetadataRegenService : Service() {
                             try {
                                 val result = withTimeoutOrNull(30_000L) {
                                     var updated = song
-                                    if (doMetadata) updated = repository.fetchMetadata(updated)
-                                    if (doArtwork) updated = repository.downloadArtworkForSong(updated)
+                                    var metadataResult: MetadataResult = MetadataResult.NoMatch
+                                    if (doMetadata) {
+                                        metadataResult = metadataFetcher.fetchFullMetadata(song.toSong())
+                                        updated = when (val mr = metadataResult) {
+                                            is MetadataResult.ClearMatch ->
+                                                repository.applyClearMatch(updated, mr.candidate)
+                                            is MetadataResult.AmbiguousMatches -> {
+                                                // T13a: persistir candidatos pero NO actualizar metadata de la canción
+                                                repository.persistAmbiguousCandidates(song.id, mr.candidates)
+                                                updated  // sin cambios
+                                            }
+                                            MetadataResult.NoMatch -> updated  // sin cambios
+                                        }
+                                    }
+                                    if (doArtwork) {
+                                        val before = updated.thumbnailUrl
+                                        updated = repository.downloadArtworkForSong(updated)
+                                        if (updated.thumbnailUrl != before && updated.thumbnailUrl.isNotBlank()) {
+                                            updated = repository.writeArtworkToFile(updated)
+                                        }
+                                    }
                                     if (doColor) updated = repository.extractDominantColor(updated)
-                                    if (doLyrics) updated = repository.fetchLyricsForSong(updated)
+                                    if (doLyrics) {
+                                        val before = updated.lyrics
+                                        updated = repository.fetchLyricsForSong(updated)
+                                        if (updated.lyrics != before && updated.lyrics.isNotBlank()) {
+                                            updated = repository.writeLyricsToFile(updated)
+                                        }
+                                    }
                                     if (doMetadata || doLyrics || doArtwork || doColor) {
                                         repository.saveSong(updated)
                                     }
                                     if (doWaveform) waveformRepo.resetWaveform(updated)
-                                    Unit
+                                    metadataResult  // devolver el resultado para tracking
                                 }
                                 val current = done.incrementAndGet()
                                 regenRepo.updateRegenProgress(current, total)
                                 updateNotificationProgress(current, total, song.title)
-                                if (result != null) {
-                                    synchronized(succeededIds) {
-                                        succeededIds.add(songId)
+                                when {
+                                    result == null -> {
+                                        // Timeout
+                                        synchronized(failedIds) {
+                                            failedIds.add(songId)
+                                            failedReasons[songId] = "timeout"
+                                        }
+                                        regenRepo.markFailed(songId)
                                     }
-                                    regenRepo.markSuccess(songId)
-                                } else {
-                                    synchronized(failedIds) {
-                                        failedIds.add(songId)
-                                        failedReasons[songId] = "timeout"
+                                    result is MetadataResult.AmbiguousMatches -> {
+                                        // T13a: ambiguas → no son success ni failed, la UI de pendientes las mostrará
+                                        Log.d(TAG, "Song $songId ambiguous → candidates persisted, pending for user choice")
                                     }
-                                    regenRepo.markFailed(songId)
+                                    else -> {
+                                        // ClearMatch o NoMatch → success (el loop anterior ya procesó)
+                                        synchronized(succeededIds) {
+                                            succeededIds.add(songId)
+                                        }
+                                        regenRepo.markSuccess(songId)
+                                    }
                                 }
                             } catch (e: CancellationException) {
                                 throw e
+                            } catch (e: TagWriteLimitReachedException) {
+                                // Only ONE thread should trigger the dialog (compareAndSet)
+                                if (limitDialogShown.compareAndSet(false, true)) {
+                                    Log.w(TAG, "Tag write limit reached — pausing ALL threads, showing dialog ONCE")
+                                    isPaused = true
+                                    repository.onLimitReached()
+                                } else {
+                                    // Other threads just pause, don't show another dialog
+                                    Log.w(TAG, "Tag write limit reached — pausing (dialog already shown)")
+                                    isPaused = true
+                                }
+                                // No marcar como failed — el usuario puede reanudar tras ver el anuncio
                             } catch (e: Exception) {
                                 val current = done.incrementAndGet()
                                 regenRepo.updateRegenProgress(current, total)
@@ -201,8 +277,29 @@ class MetadataRegenService : Service() {
 
             regenRepo.finishRegenProgress()
             regenRepo.clearRegenStatus()
-            saveLastRegenResult(succeededIds, failedIds, failedReasons, songIds.size)
+            saveLastRegenResult(succeededIds, failedIds, failedReasons, pendingSongIds.size)
             showCompletionNotification(succeededIds.size, failedIds.size)
+
+            // Mostrar toast con conteo de pendientes si hay metadata
+            if (doMetadata) {
+                try {
+                    val pendingCount = withContext(Dispatchers.IO) {
+                        repository.metadataCandidateRepository.getPendingCountSync()
+                    }
+                    if (pendingCount > 0) {
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                this@MetadataRegenService,
+                                getString(R.string.pending_candidates_toast, pendingCount),
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to get pending count: ${e.message}")
+                }
+            }
+
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -213,6 +310,16 @@ class MetadataRegenService : Service() {
     }
 
     private fun resumeRegen() {
+        isPaused = false
+    }
+
+    /**
+     * Called after user watches ad and counter is reset.
+     * Resets limit flag and unpauses ALL threads.
+     */
+    fun onLimitReset() {
+        Log.d(TAG, "onLimitReset: resetting limit flag and unpausing regen")
+        limitDialogShown.set(false)
         isPaused = false
     }
 
@@ -392,6 +499,10 @@ class MetadataRegenService : Service() {
         const val EXTRA_DO_COLOR = "regen_do_color"
         private const val CHANNEL_ID = "metadata_regen_channel"
         private const val NOTIFICATION_ID = 1002
+
+        // Global flag: set by dialog callback, checked by service to unpause
+        @Volatile
+        var limitResetPending = java.util.concurrent.atomic.AtomicBoolean(false)
 
         fun start(context: Context, songIds: Array<String>, doMetadata: Boolean, doLyrics: Boolean, doWaveform: Boolean, doArtwork: Boolean, doColor: Boolean) {
             val intent = Intent(context, MetadataRegenService::class.java).apply {

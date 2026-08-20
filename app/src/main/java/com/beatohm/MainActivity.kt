@@ -45,6 +45,9 @@ import com.beatohm.ui.PlayerFragment
 import com.beatohm.ui.PlayerViewModel
 import com.beatohm.ui.ThemeManager
 import com.beatohm.ui.IconPackManager
+import android.widget.Toast
+import com.beatohm.ads.TagWriteCounter
+import com.beatohm.ui.LimitReachedDialogFragment
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -117,7 +120,20 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNav.itemIconTintList = if (IconPackManager.isColorAwarePack(packId)) null else colorNav
         binding.bottomNav.itemTextColor = colorNav
 
-        ViewModelProvider(this)[MainViewModel::class.java]
+        val mainViewModel = ViewModelProvider(this)[MainViewModel::class.java]
+
+        // Configurar callback de límite de escritura de tags
+        mainViewModel.musicRepository.setLimitReachedCallback {
+            LimitReachedDialogFragment.newInstance {
+                TagWriteCounter.reset()
+                // Unpause the regen service so all threads resume
+                val intent = android.content.Intent(this, com.beatohm.MetadataRegenService::class.java)
+                startService(intent) // This won't restart if already running
+                // Also set a global flag for the service to check
+                com.beatohm.MetadataRegenService.limitResetPending.set(true)
+                Toast.makeText(this, getString(R.string.counter_reset_toast), Toast.LENGTH_SHORT).show()
+            }.show(supportFragmentManager, LimitReachedDialogFragment.TAG)
+        }
 
         playerViewModel = PlayerViewModel.getInstance(application)
 

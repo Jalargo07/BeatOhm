@@ -1,12 +1,11 @@
 package com.beatohm.importer
 
 import android.util.Log
+import com.beatohm.network.NetworkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * Imports playlists from Spotify using the public embed endpoint.
@@ -22,10 +21,7 @@ object SpotifyImporter : IPlaylistImporter {
     private const val TAG = "SpotifyImporter"
     private const val EMBED_URL = "https://open.spotify.com/embed/playlist"
     
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = NetworkModule.client
     
     /**
      * Check if URL is a Spotify playlist.

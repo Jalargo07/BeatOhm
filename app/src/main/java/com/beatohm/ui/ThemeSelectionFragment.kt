@@ -107,7 +107,7 @@ class ThemeSelectionFragment : Fragment() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.importar_tema))
             .setMessage(getString(R.string.importar_tema_pregunta, userTheme.name))
-            .setPositiveButton("Importar") { _, _ ->
+            .setPositiveButton(getString(R.string.importar)) { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     ThemeManager.createCustomTheme(userTheme)
                     ThemeManager.setActiveTheme(userTheme)
@@ -115,7 +115,7 @@ class ThemeSelectionFragment : Fragment() {
                     loadThemes()
                 }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 

@@ -18,4 +18,5 @@ interface IRegenRepository {
     suspend fun getPendingAndFailedSongsNow(): List<RegenStatus>
     suspend fun clearRegenStatus()
     suspend fun getFailedCount(): Int
+    suspend fun getSuccessIds(songIds: List<String>): List<String>
 }

@@ -1,6 +1,9 @@
 ﻿package com.beatohm.ui
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,10 +13,18 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.snackbar.Snackbar
+import com.inmobi.ads.InMobiBanner
+import com.beatohm.ads.InMobiManager
 import com.beatohm.R
 import com.beatohm.databinding.FragmentDownloadsBinding
 import com.beatohm.importer.UrlDetector
 import com.beatohm.model.DownloadStatus
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class DownloadsFragment : Fragment() {
@@ -24,6 +35,12 @@ class DownloadsFragment : Fragment() {
     private lateinit var adapter: DownloadAdapter
     private lateinit var searchAdapter: SearchResultAdapter
     private val seenErrorIds = mutableSetOf<String>()
+    private var bannerView: InMobiBanner? = null
+    private var initStateJob: Job? = null
+    private var bannerRetryAttempt = 0
+    private val bannerRetryHandler = Handler(Looper.getMainLooper())
+    private val _combinedUiState = MutableStateFlow<UiState<Unit>>(UiState.Loading)
+    val combinedUiState: StateFlow<UiState<Unit>> = _combinedUiState.asStateFlow()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentDownloadsBinding.inflate(inflater, container, false)
@@ -70,6 +87,8 @@ class DownloadsFragment : Fragment() {
             )
         )
 
+        observeInitStateAndLoadBanner()
+
         viewModel.downloads.observe(viewLifecycleOwner) { list ->
             adapter.submitList(list)
             updateEmptyVisibility()
@@ -104,6 +123,80 @@ class DownloadsFragment : Fragment() {
         }
     }
 
+    private fun observeInitStateAndLoadBanner() {
+        initStateJob = viewLifecycleOwner.lifecycleScope.launch {
+            InMobiManager.initState.collectLatest { state ->
+                when (state) {
+                    is InMobiManager.InitState.Ready -> {
+                        bannerRetryAttempt = 0
+                        loadBanner()
+                    }
+                    is InMobiManager.InitState.Initializing -> {
+                        Log.d(TAG, "InMobi initializing, waiting...")
+                    }
+                    is InMobiManager.InitState.Failed -> {
+                        Log.w(TAG, "InMobi init failed, banner not available")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun loadBanner() {
+        if (!InMobiManager.isInitialized) {
+            Log.w(TAG, "InMobi not ready, deferring banner")
+            return
+        }
+        if (!isAdded) return
+
+        destroyBanner()
+
+        val bannerContainer = binding.adBannerContainer
+        val banner = InMobiManager.createBanner(
+            activity = requireActivity(),
+            onLoaded = {
+                Log.d(TAG, "Banner loaded")
+                bannerRetryAttempt = 0
+            },
+            onFailed = {
+                Log.e(TAG, "Banner failed to load")
+                scheduleBannerRetry()
+            }
+        )
+        bannerContainer.removeAllViews()
+        bannerContainer.addView(banner)
+        bannerView = banner
+    }
+
+    private fun scheduleBannerRetry() {
+        if (!isAdded || bannerRetryAttempt >= MAX_BANNER_RETRIES) return
+        val delayMs = BANNER_RETRY_BASE_MS * (1L shl bannerRetryAttempt)
+        bannerRetryAttempt++
+        Log.d(TAG, "Scheduling banner retry #$bannerRetryAttempt in ${delayMs}ms")
+        bannerRetryHandler.postDelayed({
+            if (isAdded && _binding != null) {
+                loadBanner()
+            }
+        }, delayMs)
+    }
+
+    private fun destroyBanner() {
+        bannerRetryHandler.removeCallbacksAndMessages(null)
+        bannerView?.let { banner ->
+            banner.setListener(object : com.inmobi.ads.listeners.BannerAdEventListener() {})
+            (banner.parent as? ViewGroup)?.removeView(banner)
+        }
+        bannerView = null
+    }
+
+    override fun onDestroyView() {
+        destroyBanner()
+        initStateJob?.cancel()
+        initStateJob = null
+        _binding = null
+        super.onDestroyView()
+    }
+
     private fun friendlySearchError(raw: String?): String {
         val text = raw.orEmpty()
         if (text.isBlank()) return getString(R.string.search_empty)
@@ -115,10 +208,14 @@ class DownloadsFragment : Fragment() {
     }
 
     private fun updateEmptyVisibility() {
+        if (_binding == null) return
         val downloadsEmpty = viewModel.downloads.value.orEmpty().isEmpty()
         val searchEmpty = viewModel.searchResults.value.orEmpty().isEmpty()
         val hasError = viewModel.searchError.value != null
-        binding.tvEmpty.visibility = if (downloadsEmpty && searchEmpty && !hasError) View.VISIBLE else View.GONE
+        val isEmpty = downloadsEmpty && searchEmpty && !hasError
+        _combinedUiState.value = if (isEmpty) UiState.Empty(R.string.downloads_empty) else UiState.Content(Unit)
+
+        binding.tvEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
         binding.tvEmptySearch.visibility = if (searchEmpty && hasError) View.VISIBLE else View.GONE
     }
 
@@ -155,5 +252,11 @@ class DownloadsFragment : Fragment() {
                 binding.etUrl.error = getString(R.string.download_url_invalid)
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "DownloadsFragment"
+        private const val MAX_BANNER_RETRIES = 3
+        private const val BANNER_RETRY_BASE_MS = 5_000L
     }
 }

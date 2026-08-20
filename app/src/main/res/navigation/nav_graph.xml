@@ -35,6 +35,12 @@
         <action
             android:id="@+id/action_settings_to_themeSelector"
             app:destination="@id/themeSelectionFragment" />
+        <action
+            android:id="@+id/action_settings_to_metadataCandidates"
+            app:destination="@id/metadataCandidatesFragment" />
+        <action
+            android:id="@+id/action_settings_to_artistDuplicates"
+            app:destination="@id/artistDuplicatesFragment" />
     </fragment>
 
     <fragment
@@ -100,4 +106,20 @@
             android:defaultValue=""
             app:argType="string" />
     </fragment>
+
+    <fragment
+        android:id="@+id/metadataCandidatesFragment"
+        android:name="com.beatohm.ui.MetadataCandidatesFragment"
+        android:label="@string/metadata_candidates_title"
+        tools:layout="@layout/fragment_metadata_candidates">
+        <deepLink
+            android:id="@+id/deepLinkMetadataCandidates"
+            app:uri="beatohm://metadata-candidates" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/artistDuplicatesFragment"
+        android:name="com.beatohm.ui.ArtistDuplicatesFragment"
+        android:label="@string/artist_duplicates_title"
+        tools:layout="@layout/fragment_artist_duplicates" />
 </navigation>

@@ -9,6 +9,8 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.beatohm.R
+import com.beatohm.data.AppDatabase
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.toSong
 import com.beatohm.databinding.FragmentSongListBinding
@@ -28,7 +30,10 @@ class FavoritesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        repository = MusicRepository(requireContext())
+        repository = MusicRepository(
+            requireContext(),
+            metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(requireContext()).metadataCandidateDao())
+        )
         binding.tvListTitle.text = getString(R.string.favorites)
         binding.spinnerSort.visibility = View.GONE
         adapter = FilteredSongAdapter(onItemClick = { song ->

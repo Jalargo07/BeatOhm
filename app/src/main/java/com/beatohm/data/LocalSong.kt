@@ -1,10 +1,19 @@
 ﻿package com.beatohm.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.beatohm.model.Song
 
-@Entity(tableName = "songs")
+@Entity(
+    tableName = "songs",
+    indices = [
+        Index("artist"),
+        Index("album"),
+        Index("year"),
+        Index("filePath")
+    ]
+)
 data class LocalSong(
     @PrimaryKey val id: String = "",
     val title: String = "",

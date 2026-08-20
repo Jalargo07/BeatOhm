@@ -24,7 +24,7 @@
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Cerrar"
+            android:contentDescription="@string/close"
             android:src="@drawable/ic_close"
             app:tint="@color/on_surface" />
 
@@ -47,7 +47,7 @@
             android:paddingEnd="12dp"
             android:paddingTop="8dp"
             android:paddingBottom="8dp"
-            android:text="Todo"
+            android:text="@string/period_all"
             android:textColor="@color/primary"
             android:textSize="13sp" />
 

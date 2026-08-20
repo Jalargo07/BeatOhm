@@ -36,6 +36,7 @@ UI_UX_SPRINT_PLAN.md
 docs/*
 !docs/screenshots/
 !docs/screenshots/*
+!docs/BASELINE_REPORT.md
 tasks/
 Guia.md
 design-system/
@@ -44,6 +45,9 @@ design-system/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Backups / large local data
+backups/
 
 # Logs and dumps
 *.log

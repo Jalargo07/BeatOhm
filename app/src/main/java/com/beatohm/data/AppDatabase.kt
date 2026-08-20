@@ -22,9 +22,10 @@ import java.lang.reflect.Field
         RegenStatus::class,
         ImportSession::class,
         ImportTrackStatus::class,
-        PlaybackEvent::class
+        PlaybackEvent::class,
+        MetadataCandidateEntity::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun importSessionDao(): ImportSessionDao
     abstract fun importTrackStatusDao(): ImportTrackStatusDao
     abstract fun playbackEventDao(): PlaybackEventDao
+    abstract fun metadataCandidateDao(): MetadataCandidateDao
 
     companion object {
         @Volatile
@@ -142,13 +144,40 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS metadata_candidates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        songId TEXT NOT NULL,
+                        candidatesJson TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'PENDING',
+                        createdAt INTEGER NOT NULL DEFAULT 0,
+                        appliedAt INTEGER,
+                        FOREIGN KEY (songId) REFERENCES songs(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_metadata_candidates_songId ON metadata_candidates(songId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_metadata_candidates_status ON metadata_candidates(status)")
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_songs_artist ON songs(artist)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_songs_album ON songs(album)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_songs_year ON songs(year)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_songs_filePath ON songs(filePath)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "music_downloader_db"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {

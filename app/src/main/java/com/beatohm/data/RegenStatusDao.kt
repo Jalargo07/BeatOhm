@@ -40,4 +40,7 @@ interface RegenStatusDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM regen_status WHERE songId = :songId)")
     suspend fun exists(songId: String): Boolean
+
+    @Query("SELECT songId FROM regen_status WHERE songId IN (:songIds) AND status = 'success'")
+    suspend fun getSuccessIds(songIds: List<String>): List<String>
 }

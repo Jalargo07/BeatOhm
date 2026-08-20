@@ -11,6 +11,7 @@ import com.beatohm.R
 import com.beatohm.databinding.BottomSheetImportPlaylistBinding
 import com.beatohm.importer.DeezerImporter
 import com.beatohm.importer.SpotifyImporter
+import com.beatohm.importer.YouTubeImporter
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
 class ImportPlaylistBottomSheet : BottomSheetDialogFragment() {
@@ -74,6 +75,11 @@ class ImportPlaylistBottomSheet : BottomSheetDialogFragment() {
             SpotifyImporter.canHandle(url) -> {
                 binding.tvPlatform.visibility = View.VISIBLE
                 binding.tvPlatform.text = getString(R.string.import_playlist_platform_spotify)
+                binding.btnImport.isEnabled = true
+            }
+            YouTubeImporter.canHandle(url) -> {
+                binding.tvPlatform.visibility = View.VISIBLE
+                binding.tvPlatform.text = getString(R.string.import_playlist_platform_youtube)
                 binding.btnImport.isEnabled = true
             }
             url.isBlank() -> {

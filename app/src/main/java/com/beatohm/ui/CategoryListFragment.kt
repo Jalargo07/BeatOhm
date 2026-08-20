@@ -17,7 +17,9 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.beatohm.R
+import com.beatohm.data.AppDatabase
 import com.beatohm.data.LocalSong
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.ILibraryRepository
 import com.beatohm.data.LibraryRepository
@@ -72,7 +74,10 @@ class CategoryListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        repository = MusicRepository(requireContext())
+        repository = MusicRepository(
+            requireContext(),
+            metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(requireContext()).metadataCandidateDao())
+        )
         libraryRepo = LibraryRepository(requireContext())
         playerViewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
 

@@ -9,13 +9,17 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.beatohm.DeviceUtils
+import com.beatohm.data.AppDatabase
 import com.beatohm.data.LocalSong
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.downloader.AudioDownloader
 import com.beatohm.downloader.ProxyDownloader
 import com.beatohm.extractor.YouTubeExtractor
+import com.beatohm.metadata.MetadataCandidate
 import com.beatohm.metadata.MetadataFetcher
 import com.beatohm.metadata.LyricsFetcher
+import com.beatohm.metadata.MetadataResult
 import com.beatohm.model.DownloadState
 import com.beatohm.model.DownloadStatus
 import com.beatohm.model.SearchResult
@@ -48,7 +52,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val lyricsFetcher = LyricsFetcher()
     private val audioDownloader = AudioDownloader(application)
     private val proxyDownloader = ProxyDownloader()
-    private val musicRepository = MusicRepository(application)
+    val musicRepository = MusicRepository(
+        application,
+        metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(application).metadataCandidateDao())
+    )
 
     fun startDownload(url: String) {
         Log.e(TAG, "startDownload: $url")
@@ -86,8 +93,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateState(downloadId, DownloadStatus.FETCHING_METADATA, 0,
                         "Metadata: ${song.title}... (${index + 1}/${songs.size})")
 
+                    // ADAPTACIÓN MÍNIMA POR COMPILACIÓN (T4): la firma nueva devuelve
+                    // MetadataResult. T5 refina este manejo (bottom sheet de elección
+                    // para los casos ambiguos).
                     val metaResult = metadataFetcher.fetchFullMetadata(song)
-                    val enrichedSong = metaResult.getOrNull() ?: song
+                    val enrichedSong = when (metaResult) {
+                        is MetadataResult.ClearMatch -> applyCandidateMetadata(song, metaResult.candidate)
+                        is MetadataResult.AmbiguousMatches ->
+                            metaResult.candidates.maxByOrNull { it.score }
+                                ?.let { applyCandidateMetadata(song, it) } ?: song
+                        MetadataResult.NoMatch -> song
+                    }
                     Log.e(TAG, "Metadata: artist=${enrichedSong.artist} album=${enrichedSong.album}")
 
                     val lyricsResult = lyricsFetcher.fetchLyrics(enrichedSong.artist, enrichedSong.title)
@@ -303,6 +319,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         list[idx] = list[idx].copy(song = song)
         _downloads.value = list
     }
+
+    /**
+     * Aplica un candidato de metadata sobre la canción original (los campos que el
+     * candidato no provee se conservan). Helper temporal de la adaptación por
+     * compilación (T4); T5 lo refina con el bottom sheet de elección.
+     */
+    private fun applyCandidateMetadata(
+        song: com.beatohm.model.Song,
+        candidate: MetadataCandidate
+    ): com.beatohm.model.Song = song.copy(
+        title = candidate.title.ifBlank { song.title },
+        artist = candidate.artist.ifBlank { song.artist },
+        album = candidate.album,
+        genre = candidate.genre,
+        year = candidate.year,
+        thumbnailUrl = candidate.artworkUrl.ifBlank { song.thumbnailUrl }
+    )
 
     companion object {
         private const val TAG = "BeatOhm"

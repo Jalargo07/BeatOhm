@@ -22,11 +22,13 @@ import com.beatohm.data.toSong
 import coil.load
 import com.beatohm.MetadataRegenService
 import com.beatohm.R
+import com.beatohm.data.AppDatabase
 import com.beatohm.data.LocalSong
 import com.beatohm.data.IMusicRepository
 import com.beatohm.data.IWaveformRepository
 import com.beatohm.data.ILibraryRepository
 import com.beatohm.data.IRegenRepository
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.LibraryRepository
 import com.beatohm.data.RegenRepository
@@ -72,7 +74,10 @@ class SongListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        repository = MusicRepository(requireContext())
+        repository = MusicRepository(
+            requireContext(),
+            metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(requireContext()).metadataCandidateDao())
+        )
         libraryRepo = LibraryRepository(requireContext())
         waveformRepo = WaveformRepository(requireContext())
         regenRepo = RegenRepository(requireContext())
@@ -288,7 +293,7 @@ class SongListFragment : Fragment() {
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.sin_playlists))
                     .setMessage(getString(R.string.crea_playlist_primero))
-                    .setPositiveButton("OK", null)
+                    .setPositiveButton(getString(R.string.ok), null)
                     .show()
                 return@launch
             }
@@ -305,13 +310,13 @@ class SongListFragment : Fragment() {
                         }
                         android.widget.Toast.makeText(
                             requireContext(),
-                            "${songs.size} cancione${if (songs.size > 1) "s" else ""} agregada${if (songs.size > 1) "s" else ""} a '${playlist.name}'",
+                            getString(R.string.canciones_agregadas_a_playlist, songs.size, if (songs.size > 1) "s" else "", playlist.name),
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                         adapter.deselectAll()
                     }
                 }
-                .setNegativeButton("Cancelar", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show()
         }
     }
@@ -357,7 +362,7 @@ class SongListFragment : Fragment() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.regen_select_title))
             .setView(dialogView)
-            .setPositiveButton("Regenerar") { _, _ ->
+            .setPositiveButton(getString(R.string.regenerar)) { _, _ ->
                 val doMetadata = checkMetadata.isChecked
                 val doLyrics = checkLyrics.isChecked
                 val doWaveform = checkWaveform.isChecked
@@ -381,7 +386,7 @@ class SongListFragment : Fragment() {
                 isRegenActive = true
                 collectSongs(currentSortKey)
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 

@@ -62,7 +62,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="60Hz"
+                android:text="@string/eq_band_0_freq"
                 android:textColor="@color/on_surface"
                 android:textSize="11sp" />
 
@@ -93,7 +93,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="230Hz"
+                android:text="@string/eq_band_1_freq"
                 android:textColor="@color/on_surface"
                 android:textSize="11sp" />
 
@@ -124,7 +124,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="910Hz"
+                android:text="@string/eq_band_2_freq"
                 android:textColor="@color/on_surface"
                 android:textSize="11sp" />
 
@@ -155,7 +155,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="3.6kHz"
+                android:text="@string/eq_band_3_freq"
                 android:textColor="@color/on_surface"
                 android:textSize="11sp" />
 
@@ -186,7 +186,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="14kHz"
+                android:text="@string/eq_band_4_freq"
                 android:textColor="@color/on_surface"
                 android:textSize="11sp" />
 

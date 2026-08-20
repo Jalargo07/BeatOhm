@@ -75,6 +75,14 @@
     <string name="repeat">Repetir</string>
     <string name="repeat_one">Repetir una</string>
     <string name="cancel">Cancelar</string>
+
+    <!-- Limit Reached Dialog -->
+    <string name="dialog_limit_reached_title">Límite alcanzado</string>
+    <string name="dialog_limit_reached_message">Has alcanzado el límite de 100 escrituras físicas. Mira un video para resetear el contador y continuar editando tus archivos.</string>
+    <string name="dialog_limit_reached_watch_ad">Ver Anuncio</string>
+    <string name="dialog_limit_reached_cancel">Cancelar</string>
+    <string name="dialog_limit_reached_ad_unavailable">Anuncio no disponible. Intenta más tarde.</string>
+    <string name="dialog_limit_reached_retry">Reintentar</string>
     <string name="remove_from_queue">Quitar de la cola</string>
     <string name="by_artist">Por cantantes</string>
     <string name="by_genre">Por género</string>
@@ -351,6 +359,7 @@
     <string name="import_playlist_detecting">Detectando plataforma…</string>
     <string name="import_playlist_platform_deezer">Deezer</string>
     <string name="import_playlist_platform_spotify">Spotify</string>
+    <string name="import_playlist_platform_youtube">YouTube</string>
     <string name="import_playlist_invalid_url">URL inválida</string>
     <string name="import_playlist_start">Importar</string>
     <string name="import_playlist_resume">Continuar</string>
@@ -376,4 +385,48 @@
     <string name="period_all">Todos</string>
     <string name="period_this_month">Este mes</string>
     <string name="empty_most_played">Escuchá canciones para ver tu ranking</string>
+
+    <!-- Artistas duplicados -->
+    <string name="artist_duplicates_title">Detectar artistas duplicados</string>
+    <string name="artist_duplicates_empty">No hay duplicados detectados</string>
+    <string name="artist_duplicates_merge">Unir</string>
+    <string name="artist_duplicates_dismiss">No son iguales</string>
+    <string name="artist_duplicates_merged">Artistas unidos: %1$s → %2$s</string>
+    <string name="artist_duplicates_loading">Analizando artistas…</string>
+    <string name="artist_duplicates_score">Similitud: %1$d%%</string>
+    <plurals name="artist_duplicates_song_count">
+        <item quantity="one">%1$d canción</item>
+        <item quantity="other">%1$d canciones</item>
+    </plurals>
+
+    <!-- P6.3: Etiquetas de frecuencia de bandas del ecualizador -->
+    <string name="eq_band_0_freq">60Hz</string>
+    <string name="eq_band_1_freq">230Hz</string>
+    <string name="eq_band_2_freq">910Hz</string>
+    <string name="eq_band_3_freq">3.6kHz</string>
+    <string name="eq_band_4_freq">14kHz</string>
+
+    <!-- P6.3: Nombres de idiomas -->
+    <string name="lang_español">Español</string>
+    <string name="lang_english">English</string>
+    <string name="lang_português">Português</string>
+
+    <!-- P6.3: Botones de diálogo exportar/importar tema -->
+    <string name="exportar">Exportar</string>
+    <string name="importar">Importar</string>
+
+    <!-- P6.3: Botones comunes de diálogo -->
+    <string name="ok">OK</string>
+    <string name="regenerar">Regenerar</string>
+    <string name="crear">Crear</string>
+    <string name="si">Sí</string>
+
+    <!-- P6.3: Toast canciones agregadas a playlist -->
+    <string name="canciones_agregadas_a_playlist">%1$d cancione%2$s agregada%2$s a %3$s</string>
+
+    <!-- P6.3: Toast limpieza de pendientes (Settings) -->
+    <string name="pending_cleared">Pendientes limpiados (antes: %1$d, ahora: %2$d)</string>
+
+    <!-- P6.3: Toast reinicio del contador (MainActivity) -->
+    <string name="counter_reset_toast">Contador reiniciado. Puedes seguir editando.</string>
 </resources>

@@ -19,6 +19,8 @@ import kotlinx.coroutines.withContext
 import com.beatohm.BuildConfig
 import com.beatohm.DeviceUtils
 import com.beatohm.R
+import com.beatohm.data.AppDatabase
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.databinding.FragmentSettingsBinding
 import com.beatohm.model.PatternToken
 import com.beatohm.model.Song
@@ -26,6 +28,7 @@ import com.beatohm.ui.player.PlayerLayoutManager
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.beatohm.util.FolderPatternParser
+import kotlinx.coroutines.flow.collectLatest
 
 class SettingsFragment : Fragment() {
 
@@ -62,6 +65,9 @@ class SettingsFragment : Fragment() {
         initActionButtons()
         setupAppearance()
         setupLanguageChips()
+        setupMetadataCandidates()
+        setupReEnrichSuspicious()
+        setupArtistDuplicates()
     }
 
     private fun initPatternBuilder() {
@@ -218,6 +224,58 @@ class SettingsFragment : Fragment() {
             }
             val appLocales = LocaleListCompat.forLanguageTags(locale)
             AppCompatDelegate.setApplicationLocales(appLocales)
+        }
+    }
+
+    /**
+     * T11: acceso a la UI de "Canciones pendientes de elección".
+     * El botón navega a metadataCandidatesFragment y el badge muestra el
+     * conteo de registros PENDING (oculto si no hay).
+     */
+    private fun setupMetadataCandidates() {
+        binding.btnMetadataCandidates.setOnClickListener {
+            findNavController().navigate(R.id.action_settings_to_metadataCandidates)
+        }
+
+        val candidateRepo = MetadataCandidateRepository(
+            AppDatabase.getInstance(requireContext()).metadataCandidateDao()
+        )
+        viewLifecycleOwner.lifecycleScope.launch {
+            candidateRepo.getPendingCount().collectLatest { count ->
+                if (count > 0) {
+                    binding.tvPendingMetadataCount.text = getString(R.string.metadata_candidates_count, count)
+                    binding.tvPendingMetadataCount.visibility = View.VISIBLE
+                } else {
+                    binding.tvPendingMetadataCount.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    /**
+     * T12: Botón "Re-detectar malas" — SOLO borra todos los pendientes y muestra toast.
+     */
+    private fun setupReEnrichSuspicious() {
+        binding.btnReEnrichSuspicious.setOnClickListener {
+            val dao = AppDatabase.getInstance(requireContext()).metadataCandidateDao()
+            val candidateRepo = MetadataCandidateRepository(dao)
+            viewLifecycleOwner.lifecycleScope.launch {
+                val before = withContext(Dispatchers.IO) { dao.getPendingCountSync() }
+                android.util.Log.d("SettingsFrag", "BEFORE deleteAllPending: $before pendientes")
+                withContext(Dispatchers.IO) { candidateRepo.deleteAllPending() }
+                val after = withContext(Dispatchers.IO) { dao.getPendingCountSync() }
+                android.util.Log.d("SettingsFrag", "AFTER deleteAllPending: $after pendientes")
+                Toast.makeText(requireContext(), getString(R.string.pending_cleared, before, after), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /**
+     * Botón "Detectar artistas duplicados" — navega al ArtistDuplicatesFragment.
+     */
+    private fun setupArtistDuplicates() {
+        binding.btnArtistDuplicates.setOnClickListener {
+            findNavController().navigate(R.id.action_settings_to_artistDuplicates)
         }
     }
 

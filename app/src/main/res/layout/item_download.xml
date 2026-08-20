@@ -22,6 +22,7 @@
             android:id="@+id/iv_cover"
             android:layout_width="48dp"
             android:layout_height="48dp"
+            android:contentDescription="@string/songs"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_music_note"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />

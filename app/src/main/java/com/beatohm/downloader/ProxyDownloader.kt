@@ -2,20 +2,15 @@
 
 import android.util.Log
 import com.google.gson.JsonParser
+import com.beatohm.network.NetworkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 
 class ProxyDownloader {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = NetworkModule.client
 
     data class ProxyUrl(val url: String, val filename: String)
 
@@ -41,10 +36,12 @@ class ProxyDownloader {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .build()
 
-            val response = client.newCall(request).execute()
-            val initBody = response.body?.string() ?: ""
-            val initCode = response.code
-            response.close()
+            val initBody: String
+            val initCode: Int
+            client.newCall(request).execute().use { response ->
+                initBody = response.body?.string() ?: ""
+                initCode = response.code
+            }
 
             if (initCode != 200) {
                 return Result.failure(Exception("Loader.to HTTP $initCode"))
@@ -75,9 +72,10 @@ class ProxyDownloader {
                     .url(progressUrl)
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
-                val pollResponse = client.newCall(pollRequest).execute()
-                val pollBody = pollResponse.body?.string() ?: ""
-                pollResponse.close()
+                val pollBody: String
+                client.newCall(pollRequest).execute().use { pollResponse ->
+                    pollBody = pollResponse.body?.string() ?: ""
+                }
 
                 try {
                     val pollJson = JsonParser.parseString(pollBody).asJsonObject

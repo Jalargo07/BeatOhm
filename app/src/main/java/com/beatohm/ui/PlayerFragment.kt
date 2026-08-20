@@ -43,6 +43,7 @@ import com.beatohm.audio.AudioVisualizerManager
 import com.beatohm.data.AppDatabase
 import com.beatohm.data.IMusicRepository
 import com.beatohm.data.IWaveformRepository
+import com.beatohm.data.MetadataCandidateRepository
 import com.beatohm.data.MusicRepository
 import com.beatohm.data.WaveformRepository
 import com.beatohm.data.PlaylistSong
@@ -116,7 +117,10 @@ class PlayerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel = PlayerViewModel.getInstance(requireActivity().application as Application)
-        repository = MusicRepository(requireContext())
+        repository = MusicRepository(
+            requireContext(),
+            metadataCandidateRepo = MetadataCandidateRepository(AppDatabase.getInstance(requireContext()).metadataCandidateDao())
+        )
         waveformRepo = WaveformRepository(requireContext())
         animationHelper = PlayerAnimationHelper(binding)
         lyricsHelper = PlayerLyricsHelper(binding, this)
@@ -899,7 +903,7 @@ class PlayerFragment : Fragment() {
                 AlertDialog.Builder(requireContext())
                     .setTitle(getString(R.string.sin_playlists))
                     .setMessage(getString(R.string.crea_playlist_primero))
-                    .setPositiveButton("OK", null)
+                    .setPositiveButton(getString(R.string.ok), null)
                     .show()
                 return@launch
             }
@@ -914,7 +918,7 @@ class PlayerFragment : Fragment() {
                         )
                     }
                 }
-                .setNegativeButton("Cancelar", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show()
         }
     }

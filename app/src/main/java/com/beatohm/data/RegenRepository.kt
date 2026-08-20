@@ -22,7 +22,9 @@ class RegenRepository(private val context: Context) : IRegenRepository {
     override suspend fun markPending(songIds: List<String>) {
         regenStatusDao.insertAll(songIds.map { RegenStatus(it, "pending") })
     }
-    override suspend fun markSuccess(songId: String) { regenStatusDao.delete(songId) }
+    override suspend fun markSuccess(songId: String) {
+        regenStatusDao.insert(RegenStatus(songId, "success"))
+    }
     override suspend fun markFailed(songId: String) { regenStatusDao.insert(RegenStatus(songId, "failed")) }
     override fun getFailedSongs(): Flow<List<RegenStatus>> = regenStatusDao.getFailed()
     override fun getPendingAndFailedSongs(): Flow<List<RegenStatus>> = regenStatusDao.getPendingAndFailed()
@@ -31,4 +33,5 @@ class RegenRepository(private val context: Context) : IRegenRepository {
     override suspend fun getPendingAndFailedSongsNow(): List<RegenStatus> = regenStatusDao.getPendingAndFailedNow()
     override suspend fun clearRegenStatus() = regenStatusDao.clearAll()
     override suspend fun getFailedCount(): Int = regenStatusDao.getFailedCount()
+    override suspend fun getSuccessIds(songIds: List<String>): List<String> = regenStatusDao.getSuccessIds(songIds)
 }

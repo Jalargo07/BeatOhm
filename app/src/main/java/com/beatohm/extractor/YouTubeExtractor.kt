@@ -7,19 +7,14 @@ import com.beatohm.model.SearchResult
 import com.beatohm.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.beatohm.network.NetworkModule
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 class YouTubeExtractor {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client = NetworkModule.newClient(connectTimeoutSec = 30, readTimeoutSec = 30)
 
     data class AudioFormat(
         val url: String,
@@ -184,13 +179,15 @@ class YouTubeExtractor {
                 .build()
 
             val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return null
-            Log.d(TAG, "$endpoint API: ${response.code}")
-            if (response.code != 200) {
-                Log.w(TAG, "$endpoint response body: ${body.take(300)}")
-                return null
+            response.use { resp ->
+                val body = resp.body?.string() ?: return null
+                Log.d(TAG, "$endpoint API: ${resp.code}")
+                if (resp.code != 200) {
+                    Log.w(TAG, "$endpoint response body: ${body.take(300)}")
+                    return null
+                }
+                JsonParser.parseString(body).takeIf { it.isJsonObject }?.asJsonObject
             }
-            JsonParser.parseString(body).takeIf { it.isJsonObject }?.asJsonObject
         } catch (e: Exception) {
             Log.e(TAG, "$endpoint API error", e)
             null

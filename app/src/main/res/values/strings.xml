@@ -77,6 +77,14 @@
     <string name="repeat">Repetir</string>
     <string name="repeat_one">Repetir una</string>
     <string name="cancel">Cancelar</string>
+
+    <!-- Limit Reached Dialog -->
+    <string name="dialog_limit_reached_title">Límite alcanzado</string>
+    <string name="dialog_limit_reached_message">Has alcanzado el límite de 100 escrituras físicas. Mira un video para resetear el contador y continuar editando tus archivos.</string>
+    <string name="dialog_limit_reached_watch_ad">Ver Anuncio</string>
+    <string name="dialog_limit_reached_cancel">Cancelar</string>
+    <string name="dialog_limit_reached_ad_unavailable">Anuncio no disponible. Intenta más tarde.</string>
+    <string name="dialog_limit_reached_retry">Reintentar</string>
     <string name="remove_from_queue">Quitar de la cola</string>
     <string name="by_artist">Por cantantes</string>
     <string name="by_genre">Por género</string>
@@ -366,6 +374,7 @@
     <string name="import_playlist_detecting">Detectando plataforma…</string>
     <string name="import_playlist_platform_deezer">Deezer</string>
     <string name="import_playlist_platform_spotify">Spotify</string>
+    <string name="import_playlist_platform_youtube">YouTube</string>
     <string name="import_playlist_invalid_url">URL inválida</string>
     <string name="import_playlist_start">Importar</string>
     <string name="import_playlist_resume">Continuar</string>
@@ -391,4 +400,71 @@
     <string name="period_all">Todos</string>
     <string name="period_this_month">Este mes</string>
     <string name="empty_most_played">Escuchá canciones para ver tu ranking</string>
+
+    <!-- Metadata candidates UI (T10/T11) -->
+    <string name="metadata_candidates_title">Canciones pendientes de elección</string>
+    <string name="metadata_candidates_empty">No hay canciones pendientes</string>
+    <string name="metadata_candidates_empty_subtitle">Las canciones ambiguas aparecerán aquí para que elijas la metadata correcta</string>
+    <string name="metadata_candidates_apply">Aplicar</string>
+    <string name="metadata_candidates_skip">Saltar</string>
+    <string name="metadata_candidates_applied">Metadata aplicada</string>
+    <string name="metadata_candidates_skipped">Canción saltada</string>
+    <string name="metadata_candidates_source">Fuente: %1$s</string>
+    <string name="metadata_candidates_score">Confianza: %1$d%%</string>
+    <string name="metadata_candidates_count">%1$d pendientes</string>
+    <string name="metadata_candidates_settings_entry">Canciones pendientes de elección</string>
+    <string name="metadata_candidates_re_enrich">Re-detectar malas</string>
+    <string name="metadata_candidates_re_enrich_done">Pendientes limpiados</string>
+    <string name="metadata_candidates_re_enrich_running">Re-detectando…</string>
+
+    <!-- P6.3: Equalizer band frequency labels -->
+    <string name="eq_band_0_freq">60Hz</string>
+    <string name="eq_band_1_freq">230Hz</string>
+    <string name="eq_band_2_freq">910Hz</string>
+    <string name="eq_band_3_freq">3.6kHz</string>
+    <string name="eq_band_4_freq">14kHz</string>
+
+    <!-- P6.3: Language names -->
+    <string name="lang_español">Español</string>
+    <string name="lang_english">English</string>
+    <string name="lang_português">Português</string>
+
+    <!-- P6.3: Theme export/import dialog buttons -->
+    <string name="exportar">Exportar</string>
+    <string name="importar">Importar</string>
+
+    <!-- P6.3: Common dialog buttons -->
+    <string name="ok">OK</string>
+    <string name="regenerar">Regenerar</string>
+    <string name="crear">Crear</string>
+    <string name="si">Sí</string>
+
+    <!-- P6.3: Song added to playlist toast -->
+    <string name="canciones_agregadas_a_playlist">%1$d cancione%2$s agregada%2$s a %3$s</string>
+
+    <!-- P6.3: Pending counter reset toast (Settings) -->
+    <string name="pending_cleared">Pendientes limpiados (antes: %1$d, ahora: %2$d)</string>
+
+    <!-- P6.3: Tag write counter reset toast (MainActivity) -->
+    <string name="counter_reset_toast">Contador reiniciado. Puedes seguir editando.</string>
+    <!-- Metadata notification (download ambiguous) -->
+    <string name="metadata_channel_name">Metadata</string>
+    <string name="metadata_channel_description">Notificaciones de metadata encontrada</string>
+    <string name="metadata_notification_title">Metadata encontrada</string>
+    <string name="metadata_notification_message">¿Cuál es el nombre correcto de %1$s?</string>
+    <string name="pending_candidates_toast">%1$d canciones pendientes de elección en Settings</string>
+    <string name="settings_section_metadata">Metadata</string>
+
+    <!-- Artistas duplicados -->
+    <string name="artist_duplicates_title">Detectar artistas duplicados</string>
+    <string name="artist_duplicates_empty">No hay duplicados detectados</string>
+    <string name="artist_duplicates_merge">Unir</string>
+    <string name="artist_duplicates_dismiss">No son iguales</string>
+    <string name="artist_duplicates_merged">Artistas unidos: %1$s → %2$s</string>
+    <string name="artist_duplicates_loading">Analizando artistas…</string>
+    <string name="artist_duplicates_score">Similitud: %1$d%%</string>
+    <plurals name="artist_duplicates_song_count">
+        <item quantity="one">%1$d canción</item>
+        <item quantity="other">%1$d canciones</item>
+    </plurals>
 </resources>

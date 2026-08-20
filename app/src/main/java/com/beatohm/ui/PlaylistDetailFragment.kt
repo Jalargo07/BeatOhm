@@ -65,7 +65,7 @@ class PlaylistDetailFragment : Fragment() {
                 AlertDialog.Builder(requireContext())
                     .setTitle(getString(R.string.quitar_de_playlist))
                     .setMessage(getString(R.string.quitar_cancion_de_playlist, song.title))
-                    .setPositiveButton("Si") { _, _ ->
+                    .setPositiveButton(getString(R.string.si)) { _, _ ->
                         lifecycleScope.launch {
                             db.playlistDao().removeSongFromPlaylist(PlaylistSong(playlistId, song.filePath, 0))
                             Toast.makeText(requireContext(), getString(R.string.cancion_quitada), Toast.LENGTH_SHORT).show()

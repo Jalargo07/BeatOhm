@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- P1.2: Network security config — all traffic over HTTPS, no cleartext allowed.
+     All API endpoints (Last.fm, iTunes, Genius, LRCLIB, lyrics.ovh, YouTube, Deezer)
+     use HTTPS. If a future feature requires HTTP, add a domain-specific exception here
+     with a clear justification comment. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

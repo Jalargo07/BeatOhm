@@ -1,5 +1,6 @@
 ﻿package com.beatohm.data
 
+import com.beatohm.metadata.MetadataCandidate
 import kotlinx.coroutines.flow.Flow
 
 interface IMusicRepository {
@@ -50,6 +51,24 @@ interface IMusicRepository {
     suspend fun downloadArtworkForSong(song: LocalSong): LocalSong
     suspend fun extractDominantColor(song: LocalSong): LocalSong
     suspend fun fetchLyricsForSong(song: LocalSong): LocalSong
+    suspend fun writeArtworkToFile(song: LocalSong): LocalSong
+    suspend fun writeLyricsToFile(song: LocalSong): LocalSong
     fun renameSongFile(song: LocalSong): LocalSong
     suspend fun saveSong(song: LocalSong)
+
+    // T2: Aplica ClearMatch + finalizeMetadataUpdate (rename + tags + DB migration)
+    suspend fun applyClearMatch(song: LocalSong, candidate: MetadataCandidate): LocalSong
+
+    // Metadata candidates (T9): canciones que tienen candidatos ambiguos PENDING
+    // sin resolver (para la UI de pendientes)
+    suspend fun getSongsWithPendingCandidates(): List<LocalSong>
+
+    // T12: Re-enriquecimiento de canciones con metadata sospechosa
+    suspend fun reEnrichSuspiciousSongs(): Pair<Int, Int>
+
+    // Data integrity: migra referencias de filas huérfanas duplicadas y las elimina
+    suspend fun cleanOrphanDuplicateSongs()
+
+    // Callback para cuando se alcanza el límite de escritura de tags
+    fun setLimitReachedCallback(callback: (() -> Unit)?)
 }
